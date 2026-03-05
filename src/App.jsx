@@ -204,7 +204,7 @@ function TabServicos({servicos, setServicos}) {
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16,marginBottom:24}}>
         <KPI label="Total Orçado" value={fmt(totOrc)}  sub="Serviços fixos aprovados" color="#22c55e"/>
         <KPI label="Provisionado" value={fmt(totProv)} sub="Estimativa de gasto" color="#3b82f6"/>
         <KPI label="Realizado"    value={fmt(totReal)} sub={`${totOrc?((totReal/totOrc)*100).toFixed(1):0}% executado`} color="#f59e0b"/>
@@ -218,13 +218,13 @@ function TabServicos({servicos, setServicos}) {
         const cor   = SECAO_COLORS[secao]||"#8b5cf6";
         return(
           <div key={secao} style={{background:"#1e293b",borderRadius:12,overflow:"hidden",marginBottom:20}}>
-            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <span style={{width:4,height:20,background:cor,borderRadius:2,display:"inline-block"}}/>
                 <span style={{fontWeight:700,fontSize:15,color:cor}}>{secao}</span>
               </div>
-              <div style={{display:"flex",gap:20,alignItems:"center"}}>
-                <div style={{display:"flex",gap:20,fontSize:12}}>
+              <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:12,fontSize:12,flexWrap:"wrap"}}>
                   <span style={{color:"#94a3b8"}}>Orç: <b style={{color:"#22c55e"}}>{fmt(sOrc)}</b></span>
                   <span style={{color:"#94a3b8"}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(sProv)}</b></span>
                   <span style={{color:"#94a3b8"}}>Real: <b style={{color:"#f59e0b"}}>{fmt(sReal)}</b></span>
@@ -233,68 +233,70 @@ function TabServicos({servicos, setServicos}) {
                 <button onClick={()=>addItem(secao)} style={{...btnStyle,background:cor+"33",color:cor,padding:"4px 12px",fontSize:11}}>+ item</button>
               </div>
             </div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
-                {COLS.map(h=><th key={h} style={{padding:"8px 14px",textAlign:h==="Serviço"||h==="Obs"||h===""?"left":"right",color:"#475569",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {itens.map(item=>{
-                  const isEd = editing===item.id;
-                  const row  = isEd ? draft : item;
-                  const sv   = row.orcado - row.realizado;
-                  const pct  = row.orcado ? Math.min(100,(row.realizado/row.orcado)*100) : 0;
-                  return(
-                    <tr key={item.id} style={{borderTop:"1px solid #334155"}}>
-                      <td style={{padding:"10px 14px",fontWeight:600,fontSize:13}}>
-                        {isEd ? <input value={draft.nome} onChange={e=>setDraft(d=>({...d,nome:e.target.value}))} style={{...inputStyle,width:220}}/> : row.nome}
-                      </td>
-                      {["orcado","provisionado","realizado"].map(k=>{
-                        const col=k==="orcado"?"#22c55e":k==="provisionado"?"#3b82f6":"#f59e0b";
-                        return(
-                          <td key={k} style={{padding:"10px 14px",textAlign:"right"}}>
-                            {isEd
-                              ?<input value={draft[k]} onChange={e=>setDraft(d=>({...d,[k]:parseFloat(e.target.value)||0}))}
-                                  style={{...inputStyle,width:110,textAlign:"right",color:col}}/>
-                              :<span style={{color:row[k]===0?"#475569":col}}>{fmt(row[k])}</span>}
-                          </td>
-                        );
-                      })}
-                      <td style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:sv>=0?"#a3e635":"#ef4444"}}>{fmt(sv)}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",fontSize:12,color:"#94a3b8"}}>{pct.toFixed(1)}%</td>
-                      <td style={{padding:"10px 14px",minWidth:90}}>
-                        <div style={{background:"#334155",borderRadius:4,height:6}}>
-                          <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
-                        </div>
-                      </td>
-                      <td style={{padding:"10px 14px",color:"#64748b",fontSize:12,maxWidth:200}}>
-                        {isEd ? <input value={draft.obs} onChange={e=>setDraft(d=>({...d,obs:e.target.value}))} style={{...inputStyle,width:160}}/> : row.obs}
-                      </td>
-                      <td style={{padding:"10px 14px"}}>
-                        {isEd
-                          ?<div style={{display:"flex",gap:6}}>
-                              <button onClick={cancelEdit} style={{...btnStyle,background:"#475569",padding:"4px 10px",fontSize:11}}>✕</button>
-                              <button onClick={saveEdit}   style={{...btnStyle,background:"#22c55e",padding:"4px 10px",fontSize:11}}>✓</button>
-                            </div>
-                          :<button onClick={()=>startEdit(item)} style={{...btnStyle,background:"#334155",padding:"4px 10px",fontSize:11}}>✏</button>}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
-                  <td style={{padding:"10px 14px",color:cor}}>Total {secao}</td>
-                  <td style={{padding:"10px 14px",textAlign:"right",color:"#22c55e"}}>{fmt(sOrc)}</td>
-                  <td style={{padding:"10px 14px",textAlign:"right",color:"#3b82f6"}}>{fmt(sProv)}</td>
-                  <td style={{padding:"10px 14px",textAlign:"right",color:"#f59e0b"}}>{fmt(sReal)}</td>
-                  <td style={{padding:"10px 14px",textAlign:"right",color:(sOrc-sReal)>=0?"#a3e635":"#ef4444"}}>{fmt(sOrc-sReal)}</td>
-                  <td colSpan={4}/>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+                <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
+                  {COLS.map(h=><th key={h} style={{padding:"8px 14px",textAlign:h==="Serviço"||h==="Obs"||h===""?"left":"right",color:"#475569",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {itens.map(item=>{
+                    const isEd = editing===item.id;
+                    const row  = isEd ? draft : item;
+                    const sv   = row.orcado - row.realizado;
+                    const pct  = row.orcado ? Math.min(100,(row.realizado/row.orcado)*100) : 0;
+                    return(
+                      <tr key={item.id} style={{borderTop:"1px solid #334155"}}>
+                        <td style={{padding:"10px 14px",fontWeight:600,fontSize:13}}>
+                          {isEd ? <input value={draft.nome} onChange={e=>setDraft(d=>({...d,nome:e.target.value}))} style={{...inputStyle,width:220}}/> : row.nome}
+                        </td>
+                        {["orcado","provisionado","realizado"].map(k=>{
+                          const col=k==="orcado"?"#22c55e":k==="provisionado"?"#3b82f6":"#f59e0b";
+                          return(
+                            <td key={k} style={{padding:"10px 14px",textAlign:"right"}}>
+                              {isEd
+                                ?<input value={draft[k]} onChange={e=>setDraft(d=>({...d,[k]:parseFloat(e.target.value)||0}))}
+                                    style={{...inputStyle,width:110,textAlign:"right",color:col}}/>
+                                :<span style={{color:row[k]===0?"#475569":col}}>{fmt(row[k])}</span>}
+                            </td>
+                          );
+                        })}
+                        <td style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:sv>=0?"#a3e635":"#ef4444"}}>{fmt(sv)}</td>
+                        <td style={{padding:"10px 14px",textAlign:"right",fontSize:12,color:"#94a3b8"}}>{pct.toFixed(1)}%</td>
+                        <td style={{padding:"10px 14px",minWidth:90}}>
+                          <div style={{background:"#334155",borderRadius:4,height:6}}>
+                            <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                          </div>
+                        </td>
+                        <td style={{padding:"10px 14px",color:"#64748b",fontSize:12,maxWidth:200}}>
+                          {isEd ? <input value={draft.obs} onChange={e=>setDraft(d=>({...d,obs:e.target.value}))} style={{...inputStyle,width:160}}/> : row.obs}
+                        </td>
+                        <td style={{padding:"10px 14px"}}>
+                          {isEd
+                            ?<div style={{display:"flex",gap:6}}>
+                                <button onClick={cancelEdit} style={{...btnStyle,background:"#475569",padding:"4px 10px",fontSize:11}}>✕</button>
+                                <button onClick={saveEdit}   style={{...btnStyle,background:"#22c55e",padding:"4px 10px",fontSize:11}}>✓</button>
+                              </div>
+                            :<button onClick={()=>startEdit(item)} style={{...btnStyle,background:"#334155",padding:"4px 10px",fontSize:11}}>✏</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
+                    <td style={{padding:"10px 14px",color:cor}}>Total {secao}</td>
+                    <td style={{padding:"10px 14px",textAlign:"right",color:"#22c55e"}}>{fmt(sOrc)}</td>
+                    <td style={{padding:"10px 14px",textAlign:"right",color:"#3b82f6"}}>{fmt(sProv)}</td>
+                    <td style={{padding:"10px 14px",textAlign:"right",color:"#f59e0b"}}>{fmt(sReal)}</td>
+                    <td style={{padding:"10px 14px",textAlign:"right",color:(sOrc-sReal)>=0?"#a3e635":"#ef4444"}}>{fmt(sOrc-sReal)}</td>
+                    <td colSpan={4}/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}
 
-      <div style={{background:"#1e293b",borderRadius:12,padding:"14px 20px",display:"flex",justifyContent:"flex-end",gap:32}}>
+      <div style={{background:"#1e293b",borderRadius:12,padding:"14px 20px",display:"flex",justifyContent:"flex-end",gap:32,flexWrap:"wrap"}}>
         <span style={{color:"#94a3b8",fontWeight:700}}>TOTAL GERAL</span>
         <span style={{color:"#22c55e",fontWeight:700}}>{fmt(totOrc)}</span>
         <span style={{color:"#3b82f6",fontWeight:700}}>{fmt(totProv)}</span>
@@ -338,8 +340,8 @@ function NovoRapidoModal({cenario, jogos, onSave, onClose}){
   };
 
   return(
-    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:440,maxHeight:"90vh",overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:"100%",maxWidth:440,maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
           <div style={{width:4,height:28,background:info.color,borderRadius:2}}/>
           <div>
@@ -358,7 +360,7 @@ function NovoRapidoModal({cenario, jogos, onSave, onClose}){
         </div>
         <div style={{background:"#0f172a",borderRadius:8,padding:"10px 14px",marginTop:4,marginBottom:16}}>
           <p style={{color:"#64748b",fontSize:11,margin:"0 0 6px"}}>Valores que serão aplicados:</p>
-          <div style={{display:"flex",gap:16,fontSize:12}}>
+          <div style={{display:"flex",gap:16,fontSize:12,flexWrap:"wrap"}}>
             <span style={{color:"#94a3b8"}}>Logística: <b style={{color:"#22c55e"}}>{fmt(["outros_log","transporte","uber","hospedagem","diaria"].reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
             <span style={{color:"#94a3b8"}}>Pessoal: <b style={{color:"#3b82f6"}}>{fmt(Object.keys(PESSOAL).reduce((s,k)=>s+(PESSOAL[k]||0),0))}</b></span>
             <span style={{color:"#94a3b8"}}>Operações: <b style={{color:"#f59e0b"}}>{fmt(info.total - ["outros_log","transporte","uber","hospedagem","diaria",...Object.keys(PESSOAL)].reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
@@ -390,8 +392,8 @@ function NovoJogoModal({onSave,onClose}){
       orcado:{...defs},provisionado:{...defs},realizado:{...allSubKeys()}});
   };
   return(
-    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:460,maxHeight:"90vh",overflowY:"auto"}}>
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:"100%",maxWidth:460,maxHeight:"90vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 20px",fontSize:16}}>Novo Jogo</h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           {field("Mandante","mandante",TIMES)}{field("Visitante","visitante",TIMES)}
@@ -429,15 +431,15 @@ function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <button onClick={()=>idx>0&&onChangeJogo(divulgados[idx-1].id)} disabled={idx===0}
-            style={{...btnStyle,background:idx===0?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===0?0.4:1}}>← Anterior</button>
+            style={{...btnStyle,background:idx===0?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===0?0.4:1}}>←</button>
           <select value={jogoId} onChange={e=>onChangeJogo(parseInt(e.target.value))}
-            style={{...selStyle,width:"auto",padding:"7px 14px",fontWeight:600}}>
+            style={{...selStyle,width:"auto",padding:"7px 14px",fontWeight:600,maxWidth:"60vw"}}>
             {divulgados.map(j=><option key={j.id} value={j.id}>Rd {j.rodada} · {j.mandante} x {j.visitante}</option>)}
           </select>
           <button onClick={()=>idx<divulgados.length-1&&onChangeJogo(divulgados[idx+1].id)} disabled={idx===divulgados.length-1}
-            style={{...btnStyle,background:idx===divulgados.length-1?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===divulgados.length-1?0.4:1}}>Próximo →</button>
+            style={{...btnStyle,background:idx===divulgados.length-1?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===divulgados.length-1?0.4:1}}>→</button>
         </div>
         <div style={{display:"flex",gap:8}}>
           {!editing
@@ -455,7 +457,7 @@ function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
           </div>
           <Pill label={data.categoria} color={data.categoria==="B1"?"#22c55e":"#f59e0b"}/>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginTop:18}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginTop:18}}>
           {[
             {label:"Orçado",value:fmt(totOrc),color:"#22c55e"},
             {label:"Provisionado",value:fmt(totProv),color:"#3b82f6"},
@@ -474,53 +476,55 @@ function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
         const cOrc=catTotal(data.orcado,cat), cProv=catTotal(data.provisionado,cat), cReal=catTotal(data.realizado,cat);
         return(
           <div key={cat.key} style={{background:"#1e293b",borderRadius:12,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <span style={{fontWeight:700,fontSize:14,color:cat.color}}>{cat.label}</span>
-              <div style={{display:"flex",gap:24,fontSize:12}}>
+              <div style={{display:"flex",gap:16,fontSize:12,flexWrap:"wrap"}}>
                 <span style={{color:"#94a3b8"}}>Orç: <b style={{color:"#22c55e"}}>{fmt(cOrc)}</b></span>
                 <span style={{color:"#94a3b8"}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(cProv)}</b></span>
                 <span style={{color:"#94a3b8"}}>Real: <b style={{color:"#f59e0b"}}>{fmt(cReal)}</b></span>
                 <span style={{color:"#94a3b8"}}>Saving: <b style={{color:(cOrc-cReal)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cReal)}</b></span>
               </div>
             </div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
-                {["Item","Orçado","Provisionado","Realizado","Saving"].map(h=>(
-                  <th key={h} style={{padding:"8px 20px",textAlign:h==="Item"?"left":"right",color:"#475569",fontSize:11}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {cat.subs.map(sub=>{
-                  const o=data.orcado?.[sub.key]||0,p=data.provisionado?.[sub.key]||0,r=data.realizado?.[sub.key]||0;
-                  if(!editing&&o===0&&p===0&&r===0) return null;
-                  return(
-                    <tr key={sub.key} style={{borderTop:"1px solid #334155"}}>
-                      <td style={{padding:"10px 20px",fontSize:13,color:"#e2e8f0"}}>{sub.label}</td>
-                      {["orcado","provisionado","realizado"].map(tipo=>{
-                        const val=data[tipo]?.[sub.key]||0;
-                        const col=tipo==="orcado"?"#22c55e":tipo==="provisionado"?"#3b82f6":"#f59e0b";
-                        return(
-                          <td key={tipo} style={{padding:"8px 20px",textAlign:"right"}}>
-                            {editing
-                              ?<input value={draft[tipo]?.[sub.key]||0} onChange={e=>setVal(tipo,sub.key,e.target.value)}
-                                  style={{...inputStyle,width:110,textAlign:"right",padding:"4px 8px",color:col}}/>
-                              :<span style={{fontSize:13,color:val===0?"#475569":col}}>{fmt(val)}</span>}
-                          </td>
-                        );
-                      })}
-                      <td style={{padding:"10px 20px",textAlign:"right",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444",fontSize:13}}>{fmt(o-r)}</td>
-                    </tr>
-                  );
-                })}
-                <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
-                  <td style={{padding:"10px 20px",fontSize:13}}>Total {cat.label}</td>
-                  <td style={{padding:"10px 20px",textAlign:"right",color:"#22c55e"}}>{fmt(cOrc)}</td>
-                  <td style={{padding:"10px 20px",textAlign:"right",color:"#3b82f6"}}>{fmt(cProv)}</td>
-                  <td style={{padding:"10px 20px",textAlign:"right",color:"#f59e0b"}}>{fmt(cReal)}</td>
-                  <td style={{padding:"10px 20px",textAlign:"right",color:(cOrc-cReal)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cReal)}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
+                <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
+                  {["Item","Orçado","Provisionado","Realizado","Saving"].map(h=>(
+                    <th key={h} style={{padding:"8px 20px",textAlign:h==="Item"?"left":"right",color:"#475569",fontSize:11}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {cat.subs.map(sub=>{
+                    const o=data.orcado?.[sub.key]||0,p=data.provisionado?.[sub.key]||0,r=data.realizado?.[sub.key]||0;
+                    if(!editing&&o===0&&p===0&&r===0) return null;
+                    return(
+                      <tr key={sub.key} style={{borderTop:"1px solid #334155"}}>
+                        <td style={{padding:"10px 20px",fontSize:13,color:"#e2e8f0"}}>{sub.label}</td>
+                        {["orcado","provisionado","realizado"].map(tipo=>{
+                          const val=data[tipo]?.[sub.key]||0;
+                          const col=tipo==="orcado"?"#22c55e":tipo==="provisionado"?"#3b82f6":"#f59e0b";
+                          return(
+                            <td key={tipo} style={{padding:"8px 20px",textAlign:"right"}}>
+                              {editing
+                                ?<input value={draft[tipo]?.[sub.key]||0} onChange={e=>setVal(tipo,sub.key,e.target.value)}
+                                    style={{...inputStyle,width:90,textAlign:"right",padding:"4px 8px",color:col}}/>
+                                :<span style={{fontSize:13,color:val===0?"#475569":col}}>{fmt(val)}</span>}
+                            </td>
+                          );
+                        })}
+                        <td style={{padding:"10px 20px",textAlign:"right",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444",fontSize:13}}>{fmt(o-r)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
+                    <td style={{padding:"10px 20px",fontSize:13}}>Total {cat.label}</td>
+                    <td style={{padding:"10px 20px",textAlign:"right",color:"#22c55e"}}>{fmt(cOrc)}</td>
+                    <td style={{padding:"10px 20px",textAlign:"right",color:"#3b82f6"}}>{fmt(cProv)}</td>
+                    <td style={{padding:"10px 20px",textAlign:"right",color:"#f59e0b"}}>{fmt(cReal)}</td>
+                    <td style={{padding:"10px 20px",textAlign:"right",color:(cOrc-cReal)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cReal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}
@@ -592,8 +596,9 @@ export default function App(){
 
   return(
     <div style={{minHeight:"100vh",background:"#0f172a",color:"#f1f5f9",fontFamily:"'Inter',sans-serif",paddingBottom:40}}>
-      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"22px 32px 0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      {/* Cabeçalho */}
+      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"22px 16px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
           <div>
             <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 4px"}}>FFU — Transmissões</p>
             <h1 style={{fontSize:21,fontWeight:700,margin:0}}>Brasileirão Série A 2026</h1>
@@ -604,70 +609,73 @@ export default function App(){
             <p style={{fontSize:30,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0}}>{pctGasto}%</p>
           </div>
         </div>
-        <div style={{display:"flex",gap:2,marginTop:16}}>
+        {/* Tabs — scroll horizontal no mobile */}
+        <div style={{display:"flex",gap:2,marginTop:16,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:0}}>
           {TABS.map(t=>(
             <button key={t} onClick={()=>setTab(t)} style={{
-              padding:"8px 20px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",
+              padding:"8px 16px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",
               background:tab===t?"#0f172a":"rgba(255,255,255,0.12)",
               color:tab===t?"#22c55e":"#e2e8f0",
-              fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize"
+              fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0
             }}>{t}</button>
           ))}
         </div>
       </div>
 
-      <div style={{padding:"24px 32px"}}>
+      <div style={{padding:"24px 16px"}}>
 
         {tab==="dashboard"&&(<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:24}}>
             <KPI label="Total Orçado" value={fmt(totalOrc)} sub="Budget aprovado" color="#22c55e"/>
             <KPI label="Total Realizado" value={fmt(totalReal)} sub={`${pctGasto}% executado`} color="#3b82f6"/>
             <KPI label="Saldo Disponível" value={fmt(totalOrc-totalReal)} sub="Orçado - Realizado" color="#f59e0b"/>
             <KPI label="Jogos Divulgados" value={`${divulgados.length} / 76`} sub={`${aDivulgar.length} aguardando`} color="#8b5cf6"/>
           </div>
           <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"14px 20px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <h3 style={{margin:0,fontSize:14,color:"#94a3b8"}}>Resumo por Categoria</h3>
               <div style={{display:"flex",gap:12,fontSize:12,color:"#94a3b8"}}>
                 <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#6366f1",marginRight:4}}/>Fixo</span>
                 <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#f43f5e",marginRight:4}}/>Variável</span>
               </div>
             </div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:"#0f172a"}}>
-                {["Categoria","Tipo","Orçado","Realizado","Saldo","% Exec.","Progresso"].map(h=>
-                  <th key={h} style={{padding:"10px 16px",textAlign:h==="Categoria"||h==="Tipo"?"left":"right",color:"#64748b",fontSize:12}}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {RESUMO_CATS.map(c=>{
-                  const saldo=c.orcado-c.realizado;
-                  const pct=c.orcado?Math.min(100,(c.realizado/c.orcado)*100):0;
-                  return(
-                    <tr key={c.nome} style={{borderTop:"1px solid #334155"}}>
-                      <td style={{padding:"12px 16px",fontWeight:600}}>{c.nome}</td>
-                      <td style={{padding:"12px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
-                      <td style={{padding:"12px 16px",textAlign:"right"}}>{fmt(c.orcado)}</td>
-                      <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6"}}>{fmt(c.realizado)}</td>
-                      <td style={{padding:"12px 16px",textAlign:"right",fontWeight:600,color:saldo<0?"#ef4444":"#22c55e"}}>{fmt(saldo)}</td>
-                      <td style={{padding:"12px 16px",textAlign:"right"}}>{pct.toFixed(1)}%</td>
-                      <td style={{padding:"12px 20px"}}>
-                        <div style={{background:"#334155",borderRadius:4,height:8,minWidth:80}}>
-                          <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr style={{borderTop:"2px solid #475569",background:"#0f172a",fontWeight:700}}>
-                  <td colSpan={2} style={{padding:"12px 16px"}}>TOTAL GERAL</td>
-                  <td style={{padding:"12px 16px",textAlign:"right",color:"#22c55e"}}>{fmt(totalOrc)}</td>
-                  <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6"}}>{fmt(totalReal)}</td>
-                  <td style={{padding:"12px 16px",textAlign:"right",color:"#f59e0b"}}>{fmt(totalOrc-totalReal)}</td>
-                  <td style={{padding:"12px 16px",textAlign:"right"}}>{pctGasto}%</td>
-                  <td/>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+                <thead><tr style={{background:"#0f172a"}}>
+                  {["Categoria","Tipo","Orçado","Realizado","Saldo","% Exec.","Progresso"].map(h=>
+                    <th key={h} style={{padding:"10px 16px",textAlign:h==="Categoria"||h==="Tipo"?"left":"right",color:"#64748b",fontSize:12,whiteSpace:"nowrap"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {RESUMO_CATS.map(c=>{
+                    const saldo=c.orcado-c.realizado;
+                    const pct=c.orcado?Math.min(100,(c.realizado/c.orcado)*100):0;
+                    return(
+                      <tr key={c.nome} style={{borderTop:"1px solid #334155"}}>
+                        <td style={{padding:"12px 16px",fontWeight:600,whiteSpace:"nowrap"}}>{c.nome}</td>
+                        <td style={{padding:"12px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
+                        <td style={{padding:"12px 16px",textAlign:"right",whiteSpace:"nowrap"}}>{fmt(c.orcado)}</td>
+                        <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(c.realizado)}</td>
+                        <td style={{padding:"12px 16px",textAlign:"right",fontWeight:600,color:saldo<0?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>{fmt(saldo)}</td>
+                        <td style={{padding:"12px 16px",textAlign:"right"}}>{pct.toFixed(1)}%</td>
+                        <td style={{padding:"12px 20px"}}>
+                          <div style={{background:"#334155",borderRadius:4,height:8,minWidth:60}}>
+                            <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{borderTop:"2px solid #475569",background:"#0f172a",fontWeight:700}}>
+                    <td colSpan={2} style={{padding:"12px 16px"}}>TOTAL GERAL</td>
+                    <td style={{padding:"12px 16px",textAlign:"right",color:"#22c55e",whiteSpace:"nowrap"}}>{fmt(totalOrc)}</td>
+                    <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(totalReal)}</td>
+                    <td style={{padding:"12px 16px",textAlign:"right",color:"#f59e0b",whiteSpace:"nowrap"}}>{fmt(totalOrc-totalReal)}</td>
+                    <td style={{padding:"12px 16px",textAlign:"right"}}>{pctGasto}%</td>
+                    <td/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </>)}
 
@@ -692,7 +700,7 @@ export default function App(){
                 {showPlaceholder?"Ocultar a divulgar":"Ver a divulgar"}
               </button>
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <button onClick={()=>setNovoRapido("b1")} style={{...btnStyle,background:"#22c55e",fontSize:12}}>+ B1 Sudeste</button>
               <button onClick={()=>setNovoRapido("b2s")} style={{...btnStyle,background:"#3b82f6",fontSize:12}}>+ B2 Sudeste</button>
               <button onClick={()=>setNovoRapido("b2sul")} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ B2 Sul</button>
@@ -702,7 +710,7 @@ export default function App(){
           <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"10px 16px",borderBottom:"1px solid #334155",color:"#64748b",fontSize:12}}>{filtrados.length} jogos</div>
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
                 <thead><tr style={{background:"#0f172a"}}>
                   {["Jogo","Rd","Cidade","Data","Cat.","Detentor","Orçado","Provisionado","Realizado","Sav.Prov","Sav.Real",""].map(h=>
                     <th key={h} style={{padding:"10px 12px",textAlign:"left",color:"#64748b",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
@@ -713,19 +721,19 @@ export default function App(){
                     const isDef=j.mandante==="A definir";
                     return(
                       <tr key={j.id} style={{borderTop:"1px solid #334155",opacity:isDef?0.45:1}}>
-                        <td style={{padding:"10px 12px",fontWeight:600,fontSize:13}}>
+                        <td style={{padding:"10px 12px",fontWeight:600,fontSize:13,whiteSpace:"nowrap"}}>
                           {isDef?<span style={{color:"#64748b",fontStyle:"italic"}}>A divulgar</span>:`${j.mandante} x ${j.visitante}`}
                         </td>
                         <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12}}>{j.rodada}</td>
-                        <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12}}>{j.cidade}</td>
+                        <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap"}}>{j.cidade}</td>
                         <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap"}}>{j.data}</td>
                         <td style={{padding:"10px 12px"}}><Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/></td>
-                        <td style={{padding:"10px 12px",fontSize:11,color:"#94a3b8"}}>{j.detentor}</td>
-                        <td style={{padding:"10px 12px",fontSize:13}}>{fmtK(o)}</td>
-                        <td style={{padding:"10px 12px",fontSize:13,color:"#3b82f6"}}>{fmtK(p)}</td>
-                        <td style={{padding:"10px 12px",fontSize:13,color:"#f59e0b"}}>{fmtK(r)}</td>
-                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-p)>=0?"#22c55e":"#ef4444"}}>{fmtK(o-p)}</td>
-                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444"}}>{fmtK(o-r)}</td>
+                        <td style={{padding:"10px 12px",fontSize:11,color:"#94a3b8",whiteSpace:"nowrap"}}>{j.detentor}</td>
+                        <td style={{padding:"10px 12px",fontSize:13,whiteSpace:"nowrap"}}>{fmtK(o)}</td>
+                        <td style={{padding:"10px 12px",fontSize:13,color:"#3b82f6",whiteSpace:"nowrap"}}>{fmtK(p)}</td>
+                        <td style={{padding:"10px 12px",fontSize:13,color:"#f59e0b",whiteSpace:"nowrap"}}>{fmtK(r)}</td>
+                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-p)>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>{fmtK(o-p)}</td>
+                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444",whiteSpace:"nowrap"}}>{fmtK(o-r)}</td>
                         <td style={{padding:"10px 12px"}}>
                           <button onClick={()=>{setMicroJogoId(j.id);setTab("micro");}}
                             style={{...btnStyle,background:"#1d4ed8",padding:"4px 10px",fontSize:11}}>🔍</button>
@@ -763,44 +771,44 @@ export default function App(){
               </button>
             ))}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
-            <KPI label="Saving Provisionado" value={fmt(totOrcJogos-totProvJogos)} sub={`em ${divulgados.length} jogos divulgados`} color="#3b82f6"/>
-            <KPI label="Saving Realizado" value={fmt(totOrcJogos-totRealJogos)} sub="Orçado - Realizado confirmado" color="#22c55e"/>
-            <KPI label="% Saving Provisionado" value={totOrcJogos?`${(((totOrcJogos-totProvJogos)/totOrcJogos)*100).toFixed(1)}%`:"—"} sub="do budget em saving estimado" color="#f59e0b"/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:24}}>
+            <KPI label="Saving Provisionado" value={fmt(totOrcJogos-totProvJogos)} sub={`em ${divulgados.length} jogos`} color="#3b82f6"/>
+            <KPI label="Saving Realizado" value={fmt(totOrcJogos-totRealJogos)} sub="Confirmado" color="#22c55e"/>
+            <KPI label="% Saving Prov." value={totOrcJogos?`${(((totOrcJogos-totProvJogos)/totOrcJogos)*100).toFixed(1)}%`:"—"} sub="do budget" color="#f59e0b"/>
           </div>
           <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"14px 20px",borderBottom:"1px solid #334155"}}>
               <h3 style={{margin:0,fontSize:14,color:"#94a3b8"}}>Saving por Jogo</h3>
             </div>
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:750}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
                 <thead><tr style={{background:"#0f172a"}}>
                   {["Jogo","Rd","Cat.","Orçado","Provisionado","Saving Prov.","Realizado","Saving Real."].map(h=>
-                    <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontSize:11}}>{h}</th>)}
+                    <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {jogosFiltered.map(j=>{
                     const o=subTotal(j.orcado),p=subTotal(j.provisionado),r=subTotal(j.realizado);
                     return(
                       <tr key={j.id} style={{borderTop:"1px solid #334155"}}>
-                        <td style={{padding:"10px 14px",fontWeight:600,fontSize:13}}>{j.mandante} x {j.visitante}</td>
+                        <td style={{padding:"10px 14px",fontWeight:600,fontSize:13,whiteSpace:"nowrap"}}>{j.mandante} x {j.visitante}</td>
                         <td style={{padding:"10px 14px",color:"#94a3b8"}}>{j.rodada}</td>
                         <td style={{padding:"10px 14px"}}><Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/></td>
-                        <td style={{padding:"10px 14px"}}>{fmt(o)}</td>
-                        <td style={{padding:"10px 14px",color:"#3b82f6"}}>{fmt(p)}</td>
-                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-p)>=0?"#22c55e":"#ef4444"}}>{fmt(o-p)}</td>
-                        <td style={{padding:"10px 14px",color:"#f59e0b"}}>{fmt(r)}</td>
-                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-r)>=0?"#a3e635":"#ef4444"}}>{fmt(o-r)}</td>
+                        <td style={{padding:"10px 14px",whiteSpace:"nowrap"}}>{fmt(o)}</td>
+                        <td style={{padding:"10px 14px",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(p)}</td>
+                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-p)>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>{fmt(o-p)}</td>
+                        <td style={{padding:"10px 14px",color:"#f59e0b",whiteSpace:"nowrap"}}>{fmt(r)}</td>
+                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-r)>=0?"#a3e635":"#ef4444",whiteSpace:"nowrap"}}>{fmt(o-r)}</td>
                       </tr>
                     );
                   })}
                   <tr style={{borderTop:"2px solid #475569",background:"#0f172a",fontWeight:700}}>
                     <td colSpan={3} style={{padding:"12px 14px"}}>TOTAL</td>
-                    <td style={{padding:"12px 14px"}}>{fmt(totOrcJogos)}</td>
-                    <td style={{padding:"12px 14px",color:"#3b82f6"}}>{fmt(totProvJogos)}</td>
-                    <td style={{padding:"12px 14px",color:"#22c55e"}}>{fmt(totOrcJogos-totProvJogos)}</td>
-                    <td style={{padding:"12px 14px",color:"#f59e0b"}}>{fmt(totRealJogos)}</td>
-                    <td style={{padding:"12px 14px",color:"#a3e635"}}>{fmt(totOrcJogos-totRealJogos)}</td>
+                    <td style={{padding:"12px 14px",whiteSpace:"nowrap"}}>{fmt(totOrcJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(totProvJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#22c55e",whiteSpace:"nowrap"}}>{fmt(totOrcJogos-totProvJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#f59e0b",whiteSpace:"nowrap"}}>{fmt(totRealJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#a3e635",whiteSpace:"nowrap"}}>{fmt(totOrcJogos-totRealJogos)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -809,8 +817,8 @@ export default function App(){
         </>)}
 
         {tab==="gráficos"&&(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
-            <div style={{background:"#1e293b",borderRadius:12,padding:20,gridColumn:"1/-1"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr",gap:20}}>
+            <div style={{background:"#1e293b",borderRadius:12,padding:20}}>
               <h3 style={{margin:"0 0 16px",fontSize:14,color:"#94a3b8"}}>Saving por Rodada — Provisionado vs Realizado</h3>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={savingRodada}>

@@ -1,1 +1,877 @@
+import { useState, useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
+
+const fmt  = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const fmtK = v => `R$${((v||0)/1000).toFixed(0)}k`;
+
+const DETENTORES = ["CazeTV/Record/Premiere","Amazon","A definir"];
+const CIDADES    = ["Rio de Janeiro","São Paulo","Curitiba","Belo Horizonte","Porto Alegre","Chapecó","Mirassol","Outro"];
+const TIMES      = ["Fluminense","Botafogo","Flamengo","Vasco","Corinthians","Palmeiras","São Paulo","Athletico PR","Grêmio","Internacional","Cruzeiro","Atlético MG","Chapecoense","Santos","Vitória","Mirassol","Coritiba","Outro"];
+
+const CATS = [
+  { key:"logistica", label:"Logística", color:"#22c55e",
+    subs:[
+      {key:"outros_log",  label:"Outros Logística"},
+      {key:"transporte",  label:"Transporte"},
+      {key:"uber",        label:"Uber"},
+      {key:"hospedagem",  label:"Hospedagem"},
+      {key:"diaria",      label:"Diária"},
+    ]},
+  { key:"pessoal", label:"Pessoal", color:"#3b82f6",
+    subs:[
+      {key:"coord_um",    label:"Coord UM"},
+      {key:"prod_um",     label:"Prod UM"},
+      {key:"prod_campo",  label:"Prod Campo"},
+      {key:"monitoracao", label:"Monitoração"},
+      {key:"supervisor1", label:"Supervisor 1"},
+      {key:"supervisor2", label:"Supervisor 2"},
+      {key:"dtv",         label:"DTV"},
+      {key:"vmix",        label:"Vmix"},
+      {key:"audio",       label:"Áudio"},
+    ]},
+  { key:"operacoes", label:"Operações", color:"#f59e0b",
+    subs:[
+      {key:"um_b1",       label:"UM B1"},
+      {key:"um_b2",       label:"UM B2"},
+      {key:"geradores",   label:"Geradores"},
+      {key:"sng",         label:"SNG"},
+      {key:"sng_extra",   label:"SNG Extra"},
+      {key:"seg_espacial",label:"Seg. Espacial"},
+      {key:"seg_extra",   label:"Seg. Extra"},
+      {key:"drone",       label:"Drone"},
+      {key:"grua",        label:"Grua/Policam"},
+      {key:"dslr",        label:"DSLR + Microlink"},
+      {key:"carrinho",    label:"Carrinho"},
+      {key:"especial",    label:"Especial"},
+      {key:"goalcam",     label:"Goalcam"},
+      {key:"minidrone",   label:"Minidrone"},
+      {key:"infra",       label:"Infra + Distr."},
+      {key:"extra",       label:"Extra"},
+    ]},
+];
+
+const allSubKeys = () => {
+  const r={};
+  CATS.forEach(c=>c.subs.forEach(s=>{r[s.key]=0;}));
+  return r;
+};
+
+const PESSOAL = {coord_um:1000,prod_um:0,prod_campo:400,monitoracao:0,supervisor1:800,supervisor2:800,dtv:800,vmix:500,audio:800};
+
+// B1 Sudeste = R$159.476
+const B1_SUL = {outros_log:0,transporte:6000,uber:1000,hospedagem:2450,diaria:550,...PESSOAL,um_b1:85000,um_b2:0,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:15000,goalcam:4000,minidrone:2500,infra:6776,extra:0};
+// B2 Sudeste = R$100.976
+const B2_SUDESTE = {outros_log:0,transporte:5000,uber:1000,hospedagem:1450,diaria:550,...PESSOAL,um_b1:0,um_b2:50000,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
+// B2 Sul = R$118.296
+const B2_SUL = {outros_log:0,transporte:10010,uber:1200,hospedagem:3150,diaria:640,...PESSOAL,um_b1:0,um_b2:50000,geradores:6000,sng:7920,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:3500,grua:9000,dslr:10500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
+
+const getDefaults = (cat, regiao="sudeste") => {
+  if (cat==="B1") return {...B1_SUL};
+  if (regiao==="sul") return {...B2_SUL};
+  return {...B2_SUDESTE};
+};
+
+// Mapeia cada jogo para seu cenário correto
+const JOGO_CENARIO = {
+  1:"b1", 2:"b1", 5:"b1", 8:"b1", 10:"b1", 11:"b1", 15:"b1", 16:"b1", // B1 Sudeste
+  3:"b2s", 9:"b2s", 14:"b2s",                                           // B2 Sudeste
+  6:"b2sul",                                                             // B2 Sul
+  4:"b2sul", 7:"b2sul", 12:"b2sul", 13:"b2sul",                          // B2 Sul
+};
+
+const getJogoDefaults = (id, cat, det) => {
+  const c = JOGO_CENARIO[id];
+  if (c==="b1") return {...B1_SUL};
+  if (c==="b2sul") return {...B2_SUL};
+  if (c==="b2s") return {...B2_SUDESTE};
+  // placeholder: inferir pelo detentor/categoria
+  if (cat==="B1") return {...B1_SUL};
+  if (det==="CazeTV/Record/Premiere") return {...B2_SUL};
+  return {...B2_SUDESTE};
+};
+
+const subTotal = subs => Object.values(subs||{}).reduce((s,v)=>s+(v||0),0);
+const catTotal = (subs,cat) => cat.subs.reduce((s,sub)=>s+(subs?.[sub.key]||0),0);
+
+const makeJogo = (id,rodada,cat,cidade,data,hora,mandante,visitante,detentor) => {
+  const defs = getJogoDefaults(id,cat,detentor);
+  return {id,rodada,categoria:cat,cidade,data,hora,mandante,visitante,detentor,
+    orcado:{...defs},provisionado:{...defs},realizado:{...allSubKeys()}};
+};
+
+const JOGOS_REAIS = [
+  makeJogo(1,1,"B1","Rio de Janeiro","28/01","19:30","Fluminense","Grêmio","CazeTV/Record/Premiere"),
+  makeJogo(2,1,"B1","Rio de Janeiro","29/01","21:30","Botafogo","Cruzeiro","Amazon"),
+  makeJogo(3,2,"B2","Rio de Janeiro","05/02","20:00","Vasco","Chapecoense","Amazon"),
+  makeJogo(4,2,"B2","Curitiba","18/02","19:30","Athletico PR","Corinthians","CazeTV/Record/Premiere"),
+  makeJogo(5,3,"B1","Rio de Janeiro","12/02","19:30","Fluminense","Botafogo","CazeTV/Record/Premiere"),
+  makeJogo(6,3,"B2","Porto Alegre","12/02","21:30","Internacional","Palmeiras","Amazon"),
+  makeJogo(7,4,"B2","Curitiba","26/02","20:00","Coritiba","São Paulo","Amazon"),
+  makeJogo(8,4,"B1","Rio de Janeiro","à definir","à definir","Botafogo","Vitória","CazeTV/Record/Premiere"),
+  makeJogo(9,5,"B2","Mirassol","10/03","21:30","Mirassol","Santos","Amazon"),
+  makeJogo(10,5,"B1","Rio de Janeiro","12/03","19:30","Vasco","Palmeiras","CazeTV/Record/Premiere"),
+  makeJogo(11,6,"B1","Rio de Janeiro","14/03","20:30","Botafogo","Flamengo","Amazon"),
+  makeJogo(12,6,"B2","Belo Horizonte","15/03","20:30","Cruzeiro","Vasco","CazeTV/Record/Premiere"),
+  makeJogo(13,7,"B2","Curitiba","18/03","19:30","Athletico PR","Cruzeiro","CazeTV/Record/Premiere"),
+  makeJogo(14,7,"B2","Chapecó","19/03","21:30","Chapecoense","Corinthians","Amazon"),
+  makeJogo(15,8,"B1","Rio de Janeiro","21/03","18:30","Fluminense","Atlético MG","Amazon"),
+  makeJogo(16,8,"B1","São Paulo","22/03","20:30","Corinthians","Flamengo","CazeTV/Record/Premiere"),
+];
+
+const JOGOS_PLACEHOLDER = Array.from({length:60},(_,i)=>{
+  const rodada=9+Math.floor(i/2), cat=i%2===0?"B1":"B2";
+  const defs=getDefaults(cat,"A definir");
+  return {id:100+i,rodada,categoria:cat,cidade:"A definir",data:"A definir",hora:"A definir",
+    mandante:"A definir",visitante:"A definir",detentor:"A definir",
+    orcado:{...defs},provisionado:{...defs},realizado:{...allSubKeys()}};
+});
+
+const ALL_JOGOS = [...JOGOS_REAIS,...JOGOS_PLACEHOLDER];
+
+const RESUMO_VARIAVEIS = [
+  {nome:"Logística",  orcado:179000,  realizado:0,      tipo:"variavel"},
+  {nome:"Pessoal",    orcado:81600,   realizado:44200,  tipo:"variavel"},
+  {nome:"Operações",  orcado:1681200, realizado:667890, tipo:"variavel"},
+
+  {nome:"Extra",      orcado:0,       realizado:1040,   tipo:"variavel"},
+];
+
+const SERVICOS_INIT = [
+  { secao:"Pessoal", itens:[
+    {id:1,  nome:"Coordenador Sinal Internacional", orcado:0,       provisionado:0, realizado:0,     obs:""},
+    {id:2,  nome:"Produtor Campo/Detentores",        orcado:0,       provisionado:0, realizado:0,     obs:""},
+    {id:3,  nome:"Produtor Assets/Pacote",           orcado:0,       provisionado:0, realizado:0,     obs:""},
+    {id:4,  nome:"Editor de Imagens 1",              orcado:0,       provisionado:0, realizado:14900, obs:""},
+    {id:5,  nome:"Editor de Imagens 2",              orcado:0,       provisionado:0, realizado:0,     obs:""},
+  ]},
+  { secao:"Transmissão", itens:[
+    {id:6,  nome:"Recepção Fibra para MMs, Antipirataria e Arquivo", orcado:234612, provisionado:0, realizado:0, obs:""},
+  ]},
+  { secao:"Infraestrutura e Distribuição de Sinais", itens:[
+    {id:7,  nome:"Antipirataria (Serviço LiveMode)", orcado:425600,  provisionado:0, realizado:840,   obs:""},
+    {id:8,  nome:"Estatísticas",                     orcado:120000,  provisionado:0, realizado:7000,  obs:""},
+    {id:9,  nome:"Ferramenta de Clipping",           orcado:200000,  provisionado:0, realizado:0,     obs:""},
+    {id:10, nome:"Media Day",                        orcado:300000,  provisionado:0, realizado:0,     obs:""},
+    {id:11, nome:"Espumas",                          orcado:5000,    provisionado:0, realizado:0,     obs:""},
+    {id:12, nome:"Grafismo",                         orcado:90000,   provisionado:0, realizado:0,     obs:""},
+    {id:13, nome:"Vinheta + Trilha",                 orcado:35000,   provisionado:0, realizado:16000, obs:""},
+  ]},
+];
+
+const TIPO_COLOR={fixo:"#6366f1",variavel:"#f43f5e"};
+const PIE_COLORS=["#22c55e","#3b82f6","#f59e0b","#ec4899","#8b5cf6","#06b6d4","#f97316"];
+const inputStyle={background:"#0f172a",border:"1px solid #475569",borderRadius:6,color:"#f1f5f9",padding:"7px 10px",fontSize:13,width:"100%",boxSizing:"border-box"};
+const selStyle={...inputStyle};
+const btnStyle={color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontWeight:600,fontSize:13};
+
+const Pill=({label,color})=>(
+  <span style={{background:color+"22",color,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>
+);
+const KPI=({label,value,sub,color})=>(
+  <div style={{background:"#1e293b",borderRadius:12,padding:"18px 20px",borderLeft:`4px solid ${color}`}}>
+    <p style={{color:"#94a3b8",fontSize:12,marginBottom:6}}>{label}</p>
+    <p style={{fontSize:20,fontWeight:700,color,marginBottom:2}}>{value}</p>
+    <p style={{color:"#64748b",fontSize:11}}>{sub}</p>
+  </div>
+);
+const CustomTooltip=({active,payload,label})=>{
+  if(!active||!payload?.length) return null;
+  return(
+    <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"10px 14px"}}>
+      <p style={{color:"#94a3b8",marginBottom:6,fontWeight:600}}>{label}</p>
+      {payload.map(p=><p key={p.name} style={{color:p.fill||p.color,margin:"2px 0"}}>{p.name}: {fmt(p.value)}</p>)}
+    </div>
+  );
+};
+
+// ── Serviços Fixos ──────────────────────────────────────────────────────────
+const SECAO_COLORS = {"Pessoal":"#3b82f6","Transmissão":"#22c55e","Infraestrutura e Distribuição de Sinais":"#f59e0b"};
+
+function TabServicos({servicos, setServicos}) {
+  const [editing, setEditing] = useState(null);
+  const [draft,   setDraft]   = useState(null);
+
+  const allItens = servicos.flatMap(s=>s.itens);
+  const totOrc   = allItens.reduce((s,x)=>s+x.orcado,0);
+  const totProv  = allItens.reduce((s,x)=>s+x.provisionado,0);
+  const totReal  = allItens.reduce((s,x)=>s+x.realizado,0);
+
+  const startEdit = (item) => { setEditing(item.id); setDraft({...item}); };
+  const cancelEdit = () => { setEditing(null); setDraft(null); };
+  const saveEdit = () => {
+    setServicos(ss => ss.map(s=>({...s, itens: s.itens.map(it=>it.id===draft.id?draft:it)})));
+    setEditing(null); setDraft(null);
+  };
+  const addItem = (secao) => {
+    const newItem = {id:Date.now(),nome:"Novo serviço",orcado:0,provisionado:0,realizado:0,obs:""};
+    setServicos(ss=>ss.map(s=>s.secao===secao?{...s,itens:[...s.itens,newItem]}:s));
+  };
+
+  const COLS = ["Serviço","Orçado","Provisionado","Realizado","Saving","% Exec.","Progresso","Obs",""];
+
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
+        <KPI label="Total Orçado" value={fmt(totOrc)}  sub="Serviços fixos aprovados" color="#22c55e"/>
+        <KPI label="Provisionado" value={fmt(totProv)} sub="Estimativa de gasto" color="#3b82f6"/>
+        <KPI label="Realizado"    value={fmt(totReal)} sub={`${totOrc?((totReal/totOrc)*100).toFixed(1):0}% executado`} color="#f59e0b"/>
+        <KPI label="Saving"       value={fmt(totOrc-totReal)} sub="Orçado - Realizado" color={(totOrc-totReal)>=0?"#a3e635":"#ef4444"}/>
+      </div>
+
+      {servicos.map(({secao, itens})=>{
+        const sOrc  = itens.reduce((s,x)=>s+x.orcado,0);
+        const sProv = itens.reduce((s,x)=>s+x.provisionado,0);
+        const sReal = itens.reduce((s,x)=>s+x.realizado,0);
+        const cor   = SECAO_COLORS[secao]||"#8b5cf6";
+        return(
+          <div key={secao} style={{background:"#1e293b",borderRadius:12,overflow:"hidden",marginBottom:20}}>
+            {/* header seção */}
+            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{width:4,height:20,background:cor,borderRadius:2,display:"inline-block"}}/>
+                <span style={{fontWeight:700,fontSize:15,color:cor}}>{secao}</span>
+              </div>
+              <div style={{display:"flex",gap:20,alignItems:"center"}}>
+                <div style={{display:"flex",gap:20,fontSize:12}}>
+                  <span style={{color:"#94a3b8"}}>Orç: <b style={{color:"#22c55e"}}>{fmt(sOrc)}</b></span>
+                  <span style={{color:"#94a3b8"}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(sProv)}</b></span>
+                  <span style={{color:"#94a3b8"}}>Real: <b style={{color:"#f59e0b"}}>{fmt(sReal)}</b></span>
+                  <span style={{color:"#94a3b8"}}>Saving: <b style={{color:(sOrc-sReal)>=0?"#a3e635":"#ef4444"}}>{fmt(sOrc-sReal)}</b></span>
+                </div>
+                <button onClick={()=>addItem(secao)} style={{...btnStyle,background:cor+"33",color:cor,padding:"4px 12px",fontSize:11}}>+ item</button>
+              </div>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
+                {COLS.map(h=><th key={h} style={{padding:"8px 14px",textAlign:h==="Serviço"||h==="Obs"||h===""?"left":"right",color:"#475569",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {itens.map(item=>{
+                  const isEd = editing===item.id;
+                  const row  = isEd ? draft : item;
+                  const sv   = row.orcado - row.realizado;
+                  const pct  = row.orcado ? Math.min(100,(row.realizado/row.orcado)*100) : 0;
+                  return(
+                    <tr key={item.id} style={{borderTop:"1px solid #334155"}}>
+                      <td style={{padding:"10px 14px",fontWeight:600,fontSize:13}}>
+                        {isEd ? <input value={draft.nome} onChange={e=>setDraft(d=>({...d,nome:e.target.value}))} style={{...inputStyle,width:220}}/> : row.nome}
+                      </td>
+                      {["orcado","provisionado","realizado"].map(k=>{
+                        const col=k==="orcado"?"#22c55e":k==="provisionado"?"#3b82f6":"#f59e0b";
+                        return(
+                          <td key={k} style={{padding:"10px 14px",textAlign:"right"}}>
+                            {isEd
+                              ?<input value={draft[k]} onChange={e=>setDraft(d=>({...d,[k]:parseFloat(e.target.value)||0}))}
+                                  style={{...inputStyle,width:110,textAlign:"right",color:col}}/>
+                              :<span style={{color:row[k]===0?"#475569":col}}>{fmt(row[k])}</span>}
+                          </td>
+                        );
+                      })}
+                      <td style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:sv>=0?"#a3e635":"#ef4444"}}>{fmt(sv)}</td>
+                      <td style={{padding:"10px 14px",textAlign:"right",fontSize:12,color:"#94a3b8"}}>{pct.toFixed(1)}%</td>
+                      <td style={{padding:"10px 14px",minWidth:90}}>
+                        <div style={{background:"#334155",borderRadius:4,height:6}}>
+                          <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                        </div>
+                      </td>
+                      <td style={{padding:"10px 14px",color:"#64748b",fontSize:12,maxWidth:200}}>
+                        {isEd ? <input value={draft.obs} onChange={e=>setDraft(d=>({...d,obs:e.target.value}))} style={{...inputStyle,width:160}}/> : row.obs}
+                      </td>
+                      <td style={{padding:"10px 14px"}}>
+                        {isEd
+                          ?<div style={{display:"flex",gap:6}}>
+                              <button onClick={cancelEdit} style={{...btnStyle,background:"#475569",padding:"4px 10px",fontSize:11}}>✕</button>
+                              <button onClick={saveEdit}   style={{...btnStyle,background:"#22c55e",padding:"4px 10px",fontSize:11}}>✓</button>
+                            </div>
+                          :<button onClick={()=>startEdit(item)} style={{...btnStyle,background:"#334155",padding:"4px 10px",fontSize:11}}>✏</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {/* total da seção */}
+                <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
+                  <td style={{padding:"10px 14px",color:cor}}>Total {secao}</td>
+                  <td style={{padding:"10px 14px",textAlign:"right",color:"#22c55e"}}>{fmt(sOrc)}</td>
+                  <td style={{padding:"10px 14px",textAlign:"right",color:"#3b82f6"}}>{fmt(sProv)}</td>
+                  <td style={{padding:"10px 14px",textAlign:"right",color:"#f59e0b"}}>{fmt(sReal)}</td>
+                  <td style={{padding:"10px 14px",textAlign:"right",color:(sOrc-sReal)>=0?"#a3e635":"#ef4444"}}>{fmt(sOrc-sReal)}</td>
+                  <td colSpan={4}/>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+
+      {/* total geral */}
+      <div style={{background:"#1e293b",borderRadius:12,padding:"14px 20px",display:"flex",justifyContent:"flex-end",gap:32}}>
+        <span style={{color:"#94a3b8",fontWeight:700}}>TOTAL GERAL</span>
+        <span style={{color:"#22c55e",fontWeight:700}}>{fmt(totOrc)}</span>
+        <span style={{color:"#3b82f6",fontWeight:700}}>{fmt(totProv)}</span>
+        <span style={{color:"#f59e0b",fontWeight:700}}>{fmt(totReal)}</span>
+        <span style={{color:(totOrc-totReal)>=0?"#a3e635":"#ef4444",fontWeight:700}}>{fmt(totOrc-totReal)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Cadastro Rápido ────────────────────────────────────────────────────
+const CENARIO_INFO = {
+  b1:    {label:"B1 Sudeste",  color:"#22c55e", total:159476, cat:"B1", regiao:"sudeste"},
+  b2s:   {label:"B2 Sudeste",  color:"#3b82f6", total:100976, cat:"B2", regiao:"sudeste"},
+  b2sul: {label:"B2 Sul",      color:"#f59e0b", total:118296, cat:"B2", regiao:"sul"},
+};
+
+function NovoRapidoModal({cenario, jogos, onSave, onClose}){
+  const info = CENARIO_INFO[cenario];
+  const proximaRodada = Math.max(0,...jogos.filter(j=>j.mandante!=="A definir").map(j=>j.rodada)) + 1;
+  const [form,setForm] = useState({
+    mandante:"", visitante:"", rodada:String(proximaRodada),
+    cidade:"", data:"", hora:"", detentor:"A definir"
+  });
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const field = (label,key,opts=null) => (
+    <div style={{marginBottom:12}}>
+      <label style={{color:"#94a3b8",fontSize:12,display:"block",marginBottom:4}}>{label}</label>
+      {opts
+        ?<select value={form[key]} onChange={e=>set(key,e.target.value)} style={selStyle}>{opts.map(o=><option key={o}>{o}</option>)}</select>
+        :<input value={form[key]} onChange={e=>set(key,e.target.value)} style={inputStyle}/>}
+    </div>
+  );
+
+  const handleSave = () => {
+    if(!form.mandante||!form.visitante) return;
+    const defs = getDefaults(info.cat, info.regiao);
+    onSave({...form, id:Date.now(), rodada:parseInt(form.rodada)||0,
+      categoria:info.cat, regiao:info.regiao,
+      orcado:{...defs}, provisionado:{...defs}, realizado:{...allSubKeys()}});
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:440,maxHeight:"90vh",overflowY:"auto"}}>
+        {/* header */}
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+          <div style={{width:4,height:28,background:info.color,borderRadius:2}}/>
+          <div>
+            <h3 style={{margin:0,fontSize:16}}>Novo Jogo — {info.label}</h3>
+            <p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>Orçado automático: <b style={{color:info.color}}>{fmt(info.total)}</b></p>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+          {field("Mandante","mandante",TIMES)}
+          {field("Visitante","visitante",TIMES)}
+          {field("Rodada","rodada")}
+          {field("Data","data")}
+          {field("Hora","hora")}
+          {field("Cidade","cidade",CIDADES)}
+          {field("Detentor","detentor",DETENTORES)}
+        </div>
+        {/* preview orçado */}
+        <div style={{background:"#0f172a",borderRadius:8,padding:"10px 14px",marginTop:4,marginBottom:16}}>
+          <p style={{color:"#64748b",fontSize:11,margin:"0 0 6px"}}>Valores que serão aplicados:</p>
+          <div style={{display:"flex",gap:16,fontSize:12}}>
+            <span style={{color:"#94a3b8"}}>Logística: <b style={{color:"#22c55e"}}>{fmt(["logistica"].flatMap(()=>["outros_log","transporte","uber","hospedagem","diaria"]).reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
+            <span style={{color:"#94a3b8"}}>Pessoal: <b style={{color:"#3b82f6"}}>{fmt(Object.keys(PESSOAL).reduce((s,k)=>s+(PESSOAL[k]||0),0))}</b></span>
+            <span style={{color:"#94a3b8"}}>Operações: <b style={{color:"#f59e0b"}}>{fmt(info.total - ["outros_log","transporte","uber","hospedagem","diaria",...Object.keys(PESSOAL)].reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
+          <button onClick={handleSave} style={{...btnStyle,background:info.color,color:cenario==="b2sul"?"#000":"#fff"}}>Adicionar Jogo</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function NovoJogoModal({onSave,onClose}){
+  const [form,setForm]=useState({mandante:"",visitante:"",rodada:"",cidade:"",data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const field=(label,key,opts=null)=>(
+    <div style={{marginBottom:12}}>
+      <label style={{color:"#94a3b8",fontSize:12,display:"block",marginBottom:4}}>{label}</label>
+      {opts?<select value={form[key]} onChange={e=>set(key,e.target.value)} style={selStyle}>{opts.map(o=><option key={o}>{o}</option>)}</select>
+           :<input value={form[key]} onChange={e=>set(key,e.target.value)} style={inputStyle}/>}
+    </div>
+  );
+  const handleSave=()=>{
+    if(!form.mandante||!form.visitante) return;
+    const defs=getDefaults(form.categoria, form.regiao==="Sul"?"sul":"sudeste");
+    onSave({...form,id:Date.now(),rodada:parseInt(form.rodada)||0,
+      orcado:{...defs},provisionado:{...defs},realizado:{...allSubKeys()}});
+  };
+  return(
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#1e293b",borderRadius:16,padding:28,width:460,maxHeight:"90vh",overflowY:"auto"}}>
+        <h3 style={{margin:"0 0 20px",fontSize:16}}>Novo Jogo</h3>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+          {field("Mandante","mandante",TIMES)}{field("Visitante","visitante",TIMES)}
+          {field("Rodada","rodada")}{field("Data","data")}
+          {field("Hora","hora")}{field("Cidade","cidade",CIDADES)}
+          {field("Categoria","categoria",["B1","B2"])}{field("Região","regiao",["Sudeste","Sul"])}
+          {field("Detentor","detentor",DETENTORES)}
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
+          <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
+          <button onClick={handleSave} style={{...btnStyle,background:"#22c55e"}}>Adicionar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Visão Micro ──────────────────────────────────────────────────────────────
+function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
+  const divulgados=jogos.filter(j=>j.mandante!=="A definir");
+  const idx=divulgados.findIndex(j=>j.id===jogoId);
+  const jogo=divulgados[idx];
+  const [draft,setDraft]=useState(null);
+  const [editing,setEditing]=useState(false);
+
+  const setVal=(tipo,subkey,v)=>setDraft(d=>({...d,[tipo]:{...d[tipo],[subkey]:parseFloat(v)||0}}));
+  const startEdit=()=>{setDraft(JSON.parse(JSON.stringify(jogo)));setEditing(true);};
+  const cancelEdit=()=>{setDraft(null);setEditing(false);};
+  const saveEdit=()=>{onSave(draft);setEditing(false);setDraft(null);};
+
+  const data=editing?draft:jogo;
+  if(!jogo) return <p style={{color:"#64748b",padding:20}}>Nenhum jogo selecionado.</p>;
+
+  const totOrc=subTotal(data.orcado), totProv=subTotal(data.provisionado), totReal=subTotal(data.realizado);
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>idx>0&&onChangeJogo(divulgados[idx-1].id)} disabled={idx===0}
+            style={{...btnStyle,background:idx===0?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===0?0.4:1}}>← Anterior</button>
+          <select value={jogoId} onChange={e=>onChangeJogo(parseInt(e.target.value))}
+            style={{...selStyle,width:"auto",padding:"7px 14px",fontWeight:600}}>
+            {divulgados.map(j=><option key={j.id} value={j.id}>Rd {j.rodada} · {j.mandante} x {j.visitante}</option>)}
+          </select>
+          <button onClick={()=>idx<divulgados.length-1&&onChangeJogo(divulgados[idx+1].id)} disabled={idx===divulgados.length-1}
+            style={{...btnStyle,background:idx===divulgados.length-1?"#1e293b":"#334155",padding:"6px 14px",opacity:idx===divulgados.length-1?0.4:1}}>Próximo →</button>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {!editing
+            ?<button onClick={startEdit} style={{...btnStyle,background:"#3b82f6"}}>✏ Editar valores</button>
+            :<><button onClick={cancelEdit} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
+               <button onClick={saveEdit} style={{...btnStyle,background:"#22c55e"}}>💾 Salvar</button></>}
+        </div>
+      </div>
+
+      <div style={{background:"#1e293b",borderRadius:12,padding:"18px 24px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+          <div>
+            <h2 style={{margin:"0 0 6px",fontSize:20}}>{data.mandante} x {data.visitante}</h2>
+            <p style={{color:"#94a3b8",fontSize:13,margin:0}}>Rodada {data.rodada} · {data.cidade} · {data.data} {data.hora} · {data.detentor}</p>
+          </div>
+          <Pill label={data.categoria} color={data.categoria==="B1"?"#22c55e":"#f59e0b"}/>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginTop:18}}>
+          {[
+            {label:"Orçado",value:fmt(totOrc),color:"#22c55e"},
+            {label:"Provisionado",value:fmt(totProv),color:"#3b82f6"},
+            {label:"Realizado",value:fmt(totReal),color:"#f59e0b"},
+            {label:"Saving",value:fmt(totOrc-totReal),color:(totOrc-totReal)>=0?"#a3e635":"#ef4444"},
+          ].map(k=>(
+            <div key={k.label} style={{background:"#0f172a",borderRadius:8,padding:"12px 16px",borderTop:`3px solid ${k.color}`}}>
+              <p style={{color:"#64748b",fontSize:11,margin:"0 0 4px"}}>{k.label}</p>
+              <p style={{color:k.color,fontWeight:700,fontSize:16,margin:0}}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {CATS.map(cat=>{
+        const cOrc=catTotal(data.orcado,cat), cProv=catTotal(data.provisionado,cat), cReal=catTotal(data.realizado,cat);
+        return(
+          <div key={cat.key} style={{background:"#1e293b",borderRadius:12,overflow:"hidden",marginBottom:16}}>
+            <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontWeight:700,fontSize:14,color:cat.color}}>{cat.label}</span>
+              <div style={{display:"flex",gap:24,fontSize:12}}>
+                <span style={{color:"#94a3b8"}}>Orç: <b style={{color:"#22c55e"}}>{fmt(cOrc)}</b></span>
+                <span style={{color:"#94a3b8"}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(cProv)}</b></span>
+                <span style={{color:"#94a3b8"}}>Real: <b style={{color:"#f59e0b"}}>{fmt(cReal)}</b></span>
+                <span style={{color:"#94a3b8"}}>Saving: <b style={{color:(cOrc-cReal)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cReal)}</b></span>
+              </div>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr style={{background:"#0f172a",borderTop:"1px solid #1e293b"}}>
+                {["Item","Orçado","Provisionado","Realizado","Saving"].map(h=>(
+                  <th key={h} style={{padding:"8px 20px",textAlign:h==="Item"?"left":"right",color:"#475569",fontSize:11}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {cat.subs.map(sub=>{
+                  const o=data.orcado?.[sub.key]||0,p=data.provisionado?.[sub.key]||0,r=data.realizado?.[sub.key]||0;
+                  if(!editing&&o===0&&p===0&&r===0) return null;
+                  return(
+                    <tr key={sub.key} style={{borderTop:"1px solid #334155"}}>
+                      <td style={{padding:"10px 20px",fontSize:13,color:"#e2e8f0"}}>{sub.label}</td>
+                      {["orcado","provisionado","realizado"].map(tipo=>{
+                        const val=data[tipo]?.[sub.key]||0;
+                        const col=tipo==="orcado"?"#22c55e":tipo==="provisionado"?"#3b82f6":"#f59e0b";
+                        return(
+                          <td key={tipo} style={{padding:"8px 20px",textAlign:"right"}}>
+                            {editing
+                              ?<input value={draft[tipo]?.[sub.key]||0} onChange={e=>setVal(tipo,sub.key,e.target.value)}
+                                  style={{...inputStyle,width:110,textAlign:"right",padding:"4px 8px",color:col}}/>
+                              :<span style={{fontSize:13,color:val===0?"#475569":col}}>{fmt(val)}</span>}
+                          </td>
+                        );
+                      })}
+                      <td style={{padding:"10px 20px",textAlign:"right",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444",fontSize:13}}>{fmt(o-r)}</td>
+                    </tr>
+                  );
+                })}
+                <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
+                  <td style={{padding:"10px 20px",fontSize:13}}>Total {cat.label}</td>
+                  <td style={{padding:"10px 20px",textAlign:"right",color:"#22c55e"}}>{fmt(cOrc)}</td>
+                  <td style={{padding:"10px 20px",textAlign:"right",color:"#3b82f6"}}>{fmt(cProv)}</td>
+                  <td style={{padding:"10px 20px",textAlign:"right",color:"#f59e0b"}}>{fmt(cReal)}</td>
+                  <td style={{padding:"10px 20px",textAlign:"right",color:(cOrc-cReal)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cReal)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── App principal ────────────────────────────────────────────────────────────
+export default function App(){
+  const [jogos,setJogos]       = useState(ALL_JOGOS);
+  const [servicos,setServicos] = useState(SERVICOS_INIT);
+
+  // Calcula fixos dinamicamente a partir das seções de serviços
+  const fixosCalc = useMemo(() => {
+    return SERVICOS_INIT.map(secao => {
+      const s = servicos.find(x=>x.secao===secao.secao);
+      const itens = s ? s.itens : [];
+      return {
+        nome: secao.secao,
+        orcado:      itens.reduce((t,i)=>t+i.orcado,0),
+        realizado:   itens.reduce((t,i)=>t+i.realizado,0),
+        tipo: "fixo"
+      };
+    });
+  }, [servicos]);
+
+  const RESUMO_CATS = [...RESUMO_VARIAVEIS, ...fixosCalc];
+  const [tab,setTab]           = useState("dashboard");
+  const [showNovo,setNovo]     = useState(false);
+  const [novoRapido,setNovoRapido] = useState(null); // "b1" | "b2s" | "b2sul"
+  const [filtroRod,setFiltroRod]     = useState("Todas");
+  const [filtroCat,setFiltroCat]     = useState("Todas");
+  const [showPlaceholder,setShowPlaceholder] = useState(false);
+  const [microJogoId,setMicroJogoId] = useState(JOGOS_REAIS[0].id);
+
+  const saveJogo=j=>setJogos(js=>js.map(x=>x.id===j.id?j:x));
+  const addJogo=j=>{setJogos(js=>[...js,j]);setNovo(false);};
+
+  const totalOrc=RESUMO_CATS.reduce((s,c)=>s+c.orcado,0);
+  const totalReal=RESUMO_CATS.reduce((s,c)=>s+c.realizado,0);
+  const pctGasto=totalOrc?((totalReal/totalOrc)*100).toFixed(1):0;
+
+  const divulgados=jogos.filter(j=>j.mandante!=="A definir");
+  const aDivulgar=jogos.filter(j=>j.mandante==="A definir");
+  const rodadasList=["Todas",...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)];
+  const filtrados=(showPlaceholder?jogos:divulgados).filter(j=>
+    (filtroRod==="Todas"||j.rodada===parseInt(filtroRod))&&
+    (filtroCat==="Todas"||j.categoria===filtroCat)
+  );
+
+  const savingRodada=useMemo(()=>{
+    const map={};
+    divulgados.forEach(j=>{
+      const r=`R${j.rodada}`;
+      if(!map[r]) map[r]={name:r,"Saving Prov.":0,"Saving Real.":0};
+      map[r]["Saving Prov."]+=subTotal(j.orcado)-subTotal(j.provisionado);
+      map[r]["Saving Real."]+=subTotal(j.orcado)-subTotal(j.realizado);
+    });
+    return Object.values(map).sort((a,b)=>parseInt(a.name.slice(1))-parseInt(b.name.slice(1)));
+  },[jogos]);
+
+  const jogosFiltered=divulgados.filter(j=>
+    (filtroRod==="Todas"||j.rodada===parseInt(filtroRod))&&
+    (filtroCat==="Todas"||j.categoria===filtroCat)
+  );
+  const totOrcJogos=jogosFiltered.reduce((s,j)=>s+subTotal(j.orcado),0);
+  const totProvJogos=jogosFiltered.reduce((s,j)=>s+subTotal(j.provisionado),0);
+  const totRealJogos=jogosFiltered.reduce((s,j)=>s+subTotal(j.realizado),0);
+
+  const TABS=["dashboard","serviços","jogos","micro","savings","gráficos"];
+
+  return(
+    <div style={{minHeight:"100vh",background:"#0f172a",color:"#f1f5f9",fontFamily:"'Inter',sans-serif",paddingBottom:40}}>
+      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"22px 32px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 4px"}}>FFU — Transmissões</p>
+            <h1 style={{fontSize:21,fontWeight:700,margin:0}}>Brasileirão Série A 2026</h1>
+            <p style={{color:"#bbf7d0",fontSize:12,margin:"4px 0 0"}}>{divulgados.length} jogos divulgados · {aDivulgar.length} a divulgar · 38 rodadas</p>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <p style={{color:"#86efac",fontSize:11,margin:"0 0 2px"}}>Execução geral</p>
+            <p style={{fontSize:30,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0}}>{pctGasto}%</p>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:2,marginTop:16}}>
+          {TABS.map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{
+              padding:"8px 20px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",
+              background:tab===t?"#0f172a":"rgba(255,255,255,0.12)",
+              color:tab===t?"#22c55e":"#e2e8f0",
+              fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize"
+            }}>{t}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"24px 32px"}}>
+
+        {tab==="dashboard"&&(<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
+            <KPI label="Total Orçado" value={fmt(totalOrc)} sub="Budget aprovado" color="#22c55e"/>
+            <KPI label="Total Realizado" value={fmt(totalReal)} sub={`${pctGasto}% executado`} color="#3b82f6"/>
+            <KPI label="Saldo Disponível" value={fmt(totalOrc-totalReal)} sub="Orçado - Realizado" color="#f59e0b"/>
+            <KPI label="Jogos Divulgados" value={`${divulgados.length} / 76`} sub={`${aDivulgar.length} aguardando`} color="#8b5cf6"/>
+          </div>
+          <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <h3 style={{margin:0,fontSize:14,color:"#94a3b8"}}>Resumo por Categoria</h3>
+              <div style={{display:"flex",gap:12,fontSize:12,color:"#94a3b8"}}>
+                <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#6366f1",marginRight:4}}/>Fixo</span>
+                <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#f43f5e",marginRight:4}}/>Variável</span>
+              </div>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr style={{background:"#0f172a"}}>
+                {["Categoria","Tipo","Orçado","Realizado","Saldo","% Exec.","Progresso"].map(h=>
+                  <th key={h} style={{padding:"10px 16px",textAlign:h==="Categoria"||h==="Tipo"?"left":"right",color:"#64748b",fontSize:12}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {RESUMO_CATS.map(c=>{
+                  const saldo=c.orcado-c.realizado;
+                  const pct=c.orcado?Math.min(100,(c.realizado/c.orcado)*100):0;
+                  return(
+                    <tr key={c.nome} style={{borderTop:"1px solid #334155"}}>
+                      <td style={{padding:"12px 16px",fontWeight:600}}>{c.nome}</td>
+                      <td style={{padding:"12px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
+                      <td style={{padding:"12px 16px",textAlign:"right"}}>{fmt(c.orcado)}</td>
+                      <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6"}}>{fmt(c.realizado)}</td>
+                      <td style={{padding:"12px 16px",textAlign:"right",fontWeight:600,color:saldo<0?"#ef4444":"#22c55e"}}>{fmt(saldo)}</td>
+                      <td style={{padding:"12px 16px",textAlign:"right"}}>{pct.toFixed(1)}%</td>
+                      <td style={{padding:"12px 20px"}}>
+                        <div style={{background:"#334155",borderRadius:4,height:8,minWidth:80}}>
+                          <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{borderTop:"2px solid #475569",background:"#0f172a",fontWeight:700}}>
+                  <td colSpan={2} style={{padding:"12px 16px"}}>TOTAL GERAL</td>
+                  <td style={{padding:"12px 16px",textAlign:"right",color:"#22c55e"}}>{fmt(totalOrc)}</td>
+                  <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6"}}>{fmt(totalReal)}</td>
+                  <td style={{padding:"12px 16px",textAlign:"right",color:"#f59e0b"}}>{fmt(totalOrc-totalReal)}</td>
+                  <td style={{padding:"12px 16px",textAlign:"right"}}>{pctGasto}%</td>
+                  <td/>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>)}
+
+        {tab==="jogos"&&(<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {rodadasList.map(r=>(
+                <button key={r} onClick={()=>setFiltroRod(r)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+                  background:filtroRod===r?"#22c55e":"#1e293b",color:filtroRod===r?"#fff":"#94a3b8"}}>
+                  {r==="Todas"?"Todas":`Rd ${r}`}
+                </button>
+              ))}
+              <div style={{width:1,background:"#334155",margin:"0 4px"}}/>
+              {["Todas","B1","B2"].map(c=>(
+                <button key={c} onClick={()=>setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+                  background:filtroCat===c?"#f59e0b":"#1e293b",color:filtroCat===c?"#000":"#94a3b8"}}>
+                  {c==="Todas"?"B1+B2":c}
+                </button>
+              ))}
+              <button onClick={()=>setShowPlaceholder(p=>!p)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+                background:showPlaceholder?"#8b5cf6":"#1e293b",color:showPlaceholder?"#fff":"#94a3b8"}}>
+                {showPlaceholder?"Ocultar a divulgar":"Ver a divulgar"}
+              </button>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setNovoRapido("b1")} style={{...btnStyle,background:"#22c55e",fontSize:12}}>+ B1 Sudeste</button>
+              <button onClick={()=>setNovoRapido("b2s")} style={{...btnStyle,background:"#3b82f6",fontSize:12}}>+ B2 Sudeste</button>
+              <button onClick={()=>setNovoRapido("b2sul")} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ B2 Sul</button>
+              <button onClick={()=>setNovo(true)} style={{...btnStyle,background:"#475569",fontSize:12}}>+ Personalizado</button>
+            </div>
+          </div>
+          <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid #334155",color:"#64748b",fontSize:12}}>{filtrados.length} jogos</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
+                <thead><tr style={{background:"#0f172a"}}>
+                  {["Jogo","Rd","Cidade","Data","Cat.","Detentor","Orçado","Provisionado","Realizado","Sav.Prov","Sav.Real",""].map(h=>
+                    <th key={h} style={{padding:"10px 12px",textAlign:"left",color:"#64748b",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {filtrados.map(j=>{
+                    const o=subTotal(j.orcado),p=subTotal(j.provisionado),r=subTotal(j.realizado);
+                    const isDef=j.mandante==="A definir";
+                    return(
+                      <tr key={j.id} style={{borderTop:"1px solid #334155",opacity:isDef?0.45:1}}>
+                        <td style={{padding:"10px 12px",fontWeight:600,fontSize:13}}>
+                          {isDef?<span style={{color:"#64748b",fontStyle:"italic"}}>A divulgar</span>:`${j.mandante} x ${j.visitante}`}
+                        </td>
+                        <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12}}>{j.rodada}</td>
+                        <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12}}>{j.cidade}</td>
+                        <td style={{padding:"10px 12px",color:"#94a3b8",fontSize:12,whiteSpace:"nowrap"}}>{j.data}</td>
+                        <td style={{padding:"10px 12px"}}><Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/></td>
+                        <td style={{padding:"10px 12px",fontSize:11,color:"#94a3b8"}}>{j.detentor}</td>
+                        <td style={{padding:"10px 12px",fontSize:13}}>{fmtK(o)}</td>
+                        <td style={{padding:"10px 12px",fontSize:13,color:"#3b82f6"}}>{fmtK(p)}</td>
+                        <td style={{padding:"10px 12px",fontSize:13,color:"#f59e0b"}}>{fmtK(r)}</td>
+                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-p)>=0?"#22c55e":"#ef4444"}}>{fmtK(o-p)}</td>
+                        <td style={{padding:"10px 12px",fontWeight:600,color:(o-r)>=0?"#a3e635":"#ef4444"}}>{fmtK(o-r)}</td>
+                        <td style={{padding:"10px 12px"}}>
+                          <button onClick={()=>{setMicroJogoId(j.id);setTab("micro");}}
+                            style={{...btnStyle,background:"#1d4ed8",padding:"4px 10px",fontSize:11}}>🔍</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>)}
+
+        {tab==="micro"&&(
+          <VisaoMicro jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo}/>
+        )}
+
+        {tab==="serviços"&&(
+          <TabServicos servicos={servicos} setServicos={setServicos}/>
+        )}
+
+        {tab==="savings"&&(<>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
+            {["Todas",...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)].map(r=>(
+              <button key={r} onClick={()=>setFiltroRod(r)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+                background:filtroRod===r?"#22c55e":"#1e293b",color:filtroRod===r?"#fff":"#94a3b8"}}>
+                {r==="Todas"?"Todas":`Rd ${r}`}
+              </button>
+            ))}
+            <div style={{width:1,background:"#334155",margin:"0 4px"}}/>
+            {["Todas","B1","B2"].map(c=>(
+              <button key={c} onClick={()=>setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
+                background:filtroCat===c?"#f59e0b":"#1e293b",color:filtroCat===c?"#000":"#94a3b8"}}>
+                {c==="Todas"?"B1+B2":c}
+              </button>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:24}}>
+            <KPI label="Saving Provisionado" value={fmt(totOrcJogos-totProvJogos)} sub={`em ${divulgados.length} jogos divulgados`} color="#3b82f6"/>
+            <KPI label="Saving Realizado" value={fmt(totOrcJogos-totRealJogos)} sub="Orçado - Realizado confirmado" color="#22c55e"/>
+            <KPI label="% Saving Provisionado" value={totOrcJogos?`${(((totOrcJogos-totProvJogos)/totOrcJogos)*100).toFixed(1)}%`:"—"} sub="do budget em saving estimado" color="#f59e0b"/>
+          </div>
+          <div style={{background:"#1e293b",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid #334155"}}>
+              <h3 style={{margin:0,fontSize:14,color:"#94a3b8"}}>Saving por Jogo</h3>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:750}}>
+                <thead><tr style={{background:"#0f172a"}}>
+                  {["Jogo","Rd","Cat.","Orçado","Provisionado","Saving Prov.","Realizado","Saving Real."].map(h=>
+                    <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontSize:11}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {jogosFiltered.map(j=>{
+                    const o=subTotal(j.orcado),p=subTotal(j.provisionado),r=subTotal(j.realizado);
+                    return(
+                      <tr key={j.id} style={{borderTop:"1px solid #334155"}}>
+                        <td style={{padding:"10px 14px",fontWeight:600,fontSize:13}}>{j.mandante} x {j.visitante}</td>
+                        <td style={{padding:"10px 14px",color:"#94a3b8"}}>{j.rodada}</td>
+                        <td style={{padding:"10px 14px"}}><Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/></td>
+                        <td style={{padding:"10px 14px"}}>{fmt(o)}</td>
+                        <td style={{padding:"10px 14px",color:"#3b82f6"}}>{fmt(p)}</td>
+                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-p)>=0?"#22c55e":"#ef4444"}}>{fmt(o-p)}</td>
+                        <td style={{padding:"10px 14px",color:"#f59e0b"}}>{fmt(r)}</td>
+                        <td style={{padding:"10px 14px",fontWeight:700,color:(o-r)>=0?"#a3e635":"#ef4444"}}>{fmt(o-r)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{borderTop:"2px solid #475569",background:"#0f172a",fontWeight:700}}>
+                    <td colSpan={3} style={{padding:"12px 14px"}}>TOTAL</td>
+                    <td style={{padding:"12px 14px"}}>{fmt(totOrcJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#3b82f6"}}>{fmt(totProvJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#22c55e"}}>{fmt(totOrcJogos-totProvJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#f59e0b"}}>{fmt(totRealJogos)}</td>
+                    <td style={{padding:"12px 14px",color:"#a3e635"}}>{fmt(totOrcJogos-totRealJogos)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>)}
+
+        {tab==="gráficos"&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+            <div style={{background:"#1e293b",borderRadius:12,padding:20,gridColumn:"1/-1"}}>
+              <h3 style={{margin:"0 0 16px",fontSize:14,color:"#94a3b8"}}>Saving por Rodada — Provisionado vs Realizado</h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={savingRodada}>
+                  <XAxis dataKey="name" tick={{fill:"#94a3b8",fontSize:11}}/>
+                  <YAxis tickFormatter={fmtK} tick={{fill:"#94a3b8",fontSize:11}}/>
+                  <Tooltip content={<CustomTooltip/>}/>
+                  <Legend wrapperStyle={{fontSize:12}}/>
+                  <Bar dataKey="Saving Prov." fill="#3b82f6" radius={[4,4,0,0]}/>
+                  <Bar dataKey="Saving Real." fill="#22c55e" radius={[4,4,0,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{background:"#1e293b",borderRadius:12,padding:20}}>
+              <h3 style={{margin:"0 0 16px",fontSize:14,color:"#94a3b8"}}>Distribuição do Budget Geral</h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={RESUMO_CATS.map(c=>({name:c.nome,value:c.orcado}))} cx="50%" cy="50%" outerRadius={90} dataKey="value"
+                    label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                    {RESUMO_CATS.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+                  </Pie>
+                  <Tooltip formatter={v=>fmt(v)}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{background:"#1e293b",borderRadius:12,padding:20}}>
+              <h3 style={{margin:"0 0 16px",fontSize:14,color:"#94a3b8"}}>Orçado por Jogo — B1 vs B2</h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={divulgados.map(j=>({name:`R${j.rodada} ${j.mandante.split(" ")[0]}`,valor:subTotal(j.orcado),cat:j.categoria}))}>
+                  <XAxis dataKey="name" tick={{fill:"#94a3b8",fontSize:9}}/>
+                  <YAxis tickFormatter={fmtK} tick={{fill:"#94a3b8",fontSize:11}}/>
+                  <Tooltip content={<CustomTooltip/>}/>
+                  <Bar dataKey="valor" radius={[4,4,0,0]}>
+                    {divulgados.map(j=><Cell key={j.id} fill={j.categoria==="B1"?"#22c55e":"#f59e0b"}/>)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showNovo&&<NovoJogoModal onSave={addJogo} onClose={()=>setNovo(false)}/>}
+      {novoRapido&&<NovoRapidoModal cenario={novoRapido} jogos={jogos} onSave={addJogo} onClose={()=>setNovoRapido(null)}/>}
+    </div>
+  );
+}
 

@@ -58,11 +58,8 @@ const allSubKeys = () => {
 
 const PESSOAL = {coord_um:1000,prod_um:0,prod_campo:400,monitoracao:0,supervisor1:800,supervisor2:800,dtv:800,vmix:500,audio:800};
 
-// B1 Sudeste = R$159.476
 const B1_SUL = {outros_log:0,transporte:6000,uber:1000,hospedagem:2450,diaria:550,...PESSOAL,um_b1:85000,um_b2:0,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:15000,goalcam:4000,minidrone:2500,infra:6776,extra:0};
-// B2 Sudeste = R$100.976
 const B2_SUDESTE = {outros_log:0,transporte:5000,uber:1000,hospedagem:1450,diaria:550,...PESSOAL,um_b1:0,um_b2:50000,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
-// B2 Sul = R$118.296
 const B2_SUL = {outros_log:0,transporte:10010,uber:1200,hospedagem:3150,diaria:640,...PESSOAL,um_b1:0,um_b2:50000,geradores:6000,sng:7920,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:3500,grua:9000,dslr:10500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
 
 const getDefaults = (cat, regiao="sudeste") => {
@@ -71,12 +68,11 @@ const getDefaults = (cat, regiao="sudeste") => {
   return {...B2_SUDESTE};
 };
 
-// Mapeia cada jogo para seu cenário correto
 const JOGO_CENARIO = {
-  1:"b1", 2:"b1", 5:"b1", 8:"b1", 10:"b1", 11:"b1", 15:"b1", 16:"b1", // B1 Sudeste
-  3:"b2s", 9:"b2s", 14:"b2s",                                           // B2 Sudeste
-  6:"b2sul",                                                             // B2 Sul
-  4:"b2sul", 7:"b2sul", 12:"b2sul", 13:"b2sul",                          // B2 Sul
+  1:"b1", 2:"b1", 5:"b1", 8:"b1", 10:"b1", 11:"b1", 15:"b1", 16:"b1",
+  3:"b2s", 9:"b2s", 14:"b2s",
+  6:"b2sul",
+  4:"b2sul", 7:"b2sul", 12:"b2sul", 13:"b2sul",
 };
 
 const getJogoDefaults = (id, cat, det) => {
@@ -84,7 +80,6 @@ const getJogoDefaults = (id, cat, det) => {
   if (c==="b1") return {...B1_SUL};
   if (c==="b2sul") return {...B2_SUL};
   if (c==="b2s") return {...B2_SUDESTE};
-  // placeholder: inferir pelo detentor/categoria
   if (cat==="B1") return {...B1_SUL};
   if (det==="CazeTV/Record/Premiere") return {...B2_SUL};
   return {...B2_SUDESTE};
@@ -132,7 +127,6 @@ const RESUMO_VARIAVEIS = [
   {nome:"Logística",  orcado:179000,  realizado:0,      tipo:"variavel"},
   {nome:"Pessoal",    orcado:81600,   realizado:44200,  tipo:"variavel"},
   {nome:"Operações",  orcado:1681200, realizado:667890, tipo:"variavel"},
-
   {nome:"Extra",      orcado:0,       realizado:1040,   tipo:"variavel"},
 ];
 
@@ -184,7 +178,6 @@ const CustomTooltip=({active,payload,label})=>{
   );
 };
 
-// ── Serviços Fixos ──────────────────────────────────────────────────────────
 const SECAO_COLORS = {"Pessoal":"#3b82f6","Transmissão":"#22c55e","Infraestrutura e Distribuição de Sinais":"#f59e0b"};
 
 function TabServicos({servicos, setServicos}) {
@@ -225,7 +218,6 @@ function TabServicos({servicos, setServicos}) {
         const cor   = SECAO_COLORS[secao]||"#8b5cf6";
         return(
           <div key={secao} style={{background:"#1e293b",borderRadius:12,overflow:"hidden",marginBottom:20}}>
-            {/* header seção */}
             <div style={{padding:"12px 20px",background:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <span style={{width:4,height:20,background:cor,borderRadius:2,display:"inline-block"}}/>
@@ -288,7 +280,6 @@ function TabServicos({servicos, setServicos}) {
                     </tr>
                   );
                 })}
-                {/* total da seção */}
                 <tr style={{borderTop:"2px solid #334155",background:"#0f172a",fontWeight:700}}>
                   <td style={{padding:"10px 14px",color:cor}}>Total {secao}</td>
                   <td style={{padding:"10px 14px",textAlign:"right",color:"#22c55e"}}>{fmt(sOrc)}</td>
@@ -303,7 +294,6 @@ function TabServicos({servicos, setServicos}) {
         );
       })}
 
-      {/* total geral */}
       <div style={{background:"#1e293b",borderRadius:12,padding:"14px 20px",display:"flex",justifyContent:"flex-end",gap:32}}>
         <span style={{color:"#94a3b8",fontWeight:700}}>TOTAL GERAL</span>
         <span style={{color:"#22c55e",fontWeight:700}}>{fmt(totOrc)}</span>
@@ -315,7 +305,6 @@ function TabServicos({servicos, setServicos}) {
   );
 }
 
-// ── Modal Cadastro Rápido ────────────────────────────────────────────────────
 const CENARIO_INFO = {
   b1:    {label:"B1 Sudeste",  color:"#22c55e", total:159476, cat:"B1", regiao:"sudeste"},
   b2s:   {label:"B2 Sudeste",  color:"#3b82f6", total:100976, cat:"B2", regiao:"sudeste"},
@@ -351,7 +340,6 @@ function NovoRapidoModal({cenario, jogos, onSave, onClose}){
   return(
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#1e293b",borderRadius:16,padding:28,width:440,maxHeight:"90vh",overflowY:"auto"}}>
-        {/* header */}
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
           <div style={{width:4,height:28,background:info.color,borderRadius:2}}/>
           <div>
@@ -368,11 +356,10 @@ function NovoRapidoModal({cenario, jogos, onSave, onClose}){
           {field("Cidade","cidade",CIDADES)}
           {field("Detentor","detentor",DETENTORES)}
         </div>
-        {/* preview orçado */}
         <div style={{background:"#0f172a",borderRadius:8,padding:"10px 14px",marginTop:4,marginBottom:16}}>
           <p style={{color:"#64748b",fontSize:11,margin:"0 0 6px"}}>Valores que serão aplicados:</p>
           <div style={{display:"flex",gap:16,fontSize:12}}>
-            <span style={{color:"#94a3b8"}}>Logística: <b style={{color:"#22c55e"}}>{fmt(["logistica"].flatMap(()=>["outros_log","transporte","uber","hospedagem","diaria"]).reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
+            <span style={{color:"#94a3b8"}}>Logística: <b style={{color:"#22c55e"}}>{fmt(["outros_log","transporte","uber","hospedagem","diaria"].reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
             <span style={{color:"#94a3b8"}}>Pessoal: <b style={{color:"#3b82f6"}}>{fmt(Object.keys(PESSOAL).reduce((s,k)=>s+(PESSOAL[k]||0),0))}</b></span>
             <span style={{color:"#94a3b8"}}>Operações: <b style={{color:"#f59e0b"}}>{fmt(info.total - ["outros_log","transporte","uber","hospedagem","diaria",...Object.keys(PESSOAL)].reduce((s,k)=>s+(getDefaults(info.cat,info.regiao)[k]||0),0))}</b></span>
           </div>
@@ -385,7 +372,6 @@ function NovoRapidoModal({cenario, jogos, onSave, onClose}){
     </div>
   );
 }
-
 
 function NovoJogoModal({onSave,onClose}){
   const [form,setForm]=useState({mandante:"",visitante:"",rodada:"",cidade:"",data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
@@ -423,7 +409,6 @@ function NovoJogoModal({onSave,onClose}){
   );
 }
 
-// ── Visão Micro ──────────────────────────────────────────────────────────────
 function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
   const divulgados=jogos.filter(j=>j.mandante!=="A definir");
   const idx=divulgados.findIndex(j=>j.id===jogoId);
@@ -543,12 +528,10 @@ function VisaoMicro({jogos,jogoId,onChangeJogo,onSave}){
   );
 }
 
-// ── App principal ────────────────────────────────────────────────────────────
 export default function App(){
   const [jogos,setJogos]       = useState(ALL_JOGOS);
   const [servicos,setServicos] = useState(SERVICOS_INIT);
 
-  // Calcula fixos dinamicamente a partir das seções de serviços
   const fixosCalc = useMemo(() => {
     return SERVICOS_INIT.map(secao => {
       const s = servicos.find(x=>x.secao===secao.secao);
@@ -565,14 +548,14 @@ export default function App(){
   const RESUMO_CATS = [...RESUMO_VARIAVEIS, ...fixosCalc];
   const [tab,setTab]           = useState("dashboard");
   const [showNovo,setNovo]     = useState(false);
-  const [novoRapido,setNovoRapido] = useState(null); // "b1" | "b2s" | "b2sul"
+  const [novoRapido,setNovoRapido] = useState(null);
   const [filtroRod,setFiltroRod]     = useState("Todas");
   const [filtroCat,setFiltroCat]     = useState("Todas");
   const [showPlaceholder,setShowPlaceholder] = useState(false);
   const [microJogoId,setMicroJogoId] = useState(JOGOS_REAIS[0].id);
 
   const saveJogo=j=>setJogos(js=>js.map(x=>x.id===j.id?j:x));
-  const addJogo=j=>{setJogos(js=>[...js,j]);setNovo(false);};
+  const addJogo=j=>{setJogos(js=>[...js,j]);setNovo(false);setNovoRapido(null);};
 
   const totalOrc=RESUMO_CATS.reduce((s,c)=>s+c.orcado,0);
   const totalReal=RESUMO_CATS.reduce((s,c)=>s+c.realizado,0);
@@ -874,4 +857,3 @@ export default function App(){
     </div>
   );
 }
-

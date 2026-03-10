@@ -11,6 +11,21 @@ const fmtNum  = n => Number(n||0).toLocaleString("pt-BR",{minimumFractionDigits:
 const fmtR    = v => "R$ "+Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtRs   = v => "R$ "+Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});
 
+// ─── PERSISTÊNCIA ─────────────────────────────────────────────────────────────
+const LS_JOGOS    = "ffu_jogos_v1";
+const LS_SERVICOS = "ffu_servicos_v1";
+const LS_DARK     = "ffu_darkmode_v1";
+
+function lsGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
 const Pill = ({label,color}) => (
   <span style={{background:color+"22",color,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>
 );
@@ -87,6 +102,34 @@ const TIPO_COLOR = {fixo:"#6366f1",variavel:"#f43f5e"};
 const PIE_COLORS = ["#22c55e","#3b82f6","#f59e0b","#ec4899","#8b5cf6","#06b6d4","#f97316"];
 const SECAO_COLORS = {"Pessoal":"#3b82f6","Transmissão":"#22c55e","Infraestrutura e Distribuição de Sinais":"#f59e0b"};
 const CENARIO_INFO = {b1:{label:"B1 Sudeste",color:"#22c55e",total:159476,cat:"B1",regiao:"sudeste"},b2s:{label:"B2 Sudeste",color:"#3b82f6",total:100976,cat:"B2",regiao:"sudeste"},b2sul:{label:"B2 Sul",color:"#f59e0b",total:118296,cat:"B2",regiao:"sul"}};
+
+const CATS_FIXOS_INIT = [
+  { id:"pessoal", label:"Pessoal", subs:[
+    { id:1, nome:"Freelas Fixos", itens:[
+      {id:1,nome:"Coordenador sinal internacional",orc:0,gasto:0,prov:0},
+      {id:2,nome:"Produtor campo/detentores",orc:0,gasto:0,prov:0},
+      {id:3,nome:"Produtor assets/pacote",orc:0,gasto:0,prov:0},
+      {id:4,nome:"Editor de imagens 1",orc:0,gasto:14900,prov:0},
+      {id:5,nome:"Editor de imagens 2",orc:0,gasto:0,prov:0},
+    ]}
+  ]},
+  { id:"transmissao", label:"Transmissão", subs:[
+    { id:2, nome:"Pacotes Mensais", itens:[
+      {id:6,nome:"Recepção Fibra para MMs, Antipirataria e Arquivo",orc:234612,gasto:0,prov:234612},
+    ]}
+  ]},
+  { id:"infra", label:"Infraestrutura e Distribuição de Sinais", subs:[
+    { id:3, nome:"Serviços (Pacotes Mensais)", itens:[
+      {id:7,nome:"Antipirataria (Serviço LiveMode)",orc:425600,gasto:840,prov:299160},
+      {id:8,nome:"Estatísticas",orc:120000,gasto:7000,prov:49000},
+      {id:9,nome:"Ferramenta de Clipping",orc:200000,gasto:0,prov:200000},
+      {id:10,nome:"Media Day",orc:300000,gasto:0,prov:200000},
+      {id:11,nome:"Espumas",orc:5000,gasto:0,prov:5000},
+      {id:12,nome:"Grafismo",orc:90000,gasto:0,prov:90000},
+      {id:13,nome:"Vinheta + Trilha",orc:35000,gasto:16000,prov:19000},
+    ]}
+  ]},
+];
 
 const CAMPEONATOS = [
   {id:"brasileirao-2026",nome:"Brasileirão Série A",edicao:"2026",status:"Em andamento",statusColor:"#22c55e",cor:"#166534",corGrad:"linear-gradient(135deg,#166534,#15803d)",icon:"🇧🇷",rodadas:38,descricao:"Campeonato Brasileiro — FFU Transmissões"},
@@ -373,39 +416,8 @@ function useDonut(canvasRef, rec, pend) {
   },[rec,pend]);
 }
 
-// ── Formulário Custos Fixos ────────────────────────────────────────────────────
-const CATS_FIXOS_INIT = [
-  { id:"pessoal", label:"Pessoal", subs:[
-    { id:1, nome:"Freelas Fixos", itens:[
-      {id:1,nome:"Coordenador sinal internacional",orc:0,gasto:0,prov:0},
-      {id:2,nome:"Produtor campo/detentores",orc:0,gasto:0,prov:0},
-      {id:3,nome:"Produtor assets/pacote",orc:0,gasto:0,prov:0},
-      {id:4,nome:"Editor de imagens 1",orc:0,gasto:14900,prov:0},
-      {id:5,nome:"Editor de imagens 2",orc:0,gasto:0,prov:0},
-    ]}
-  ]},
-  { id:"transmissao", label:"Transmissão", subs:[
-    { id:2, nome:"Pacotes Mensais", itens:[
-      {id:6,nome:"Recepção Fibra para MMs, Antipirataria e Arquivo",orc:234612,gasto:0,prov:234612},
-    ]}
-  ]},
-  { id:"infra", label:"Infraestrutura e Distribuição de Sinais", subs:[
-    { id:3, nome:"Serviços (Pacotes Mensais)", itens:[
-      {id:7,nome:"Antipirataria (Serviço LiveMode)",orc:425600,gasto:840,prov:299160},
-      {id:8,nome:"Estatísticas",orc:120000,gasto:7000,prov:49000},
-      {id:9,nome:"Ferramenta de Clipping",orc:200000,gasto:0,prov:200000},
-      {id:10,nome:"Media Day",orc:300000,gasto:0,prov:200000},
-      {id:11,nome:"Espumas",orc:5000,gasto:0,prov:5000},
-      {id:12,nome:"Grafismo",orc:90000,gasto:0,prov:90000},
-      {id:13,nome:"Vinheta + Trilha",orc:35000,gasto:16000,prov:19000},
-    ]}
-  ]},
-];
-
 function TabApresentacoes({T}) {
-  // ── Seletor de tipo
-  const [tipo, setTipo] = useState(null); // null | "variaveis" | "fixos"
-
+  const [tipo, setTipo] = useState(null);
   if (!tipo) return <SeletorTipo T={T} onSelect={setTipo}/>;
   if (tipo === "variaveis") return <FormVariaveis T={T} onBack={()=>setTipo(null)}/>;
   return <FormFixos T={T} onBack={()=>setTipo(null)}/>;
@@ -481,7 +493,6 @@ function FormVariaveis({T, onBack}) {
   useDonut(canvasRef,parsed.nfRecV,parsed.nfPend);
 
   const IS={...iSty(T),width:"100%"};
-  const labelSty={color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1};
   const fw={marginBottom:16};
 
   async function gerarPPTX() {
@@ -552,9 +563,9 @@ function FormVariaveis({T, onBack}) {
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>01</span><span style={secHdr}>Configuração Base</span></div>
         <div style={grid3}>
-          <div style={fw}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada Atual *</label><input type="number" min={1} max={38} value={rodadaAtual} onChange={e=>setRodadaCount(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Qual rodada acabou de ser jogada</span></div>
-          <div style={fw}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Campeonato *</label><input value={orcGlobal} onChange={e=>setOrcGlobal(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Orçamento fixo (38 rodadas)</span></div>
-          <div style={fw}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até a Rodada *</label><input value={orcAteRod} onChange={e=>setOrcAteRod(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Valor real orçado (não proporcional)</span></div>
+          <div style={fieldWrap}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada Atual *</label><input type="number" min={1} max={38} value={rodadaAtual} onChange={e=>setRodadaCount(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Qual rodada acabou de ser jogada</span></div>
+          <div style={fieldWrap}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Campeonato *</label><input value={orcGlobal} onChange={e=>setOrcGlobal(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Orçamento fixo (38 rodadas)</span></div>
+          <div style={fieldWrap}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até a Rodada *</label><input value={orcAteRod} onChange={e=>setOrcAteRod(e.target.value)} style={{...IS}}/><span style={{fontSize:10,color:T.textSm}}>Valor real orçado (não proporcional)</span></div>
         </div>
       </div>
 
@@ -564,7 +575,7 @@ function FormVariaveis({T, onBack}) {
           {[{label:"Orçado",val:macroOrc,set:setMacroOrc,color:"#9ca3af",desc:"Valor previamente orçado para o campeonato."},{label:"Realizado",val:macroReal,set:setMacroReal,color:"#22c55e",desc:"NFs com confirmação de recebimento até a rodada atual."},{label:"Projetado",val:macroProj,set:setMacroProj,color:"#3b82f6",desc:"Estimativa para rodadas ainda não realizadas."}].map(({label,val,set:setter,color,desc})=>(
             <div key={label} style={{background:T.bg,borderRadius:8,padding:"16px",borderTop:`3px solid ${color}`}}>
               <p style={{fontSize:10,fontWeight:700,color,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>{label}</p>
-              <div style={fw}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Valor Total *</label><input value={val} onChange={e=>setter(e.target.value)} style={{...IS,color}}/></div>
+              <div style={fieldWrap}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Valor Total *</label><input value={val} onChange={e=>setter(e.target.value)} style={{...IS,color}}/></div>
               <p style={{fontSize:10,color:T.textSm,lineHeight:1.5}}>{desc}</p>
             </div>
           ))}
@@ -609,14 +620,11 @@ function FormVariaveis({T, onBack}) {
   );
 }
 
-// ── Formulário Custos Fixos ────────────────────────────────────────────────────
 function FormFixos({T, onBack}) {
   const [rodadaAtual, setRodadaAtual] = useState(4);
   const [orcTotal, setOrcTotal] = useState("1.410.212,00");
   const [status, setStatus] = useState({msg:"Aguardando...", cls:""});
   const [loading, setLoading] = useState(false);
-
-  // cats state
   const [cats, setCats] = useState(() => JSON.parse(JSON.stringify(CATS_FIXOS_INIT)));
   const [collapsed, setCollapsed] = useState({});
   const [collapsedSubs, setCollapsedSubs] = useState({});
@@ -643,7 +651,6 @@ function FormFixos({T, onBack}) {
     setCats(prev => prev.map(cat => cat.id!==catId ? cat : {...cat, subs: cat.subs.map(sub => sub.id!==subId ? sub : {...sub, nome:val})}));
   };
 
-  // totals
   const calcSub = sub => {
     const orc=sub.itens.reduce((s,it)=>s+it.orc,0);
     const gasto=sub.itens.reduce((s,it)=>s+it.gasto,0);
@@ -719,8 +726,6 @@ function FormFixos({T, onBack}) {
           <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Serviços fixos do campeonato</p>
         </div>
       </div>
-
-      {/* S1 Config */}
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}>
           <span style={{fontSize:10,color:T.textSm,fontWeight:700,marginRight:8}}>01</span>
@@ -732,8 +737,6 @@ function FormFixos({T, onBack}) {
           <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Campeonato *</label><input value={orcTotal} onChange={e=>setOrcTotal(e.target.value)} style={{...IS,color:"#3b82f6"}}/></div>
         </div>
       </div>
-
-      {/* S2 Totais rápidos */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
         {[{l:"Orçado Total",v:fmt(totals.orc),c:"#3b82f6"},{l:"Gasto Total",v:fmt(totals.gasto),c:T.text},{l:"Provisionado Total",v:fmt(totals.prov),c:"#f59e0b"},{l:"Saldo Total",v:fmt(totals.saldo),c:totals.saldo>=0?"#22c55e":"#ef4444"}].map(k=>(
           <div key={k.l} style={{background:T.card,borderRadius:10,padding:"14px 16px",borderTop:`3px solid ${k.c}`}}>
@@ -742,14 +745,11 @@ function FormFixos({T, onBack}) {
           </div>
         ))}
       </div>
-
-      {/* Categorias */}
       {cats.map(cat => {
         const ct = calcCat(cat);
         const isOpen = !collapsed[cat.id];
         return (
           <div key={cat.id} style={{background:T.card,borderRadius:12,overflow:"hidden",marginBottom:16}}>
-            {/* Cat header */}
             <div onClick={()=>toggleCat(cat.id)} style={{padding:"12px 20px",background:T.bg,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",userSelect:"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <span style={{color:T.textSm,fontSize:10,transition:"transform .2s",display:"inline-block",transform:isOpen?"rotate(0)":"rotate(-90deg)"}}>▼</span>
@@ -762,7 +762,6 @@ function FormFixos({T, onBack}) {
                 <span style={{color:T.textMd}}>Saldo: <b style={{color:ct.saldo>=0?"#22c55e":"#ef4444"}}>{fmt(ct.saldo)}</b></span>
               </div>
             </div>
-
             {isOpen && (
               <div>
                 {cat.subs.map(sub => {
@@ -770,7 +769,6 @@ function FormFixos({T, onBack}) {
                   const subOpen = !collapsedSubs[sub.id];
                   return (
                     <div key={sub.id} style={{borderTop:`1px solid ${T.border}`}}>
-                      {/* Sub header */}
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 20px",background:T.card,cursor:"pointer"}} onClick={()=>toggleSub(sub.id)}>
                         <div style={{display:"flex",alignItems:"center",gap:8}} onClick={e=>e.stopPropagation()}>
                           <span onClick={()=>toggleSub(sub.id)} style={{color:T.textSm,fontSize:10,cursor:"pointer",transform:subOpen?"rotate(0)":"rotate(-90deg)",display:"inline-block",transition:"transform .2s"}}>▼</span>
@@ -783,7 +781,6 @@ function FormFixos({T, onBack}) {
                           <button onClick={e=>{e.stopPropagation();removeSub(cat.id,sub.id);}} style={{background:"none",border:"none",color:T.textSm,cursor:"pointer",fontSize:11,padding:"2px 6px",borderRadius:4}} onMouseEnter={e=>e.target.style.color="#ef4444"} onMouseLeave={e=>e.target.style.color=T.textSm}>✕</button>
                         </div>
                       </div>
-
                       {subOpen && (
                         <div style={{padding:"12px 20px"}}>
                           <div style={{overflowX:"auto"}}>
@@ -821,7 +818,6 @@ function FormFixos({T, onBack}) {
                             </table>
                           </div>
                           <button onClick={()=>addItem(cat.id,sub.id)} style={{marginTop:8,background:"none",border:`1px dashed #1e3a5a`,color:"#3b82f6",padding:"5px 12px",borderRadius:7,cursor:"pointer",fontSize:11,letterSpacing:.4}}>+ Item</button>
-                          {/* Sub footer totals */}
                           <div style={{display:"flex",gap:20,padding:"8px 10px",background:T.bg,borderRadius:7,marginTop:8,flexWrap:"wrap",fontSize:11}}>
                             {[{l:"Itens",v:sub.itens.length,c:T.text},{l:"Orçado",v:fmt(st.orc),c:"#3b82f6"},{l:"Gasto",v:fmt(st.gasto),c:T.text},{l:"Provisionado",v:fmt(st.prov),c:"#f59e0b"},{l:"Saldo",v:fmt(st.saldo),c:st.saldo>=0?"#22c55e":"#ef4444"}].map(x=>(
                               <div key={x.l}><div style={{color:T.textSm,fontSize:9,textTransform:"uppercase",letterSpacing:.5}}>{x.l}</div><div style={{color:x.c,fontWeight:700,marginTop:2}}>{x.v}</div></div>
@@ -838,8 +834,6 @@ function FormFixos({T, onBack}) {
           </div>
         );
       })}
-
-      {/* Footer */}
       <div style={{position:"sticky",bottom:0,left:0,right:0,background:T.card,borderTop:`1px solid ${T.border}`,padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50,borderRadius:"0 0 12px 12px"}}>
         <div><p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text}}>Tudo preenchido?</b> Clique para gerar o PPTX de Custos Fixos.</p><p style={{fontSize:11,color:status.cls==="ok"?"#22c55e":status.cls==="err"?"#ef4444":T.textSm}}>{status.msg}</p></div>
         <button onClick={gerarPPTX} disabled={loading} style={{...btnStyle,background:loading?"#1a2a3a":"#3b82f6",color:loading?"#60a5fa":"#fff",padding:"11px 28px",fontSize:12,letterSpacing:1.5,textTransform:"uppercase",opacity:loading?0.7:1}}>{loading?"Gerando...":"📊 Gerar PPTX"}</button>
@@ -850,11 +844,25 @@ function FormFixos({T, onBack}) {
 
 // ─── BRASILEIRÃO ─────────────────────────────────────────────────────────────
 function Brasileirao({onBack,T,darkMode,setDarkMode}) {
-  const [jogos,setJogos]       = useState(ALL_JOGOS);
-  const [servicos,setServicos] = useState(SERVICOS_INIT);
+  // ── Estado com persistência localStorage ──────────────────────────────────
+  const [jogos, setJogosRaw] = useState(() => lsGet(LS_JOGOS, ALL_JOGOS));
+  const [servicos, setServicosRaw] = useState(() => lsGet(LS_SERVICOS, SERVICOS_INIT));
 
-  const setJogosP=fn=>{setJogos(prev=>{const next=typeof fn==="function"?fn(prev):fn;return next;});};
-  const setServicosP=fn=>{setServicos(prev=>{const next=typeof fn==="function"?fn(prev):fn;return next;});};
+  // Wrappers que salvam no localStorage automaticamente a cada mudança
+  const setJogos = fn => {
+    setJogosRaw(prev => {
+      const next = typeof fn === "function" ? fn(prev) : fn;
+      lsSet(LS_JOGOS, next);
+      return next;
+    });
+  };
+  const setServicos = fn => {
+    setServicosRaw(prev => {
+      const next = typeof fn === "function" ? fn(prev) : fn;
+      lsSet(LS_SERVICOS, next);
+      return next;
+    });
+  };
 
   const varCalc=useMemo(()=>{
     const allJ=jogos.filter(j=>j.mandante!=="A definir");
@@ -874,8 +882,8 @@ function Brasileirao({onBack,T,darkMode,setDarkMode}) {
   const [showPlaceholder,setShowPlaceholder]=useState(false);
   const [microJogoId,setMicroJogoId]=useState(JOGOS_REAIS[0].id);
 
-  const saveJogo=j=>setJogosP(js=>js.map(x=>x.id===j.id?j:x));
-  const addJogo=j=>{setJogosP(js=>[...js,j]);setNovo(false);setNovoRapido(null);};
+  const saveJogo=j=>setJogos(js=>js.map(x=>x.id===j.id?j:x));
+  const addJogo=j=>{setJogos(js=>[...js,j]);setNovo(false);setNovoRapido(null);};
   const totalOrc=RESUMO_CATS.reduce((s,c)=>s+c.orcado,0),totalProv=RESUMO_CATS.reduce((s,c)=>s+c.provisionado,0),totalReal=RESUMO_CATS.reduce((s,c)=>s+c.realizado,0);
   const pctGasto=totalOrc?((totalReal/totalOrc)*100).toFixed(1):0;
   const divulgados=jogos.filter(j=>j.mandante!=="A definir"),aDivulgar=jogos.filter(j=>j.mandante==="A definir");
@@ -972,7 +980,7 @@ function Brasileirao({onBack,T,darkMode,setDarkMode}) {
         </>)}
 
         {tab==="micro"&&<VisaoMicro jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
-        {tab==="serviços"&&<TabServicos servicos={servicos} setServicos={setServicosP} T={T}/>}
+        {tab==="serviços"&&<TabServicos servicos={servicos} setServicos={setServicos} T={T}/>}
 
         {tab==="savings"&&(<>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
@@ -1039,10 +1047,16 @@ function Brasileirao({onBack,T,darkMode,setDarkMode}) {
 }
 
 export default function App() {
-  const [darkMode,setDarkMode]=useState(true);
-  const [pagina,setPagina]=useState("home");
-  const T=darkMode?DARK:LIGHT;
-  const toggleDark=v=>{const next=typeof v==="function"?v(darkMode):v;setDarkMode(next);};
+  const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
+  const [pagina, setPagina] = useState("home");
+  const T = darkMode ? DARK : LIGHT;
+
+  const toggleDark = v => {
+    const next = typeof v === "function" ? v(darkMode) : v;
+    setDarkMode(next);
+    lsSet(LS_DARK, next);
+  };
+
   if(pagina==="home") return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;

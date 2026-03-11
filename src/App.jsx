@@ -1,22 +1,17 @@
-import { useState } from "react";
-import { DARK, LIGHT, btnStyle, iSty, CENARIO_INFO, LS_JOGOS, LS_SERVICOS, LS_DARK } from "./constants";
-import { lsGet, lsSet } from "./utils";
-import { ALL_JOGOS, SERVICOS_INIT } from "./data";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 
-import Home             from "./components/Home";
-import TabRelatorio     from "./components/tabs/TabRelatorio";
-import TabServicos      from "./components/tabs/TabServicos";
+// ─── Importa dos arquivos separados ──────────────────────────────────────────
+import { DARK, LIGHT, CATS, DETENTORES, CIDADES, TIMES, CENARIO_INFO, SECAO_COLORS, PIE_COLORS, TIPO_COLOR, CAMPEONATOS, ORC_PADRAO, REAL_PADRAO, btnStyle, iSty, LS_JOGOS, LS_SERVICOS, LS_DARK } from "./constants";
+import { fmt, fmtK, fmtNum, fmtR, fmtRs, parseBR, subTotal, catTotal, lsGet, lsSet } from "./utils";
+import { ALL_JOGOS, SERVICOS_INIT, CATS_FIXOS_INIT, allSubKeys, getDefaults, getJogoDefaults, makeJogo } from "./data";
+import { KPI, Pill, CustomTooltip } from "./components/shared";
+import Home from "./components/Home";
+import TabServicos from "./components/tabs/TabServicos";
+import TabRelatorio from "./components/tabs/TabRelatorio";
+import VisaoMicro from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
-import VisaoMicro       from "./components/tabs/VisaoMicro";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-
-const TABS = [
-  { id:"dashboard",     label:"📊 Dashboard"     },
-  { id:"jogos",         label:"🎮 Jogos"          },
-  { id:"servicos",      label:"🔧 Serviços"       },
-  { id:"relatorio",     label:"📋 Relatório"      },
-  { id:"apresentacoes", label:"📽 Apresentações"  },
-];
 
 export default function App() {
   const [darkMode,    setDarkMode]    = useState(() => lsGet(LS_DARK, true));

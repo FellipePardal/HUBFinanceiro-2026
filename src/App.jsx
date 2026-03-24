@@ -8,9 +8,9 @@ import TabRelatorio from "./components/tabs/TabRelatorio";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import VisaoMicro from "./components/tabs/VisaoMicro";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-import { JOGOS_REAIS, JOGOS_PLACEHOLDER, SERVICOS_INIT, allSubKeys, getDefaults } from "./data";
+import { JOGOS_REAIS, JOGOS_PLACEHOLDER, SERVICOS_INIT } from "./data";
 import { CENARIO_INFO } from "./constants";
-import { subTotal } from "./utils";
+import { subTotal, lsGet, lsSet } from "./utils";
 
 // ─── TEMA ─────────────────────────────────────────────────────────────────────
 const DARK  = { bg:"#0f172a", card:"#1e293b", border:"#334155", text:"#f1f5f9", textMd:"#94a3b8", textSm:"#64748b" };
@@ -23,9 +23,9 @@ export default function App() {
 
   const [campeonato, setCampeonato] = useState(null);
   const [tab, setTab]               = useState("jogos");
-  const [jogos, setJogos]           = useState([...JOGOS_REAIS]);
+  const [jogos, setJogos]           = useState(() => lsGet("bra2026_jogos", [...JOGOS_REAIS]));
   const [showPlaceholder, setShowPlaceholder] = useState(false);
-  const [servicos, setServicos]     = useState(SERVICOS_INIT);
+  const [servicos, setServicos]     = useState(() => lsGet("bra2026_servicos", SERVICOS_INIT));
   const [filtroRod, setFiltroRod]   = useState("Todas");
   const [filtroCat, setFiltroCat]   = useState("Todas");
   const [microJogoId, setMicroJogoId] = useState(null);
@@ -69,17 +69,17 @@ export default function App() {
 
   // ─── handlers ──────────────────────────────────────────────────────────────
   const handleSaveJogo = (novoJogo) => {
-    setJogos(prev => [...prev, novoJogo]);
+    setJogos(prev => { const next = [...prev, novoJogo]; lsSet("bra2026_jogos", next); return next; });
     setNovo(false);
   };
 
   const handleSaveRapido = (novoJogo) => {
-    setJogos(prev => [...prev, novoJogo]);
+    setJogos(prev => { const next = [...prev, novoJogo]; lsSet("bra2026_jogos", next); return next; });
     setNovoRapido(null);
   };
 
   const handleSaveMicro = (jogoAtualizado) => {
-    setJogos(prev => prev.map(j => j.id === jogoAtualizado.id ? jogoAtualizado : j));
+    setJogos(prev => { const next = prev.map(j => j.id === jogoAtualizado.id ? jogoAtualizado : j); lsSet("bra2026_jogos", next); return next; });
   };
 
   // ─── tela inicial ──────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { fmt } from "../../utils";
 export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
   const info = CENARIO_INFO[cenario];
   const proximaRodada = Math.max(0, ...jogos.filter(j=>j.mandante!=="A definir").map(j=>j.rodada)) + 1;
-  const [form, setForm] = useState({mandante:"",visitante:"",rodada:String(proximaRodada),cidade:"",data:"",hora:"",detentor:"A definir"});
+  const [form, setForm] = useState({mandante:TIMES[0],visitante:TIMES[0],rodada:String(proximaRodada),cidade:CIDADES[0],data:"",hora:"",detentor:"A definir"});
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const IS = iSty(T);
 
@@ -57,7 +57,7 @@ export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
 
 // ─── MODAL NOVO JOGO COMPLETO ─────────────────────────────────────────────────
 export function NovoJogoModal({onSave, onClose, T}) {
-  const [form, setForm] = useState({mandante:"",visitante:"",rodada:"",cidade:"",data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
+  const [form, setForm] = useState({mandante:TIMES[0],visitante:TIMES[0],rodada:"",cidade:CIDADES[0],data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const IS = iSty(T);
 

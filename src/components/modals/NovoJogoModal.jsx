@@ -56,10 +56,22 @@ export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
 }
 
 // ─── MODAL NOVO JOGO COMPLETO ─────────────────────────────────────────────────
-export function NovoJogoModal({onSave, onClose, T}) {
-  const [form, setForm] = useState({mandante:TIMES[0],visitante:TIMES[0],rodada:"",cidade:CIDADES[0],data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
+export function NovoJogoModal({jogo, onSave, onClose, T}) {
+  const [form, setForm] = useState(jogo ? {
+    mandante:  jogo.mandante,
+    visitante: jogo.visitante,
+    rodada:    String(jogo.rodada),
+    cidade:    jogo.cidade,
+    data:      jogo.data,
+    hora:      jogo.hora,
+    categoria: jogo.categoria,
+    regiao:    jogo.regiao || "Sudeste",
+    detentor:  jogo.detentor,
+  } : {mandante:TIMES[0],visitante:TIMES[0],rodada:"",cidade:CIDADES[0],data:"",hora:"",categoria:"B1",regiao:"Sudeste",detentor:"A definir"});
+
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const IS = iSty(T);
+  const isEdit = !!jogo;
 
   const field = (label, key, opts=null) => (
     <div style={{marginBottom:12}}>
@@ -74,13 +86,20 @@ export function NovoJogoModal({onSave, onClose, T}) {
   const handleSave = () => {
     if(!form.mandante||!form.visitante) return;
     const defs = getDefaults(form.categoria, form.regiao==="Sul"?"sul":"sudeste");
-    onSave({...form, id:Date.now(), rodada:parseInt(form.rodada)||0, orcado:{...defs}, provisionado:{...defs}, realizado:{...allSubKeys()}});
+    onSave({
+      ...form,
+      id:           jogo?.id || Date.now(),
+      rodada:       parseInt(form.rodada)||0,
+      orcado:       jogo?.orcado       || {...defs},
+      provisionado: jogo?.provisionado || {...defs},
+      realizado:    jogo?.realizado    || {...allSubKeys()},
+    });
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:460,maxHeight:"90vh",overflowY:"auto"}}>
-        <h3 style={{margin:"0 0 20px",fontSize:16,color:T.text}}>Novo Jogo</h3>
+        <h3 style={{margin:"0 0 20px",fontSize:16,color:T.text}}>{isEdit ? "Editar Jogo" : "Novo Jogo"}</h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           {field("Mandante","mandante",TIMES)}
           {field("Visitante","visitante",TIMES)}
@@ -94,7 +113,7 @@ export function NovoJogoModal({onSave, onClose, T}) {
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
           <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-          <button onClick={handleSave} style={{...btnStyle,background:"#22c55e"}}>Adicionar</button>
+          <button onClick={handleSave} style={{...btnStyle,background:"#22c55e"}}>{isEdit ? "Salvar" : "Adicionar"}</button>
         </div>
       </div>
     </div>

@@ -12,8 +12,7 @@ import TabRelatorio     from "./components/tabs/TabRelatorio";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-// 👇 NOVO IMPORT
-import ImportCSVModal from "./components/modals/ImportCSVModal";
+
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
 function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
@@ -57,8 +56,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [showNovo,        setNovo]            = useState(false);
   const [novoRapido,      setNovoRapido]      = useState(null);
   const [jogoEdit,        setJogoEdit]        = useState(null);
-  // 👇 NOVO ESTADO
-  const [showImport,      setShowImport]      = useState(false);
+
   const [filtroRod,       setFiltroRod]       = useState("Todas");
   const [filtroCat,       setFiltroCat]       = useState("Todas");
   const [showPlaceholder, setShowPlaceholder] = useState(false);
@@ -69,8 +67,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const deleteJogo     = id => { if(window.confirm("Excluir este jogo?")) setJogos(js => js.filter(j => j.id !== id)); };
   const editJogo       = j => setJogoEdit(j);
   const handleEditSave = j => { saveJogo(j); setJogoEdit(null); };
-  // 👇 NOVO HANDLER
-  const handleImport   = novosJogos => setJogos(novosJogos);
+
 
   const totalOrc  = RESUMO_CATS.reduce((s,c) => s+c.orcado, 0);
   const totalProv = RESUMO_CATS.reduce((s,c) => s+c.provisionado, 0);
@@ -202,8 +199,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         </>)}
 
         {/* ── ABAS ── */}
-        {/* 👇 ALTERADO: adicionado onImportCSV */}
-        {tab==="jogos"         && <TabJogos         jogos={jogos} filtrados={filtrados} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} rodadasList={rodadasList} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} setNovoRapido={setNovoRapido} onDelete={deleteJogo} onEdit={editJogo} onImportCSV={()=>setShowImport(true)} T={T}/>}
+        {tab==="jogos"         && <TabJogos         jogos={jogos} filtrados={filtrados} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} rodadasList={rodadasList} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} setNovoRapido={setNovoRapido} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
         {tab==="savings"       && <TabSavings       jogosFiltered={jogosFiltered} totOrcJogos={totOrcJogos} totProvJogos={totProvJogos} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} rodadasList={rodadasList} T={T}/>}
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
@@ -216,8 +212,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
       {showNovo    && <NovoJogoModal   onSave={addJogo} onClose={()=>setNovo(false)} T={T}/>}
       {novoRapido  && <NovoRapidoModal cenario={novoRapido} jogos={jogos} onSave={addJogo} onClose={()=>setNovoRapido(null)} T={T}/>}
       {jogoEdit    && <NovoJogoModal   jogo={jogoEdit} onSave={handleEditSave} onClose={()=>setJogoEdit(null)} T={T}/>}
-      {/* 👇 NOVO MODAL */}
-      {showImport  && <ImportCSVModal  jogos={jogos} onImport={handleImport} onClose={()=>setShowImport(false)} T={T}/>}
+
     </div>
   );
 }

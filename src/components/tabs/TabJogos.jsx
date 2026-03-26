@@ -5,7 +5,7 @@ import { btnStyle } from "../../constants";
 export default function TabJogos({
   jogos, filtrados, filtroRod, setFiltroRod, filtroCat, setFiltroCat,
   showPlaceholder, setShowPlaceholder, rodadasList,
-  setMicroJogoId, setTab, setNovo, setNovoRapido, T
+  setMicroJogoId, setTab, setNovo, setNovoRapido, onDelete, onEdit, T
 }) {
   return (
     <>
@@ -66,7 +66,11 @@ export default function TabJogos({
                     <td style={{padding:"10px 12px",fontSize:13,color:"#f59e0b",whiteSpace:"nowrap"}}>{fmtK(r)}</td>
                     <td style={{padding:"10px 12px",fontWeight:600,color:(o-p)>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>{fmtK(o-p)}</td>
                     <td style={{padding:"10px 12px"}}>
-                      <button onClick={()=>{setMicroJogoId(j.id);setTab("micro");}} style={{...btnStyle,background:"#1d4ed8",padding:"4px 10px",fontSize:11}}>🔍</button>
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>{setMicroJogoId(j.id);setTab("micro");}} style={{...btnStyle,background:"#1d4ed8",padding:"4px 10px",fontSize:11}}>🔍</button>
+                        {!isDef && <button onClick={()=>onEdit(j)} style={{...btnStyle,background:"#475569",padding:"4px 10px",fontSize:11}}>✏️</button>}
+                        {!isDef && <button onClick={()=>onDelete(j.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 10px",fontSize:11}}>🗑</button>}
+                      </div>
                     </td>
                   </tr>
                 );

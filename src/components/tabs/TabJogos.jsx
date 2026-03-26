@@ -5,7 +5,8 @@ import { btnStyle } from "../../constants";
 export default function TabJogos({
   jogos, filtrados, filtroRod, setFiltroRod, filtroCat, setFiltroCat,
   showPlaceholder, setShowPlaceholder, rodadasList,
-  setMicroJogoId, setTab, setNovo, setNovoRapido, onDelete, onEdit, T
+  // 👇 NOVO: onImportCSV adicionado
+  setMicroJogoId, setTab, setNovo, setNovoRapido, onDelete, onEdit, onImportCSV, T
 }) {
   return (
     <>
@@ -31,6 +32,8 @@ export default function TabJogos({
           <button onClick={()=>setNovoRapido("b2s")}   style={{...btnStyle,background:"#3b82f6",fontSize:12}}>+ B2 Sudeste</button>
           <button onClick={()=>setNovoRapido("b2sul")} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ B2 Sul</button>
           <button onClick={()=>setNovo(true)}          style={{...btnStyle,background:"#475569",fontSize:12}}>+ Personalizado</button>
+          {/* 👇 NOVO BOTÃO */}
+          <button onClick={onImportCSV}                style={{...btnStyle,background:"#0f766e",fontSize:12}}>⬆️ Importar CSV</button>
         </div>
       </div>
 

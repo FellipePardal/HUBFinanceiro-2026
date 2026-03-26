@@ -78,7 +78,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const filtrados = (showPlaceholder ? jogos : divulgados).filter(j =>
     (filtroRod==="Todas" || j.rodada===parseInt(filtroRod)) &&
     (filtroCat==="Todas" || j.categoria===filtroCat)
-  );
+  ).sort((a,b) => a.rodada - b.rodada);
   const jogosFiltered = divulgados.filter(j =>
     (filtroRod==="Todas" || j.rodada===parseInt(filtroRod)) &&
     (filtroCat==="Todas" || j.categoria===filtroCat)

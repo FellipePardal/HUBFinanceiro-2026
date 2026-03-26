@@ -81,7 +81,7 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
             {label:"Orçado",      value:fmt(totOrc),          color:"#22c55e"},
             {label:"Provisionado",value:fmt(totProv),         color:"#3b82f6"},
             {label:"Realizado",   value:fmt(totReal),         color:"#f59e0b"},
-            {label:"Saving",      value:fmt(totOrc-totReal),  color:(totOrc-totReal)>=0?"#a3e635":"#ef4444"},
+            {label:"Saving", value:fmt(totOrc-totProv), color:(totOrc-totProv)>=0?"#a3e635":"#ef4444"},
           ].map(k => (
             <div key={k.label} style={{background:T.bg,borderRadius:8,padding:"12px 16px",borderTop:`3px solid ${k.color}`}}>
               <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>{k.label}</p>

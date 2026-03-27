@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
@@ -12,21 +12,43 @@ import TabRelatorio     from "./components/tabs/TabRelatorio";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
+import { getState, setState as setSupabaseState } from "./lib/supabase";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
 function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
-  const [jogos, setJogosRaw]       = useState(() => lsGet(LS_JOGOS, ALL_JOGOS));
-  const [servicos, setServicosRaw] = useState(() => lsGet(LS_SERVICOS, SERVICOS_INIT));
+  const [jogos, setJogosRaw]            = useState(ALL_JOGOS);
+  const [servicos, setServicosRaw]      = useState(SERVICOS_INIT);
+  const [loading, setLoading]           = useState(true);
+  const [hasMigration, setHasMigration] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      const [j, s] = await Promise.all([getState('jogos'), getState('servicos')]);
+      if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
+      if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
+      if (lsGet(LS_JOGOS, null)) setHasMigration(true);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
   const setJogos = fn => setJogosRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
-    lsSet(LS_JOGOS, next); return next;
+    setSupabaseState('jogos', next); return next;
   });
   const setServicos = fn => setServicosRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
-    lsSet(LS_SERVICOS, next); return next;
+    setSupabaseState('servicos', next); return next;
   });
+
+  const handleMigrate = async () => {
+    const lsJogos    = lsGet(LS_JOGOS, null);
+    const lsServicos = lsGet(LS_SERVICOS, null);
+    if (lsJogos)    { await setSupabaseState('jogos', lsJogos); setJogosRaw(lsJogos); }
+    if (lsServicos) { await setSupabaseState('servicos', lsServicos); setServicosRaw(lsServicos); }
+    setHasMigration(false);
+  };
 
   const varCalc = useMemo(() => {
     const allJ = jogos.filter(j => j.mandante !== "A definir");
@@ -102,6 +124,12 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
   const TABS = ["dashboard","serviços","jogos","micro","savings","gráficos","relatório","apresentações"];
 
+  if (loading) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>
+    </div>
+  );
+
   return (
     <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",paddingBottom:40}}>
 
@@ -117,9 +145,16 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-            <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
-              {darkMode ? "☀️ Claro" : "🌙 Escuro"}
-            </button>
+            <div style={{display:"flex",gap:8}}>
+              {hasMigration && (
+                <button onClick={handleMigrate} style={{background:"rgba(251,191,36,0.25)",border:"1px solid rgba(251,191,36,0.5)",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fef08a",fontWeight:600}}>
+                  ↑ Enviar dados locais
+                </button>
+              )}
+              <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
+                {darkMode ? "☀️ Claro" : "🌙 Escuro"}
+              </button>
+            </div>
             <div style={{textAlign:"right"}}>
               <p style={{color:"#86efac",fontSize:10,margin:"0 0 1px"}}>Execução geral</p>
               <p style={{fontSize:26,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0}}>{pctGasto}%</p>
@@ -229,5 +264,5 @@ export default function App() {
   };
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
-  return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>
 }

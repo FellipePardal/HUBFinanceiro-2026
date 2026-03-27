@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Iniciar app",
+      "type": "shell",
+      "command": "npm run dev",
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "silent" }
+    }
+  ]
+}

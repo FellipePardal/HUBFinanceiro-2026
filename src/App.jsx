@@ -12,7 +12,7 @@ import TabRelatorio     from "./components/tabs/TabRelatorio";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-import { getState, setState as setSupabaseState } from "./lib/supabase";
+import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
@@ -29,6 +29,16 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
       setLoading(false);
     }
     load();
+
+    const channel = supabase
+      .channel('app_state_changes')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
+        if (payload.new.key === 'jogos')    setJogosRaw(payload.new.value);
+        if (payload.new.key === 'servicos') setServicosRaw(payload.new.value);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, []);
 
   const setJogos = fn => setJogosRaw(prev => {

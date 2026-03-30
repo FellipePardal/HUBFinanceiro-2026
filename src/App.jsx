@@ -233,7 +233,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="relatório"     && <TabRelatorio     jogos={jogos} servicos={servicos} T={T}/>}
-        {tab==="apresentações" && <TabApresentacoes T={T}/>}
+        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
 
       </div>
 

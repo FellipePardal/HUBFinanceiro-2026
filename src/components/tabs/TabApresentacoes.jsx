@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import PptxGenJS from "pptxgenjs";
 import { btnStyle, iSty, ORC_PADRAO, REAL_PADRAO } from "../../constants";
-import { parseBR, fmtNum, fmtR, fmtRs } from "../../utils";
+import { parseBR, fmtNum, fmtR, fmtRs, subTotal } from "../../utils";
 import { CATS_FIXOS_INIT } from "../../data";
 
 const fmtBRL = v => "R$ " + Number(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});

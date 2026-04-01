@@ -8,21 +8,24 @@ export default function TabSavings({
   rodadasList, T
 }) {
   const [savingsMode, setSavingsMode] = useState("individual");
+  const [deRodada, setDeRodada] = useState(null);
   const [ateRodada, setAteRodada] = useState(null);
 
   const rodadasDisp = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
+  const minRod = rodadasDisp.length ? rodadasDisp[0] : 1;
   const maxRod = rodadasDisp.length ? rodadasDisp[rodadasDisp.length - 1] : 1;
+  const deRodadaEfetiva = deRodada ?? minRod;
   const ateRodadaEfetiva = ateRodada ?? maxRod;
 
   const savingsJogos = savingsMode === "acumulado"
-    ? divulgados.filter(j => j.rodada <= ateRodadaEfetiva && (filtroCat === "Todas" || j.categoria === filtroCat))
+    ? divulgados.filter(j => j.rodada >= deRodadaEfetiva && j.rodada <= ateRodadaEfetiva && (filtroCat === "Todas" || j.categoria === filtroCat))
     : jogosFiltered;
 
   const sOrc  = savingsJogos.reduce((s, j) => s + subTotal(j.orcado), 0);
   const sProv = savingsJogos.reduce((s, j) => s + subTotal(j.provisionado), 0);
 
   // Dados acumulados por rodada
-  const acumByRodada = savingsMode === "acumulado" ? rodadasDisp.filter(r => r <= ateRodadaEfetiva).map(rod => {
+  const acumByRodada = savingsMode === "acumulado" ? rodadasDisp.filter(r => r >= deRodadaEfetiva && r <= ateRodadaEfetiva).map(rod => {
     const jogosRod = divulgados.filter(j => j.rodada === rod && (filtroCat === "Todas" || j.categoria === filtroCat));
     const rOrc  = jogosRod.reduce((s, j) => s + subTotal(j.orcado), 0);
     const rProv = jogosRod.reduce((s, j) => s + subTotal(j.provisionado), 0);
@@ -34,6 +37,8 @@ export default function TabSavings({
     acumOrc += r.orc; acumProv += r.prov;
     return { ...r, acumOrc, acumProv, acumSav: acumOrc - acumProv };
   });
+
+  const rangeLabel = `Rd ${deRodadaEfetiva}–${ateRodadaEfetiva}`;
 
   return (
     <>
@@ -68,28 +73,45 @@ export default function TabSavings({
         </div>
       )}
 
-      {/* Seletor acumulado */}
+      {/* Seletor intervalo acumulado */}
       {savingsMode === "acumulado" && (
         <div style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:20}}>
-          <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-            <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Analisar da Rodada 1 até:</span>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              {rodadasDisp.map(r => (
-                <button key={r} onClick={() => setAteRodada(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-                  background:ateRodadaEfetiva===r?"#22c55e":T.bg,color:ateRodadaEfetiva===r?"#fff":T.textMd,
-                  boxShadow:ateRodadaEfetiva===r?"0 2px 8px rgba(34,197,94,0.3)":"none"}}>
-                  Rd {r}
-                </button>
-              ))}
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <span style={{color:T.textMd,fontSize:13,fontWeight:600,minWidth:90}}>Da Rodada:</span>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {rodadasDisp.filter(r => r <= ateRodadaEfetiva).map(r => (
+                  <button key={r} onClick={() => setDeRodada(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                    background:deRodadaEfetiva===r?"#3b82f6":T.bg,color:deRodadaEfetiva===r?"#fff":T.textMd,
+                    boxShadow:deRodadaEfetiva===r?"0 2px 8px rgba(59,130,246,0.3)":"none"}}>
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
-            <span style={{color:T.textSm,fontSize:12}}>({savingsJogos.length} jogos · Rodadas 1–{ateRodadaEfetiva})</span>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <span style={{color:T.textMd,fontSize:13,fontWeight:600,minWidth:90}}>Até Rodada:</span>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {rodadasDisp.filter(r => r >= deRodadaEfetiva).map(r => (
+                  <button key={r} onClick={() => setAteRodada(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                    background:ateRodadaEfetiva===r?"#22c55e":T.bg,color:ateRodadaEfetiva===r?"#fff":T.textMd,
+                    boxShadow:ateRodadaEfetiva===r?"0 2px 8px rgba(34,197,94,0.3)":"none"}}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{color:T.text,fontSize:14,fontWeight:700}}>{rangeLabel}</span>
+              <span style={{color:T.textSm,fontSize:12}}>{savingsJogos.length} jogos selecionados</span>
+            </div>
           </div>
         </div>
       )}
 
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
-        <KPI label={savingsMode==="acumulado" ? `Saving (Rd 1–${ateRodadaEfetiva})` : "Saving (Orç − Prov)"} value={fmt(sOrc - sProv)} sub={`${sOrc ? ((sOrc - sProv) / sOrc * 100).toFixed(1) : 0}% do budget`} color="#22c55e" T={T}/>
+        <KPI label={savingsMode==="acumulado" ? `Saving (${rangeLabel})` : "Saving (Orç − Prov)"} value={fmt(sOrc - sProv)} sub={`${sOrc ? ((sOrc - sProv) / sOrc * 100).toFixed(1) : 0}% do budget`} color="#22c55e" T={T}/>
         <KPI label="% Saving" value={sOrc ? `${((sOrc - sProv) / sOrc * 100).toFixed(1)}%` : "—"} sub="sobre o orçado" color="#3b82f6" T={T}/>
         <KPI label="Custo Médio / Jogo" value={savingsJogos.length ? fmt(sOrc / savingsJogos.length) : "—"} sub="orçado" color="#8b5cf6" T={T}/>
       </div>
@@ -98,7 +120,7 @@ export default function TabSavings({
       {savingsMode === "acumulado" && acumProgressive.length > 0 && (
         <div style={{background:T.card,borderRadius:12,overflow:"hidden",marginBottom:20}}>
           <div style={{padding:"14px 20px",borderBottom:`1px solid ${T.border}`}}>
-            <h3 style={{margin:0,fontSize:14,color:T.textMd}}>Evolução Acumulada por Rodada</h3>
+            <h3 style={{margin:0,fontSize:14,color:T.textMd}}>Evolução Acumulada por Rodada ({rangeLabel})</h3>
           </div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
@@ -126,7 +148,7 @@ export default function TabSavings({
       {/* Tabela de jogos */}
       <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
         <div style={{padding:"14px 20px",borderBottom:`1px solid ${T.border}`}}>
-          <h3 style={{margin:0,fontSize:14,color:T.textMd}}>{savingsMode==="acumulado" ? `Saving por Jogo (Rd 1–${ateRodadaEfetiva})` : "Saving por Jogo"}</h3>
+          <h3 style={{margin:0,fontSize:14,color:T.textMd}}>{savingsMode==="acumulado" ? `Saving por Jogo (${rangeLabel})` : "Saving por Jogo"}</h3>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>

@@ -10,6 +10,7 @@ import TabGraficos      from "./components/tabs/TabGraficos";
 import TabServicos      from "./components/tabs/TabServicos";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
+import TabNotas         from "./components/tabs/TabNotas";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 
@@ -18,13 +19,15 @@ import { getState, setState as setSupabaseState, supabase } from "./lib/supabase
 function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [jogos, setJogosRaw]       = useState(ALL_JOGOS);
   const [servicos, setServicosRaw] = useState(SERVICOS_INIT);
+  const [notas, setNotasRaw]       = useState([]);
   const [loading, setLoading]      = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s] = await Promise.all([getState('jogos'), getState('servicos')]);
+      const [j, s, n] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
+      if (n) setNotasRaw(n); else setSupabaseState('notas', []);
       setLoading(false);
     }
     load();
@@ -34,6 +37,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
         if (payload.new.key === 'jogos')    setJogosRaw(payload.new.value);
         if (payload.new.key === 'servicos') setServicosRaw(payload.new.value);
+        if (payload.new.key === 'notas')    setNotasRaw(payload.new.value);
       })
       .subscribe();
 
@@ -47,6 +51,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const setServicos = fn => setServicosRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('servicos', next); return next;
+  });
+  const setNotas = fn => setNotasRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('notas', next); return next;
   });
 
   const varCalc = useMemo(() => {
@@ -73,6 +81,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
   const RESUMO_CATS = [...varCalc, ...fixosCalc];
 
+  const [setor,           setSetor]           = useState("orcamento");
   const [tab,             setTab]             = useState("dashboard");
   const [showNovo,        setNovo]            = useState(false);
   const [novoRapido,      setNovoRapido]      = useState(null);
@@ -136,7 +145,14 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     return Object.values(map).sort((a,b) => parseInt(a.name.slice(1))-parseInt(b.name.slice(1)));
   }, [jogos]);
 
-  const TABS = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
+  const TABS_ORC = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
+  const TABS_NF  = ["notas fiscais"];
+  const TABS = setor === "orcamento" ? TABS_ORC : TABS_NF;
+
+  const handleSetorChange = s => {
+    setSetor(s);
+    setTab(s === "orcamento" ? "dashboard" : "notas fiscais");
+  };
 
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -173,7 +189,19 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
             </div>
           </div>
         </div>
-        <div style={{display:"flex",gap:2,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+        {/* Barra de setores */}
+        <div style={{display:"flex",gap:0,marginTop:14,borderBottom:"1px solid rgba(255,255,255,0.15)"}}>
+          {[{k:"orcamento",l:"Orçamento",icon:"📊"},{k:"notas",l:"Notas Fiscais",icon:"📄"}].map(s => (
+            <button key={s.k} onClick={() => handleSetorChange(s.k)} style={{padding:"8px 20px",border:"none",cursor:"pointer",fontSize:13,fontWeight:setor===s.k?700:400,
+              background:setor===s.k?"rgba(255,255,255,0.18)":"transparent",color:setor===s.k?"#fff":"rgba(255,255,255,0.6)",
+              borderBottom:setor===s.k?"2px solid #86efac":"2px solid transparent",transition:"all 0.2s"}}>
+              {s.icon} {s.l}
+            </button>
+          ))}
+        </div>
+
+        {/* Abas do setor ativo */}
+        <div style={{display:"flex",gap:2,marginTop:4,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
           {TABS.map(t => (
             <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
               {t}
@@ -252,6 +280,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} T={T}/>}
 
       </div>
 

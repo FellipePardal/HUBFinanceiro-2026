@@ -8,7 +8,6 @@ import TabJogos         from "./components/tabs/TabJogos";
 import TabSavings       from "./components/tabs/TabSavings";
 import TabGraficos      from "./components/tabs/TabGraficos";
 import TabServicos      from "./components/tabs/TabServicos";
-import TabRelatorio     from "./components/tabs/TabRelatorio";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
@@ -122,7 +121,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     return Object.values(map).sort((a,b) => parseInt(a.name.slice(1))-parseInt(b.name.slice(1)));
   }, [jogos]);
 
-  const TABS = ["dashboard","serviços","jogos","micro","savings","gráficos","relatório","apresentações"];
+  const TABS = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
 
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -232,7 +231,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
-        {tab==="relatório"     && <TabRelatorio     jogos={jogos} servicos={servicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
 
       </div>

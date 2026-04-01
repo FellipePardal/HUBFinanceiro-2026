@@ -78,15 +78,17 @@ function FormVariaveis({T, onBack}) {
   const setRodadaField = (i,field,val) => setRodadas(prev => prev.map((r,idx) => idx===i ? {...r,[field]:val} : r));
 
   const parsed = useMemo(() => {
-    const rows      = rodadas.map(r => ({label:r.label, orcado:parseBR(r.orcado), realizado:parseBR(r.realizado)}));
-    const totOrc    = rows.reduce((s,r) => s+r.orcado, 0);
-    const totReal   = rows.reduce((s,r) => s+r.realizado, 0);
-    const saving    = totOrc - totReal;
-const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
-    const nfPend    = Math.max(0, nfEspV - nfRecV);
-    const pctRec    = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
+    const rows    = rodadas.map(r => ({label:r.label, orcado:parseBR(r.orcado), realizado:parseBR(r.realizado)}));
+    const totOrc  = rows.reduce((s,r) => s+r.orcado, 0);
+    const totReal = rows.reduce((s,r) => s+r.realizado, 0);
+    // ✅ FIX 1: saving = totOrc - totReal (era orcAteRodV - totReal)
+    const saving  = totOrc - totReal;
+    const savPct  = totOrc > 0 ? saving/totOrc*100 : 0;
+    const nfEspV  = parseBR(nfEsp), nfRecV = parseBR(nfRec);
+    const nfPend  = Math.max(0, nfEspV - nfRecV);
+    const pctRec  = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
     return {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfEspV, nfRecV};
-  }, [rodadas, orcAteRod, nfEsp, nfRec]);
+  }, [rodadas, nfEsp, nfRec]);
 
   useDonut(canvasRef, parsed.nfRecV, parsed.nfPend);
 
@@ -181,6 +183,7 @@ const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
         ];
       });
 
+      // ✅ FIX 2: savPctTot usa totOrc (era orcAteRodV)
       const savPctTot = totOrc>0 ? saving/totOrc*100 : 0;
       const stc = saving>=0?"A3E635":"FF6B6B";
       const tblTot = [
@@ -191,11 +194,12 @@ const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
         {text:(savPctTot>=0?"▲ ":"▼ ")+Math.abs(savPctTot).toFixed(1)+"%",     options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
+      // ✅ FIX 3: rowH dinâmico para não sobrepor o footer
       const rowH = Math.max(0.145, 1.55 / (rows.length + 1));
-sl.addTable([tblHead, ...tblBody, tblTot], {
-  x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
-  border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
-});
+      sl.addTable([tblHead, ...tblBody, tblTot], {
+        x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
+        border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
+      });
 
       // footer escuro
       const fY = 6.55;
@@ -297,9 +301,9 @@ sl.addTable([tblHead, ...tblBody, tblTot], {
           </div>
           <div style={{display:"flex",gap:28,flexWrap:"wrap",flex:1}}>
             {[
-              {label:"% Recebidas",     val:`${pctRec.toFixed(1)}%`,              sub:fmtRs(nfRecV),                             color:"#22c55e"},
-              {label:"% Pendentes",     val:`${(100-pctRec).toFixed(1)}%`,        sub:fmtRs(nfPend),                             color:"#d97706"},
-              {label:"Saving Acumulado",val:(saving>=0?"▲ ":"▼ ")+fmtRs(Math.abs(saving)),sub:`${Math.abs(savPct).toFixed(1)}% vs. orçado`,color:saving>=0?"#a3e635":"#ef4444"},
+              {label:"% Recebidas",     val:`${pctRec.toFixed(1)}%`,                           sub:fmtRs(nfRecV),                             color:"#22c55e"},
+              {label:"% Pendentes",     val:`${(100-pctRec).toFixed(1)}%`,                     sub:fmtRs(nfPend),                             color:"#d97706"},
+              {label:"Saving Acumulado",val:(saving>=0?"▲ ":"▼ ")+fmtRs(Math.abs(saving)),    sub:`${Math.abs(savPct).toFixed(1)}% vs. orçado`,color:saving>=0?"#a3e635":"#ef4444"},
             ].map(m=>(
               <div key={m.label}>
                 <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>

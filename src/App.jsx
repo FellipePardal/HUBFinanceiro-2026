@@ -160,57 +160,63 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     </div>
   );
 
-  return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",paddingBottom:40}}>
+  const SETORES = [
+    {k:"orcamento", l:"Orçamento",     icon:"📊"},
+    {k:"notas",     l:"Notas Fiscais", icon:"📄"},
+  ];
 
-      {/* Header verde */}
-      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"16px 16px 0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <button onClick={onBack} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"6px 12px",cursor:"pointer",color:"#fff",fontSize:12,fontWeight:600}}>← Portal</button>
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex"}}>
+
+      {/* Sidebar */}
+      <div style={{width:64,minHeight:"100vh",background:"linear-gradient(180deg,#166534,#15803d)",display:"flex",flexDirection:"column",alignItems:"center",paddingTop:12,gap:4,flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+        <button onClick={onBack} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,padding:"8px",cursor:"pointer",color:"#fff",fontSize:14,marginBottom:12,width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center"}} title="Voltar ao Portal">←</button>
+        {SETORES.map(s => (
+          <button key={s.k} onClick={() => handleSetorChange(s.k)} title={s.l}
+            style={{width:48,height:48,borderRadius:12,border:"none",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s",
+              background:setor===s.k?"rgba(255,255,255,0.25)":"transparent",
+              boxShadow:setor===s.k?"0 0 12px rgba(134,239,172,0.3)":"none"}}>
+            {s.icon}
+          </button>
+        ))}
+        <div style={{flex:1}}/>
+        <button onClick={()=>setOcultar(o=>!o)} title={ocultar?"Mostrar valores":"Ocultar valores"}
+          style={{width:42,height:42,borderRadius:10,border:"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
+            background:ocultar?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.1)",marginBottom:4}}>
+          {ocultar ? "👁" : "🔒"}
+        </button>
+        <button onClick={()=>setDarkMode(d=>!d)} title={darkMode?"Modo claro":"Modo escuro"}
+          style={{width:42,height:42,borderRadius:10,border:"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
+            background:"rgba(255,255,255,0.1)",marginBottom:12}}>
+          {darkMode ? "☀️" : "🌙"}
+        </button>
+      </div>
+
+      {/* Main */}
+      <div style={{flex:1,minWidth:0,paddingBottom:40}}>
+        {/* Header verde */}
+        <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"16px 20px 0"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
             <div>
-              <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 2px"}}>FFU — Transmissões</p>
+              <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 2px"}}>FFU — Transmissões · {SETORES.find(s=>s.k===setor)?.l}</p>
               <h1 style={{fontSize:19,fontWeight:700,margin:0,color:"#fff"}}>Brasileirão Série A 2026</h1>
               <p style={{color:"#bbf7d0",fontSize:11,margin:"2px 0 0"}}>{divulgados.length} jogos divulgados · {aDivulgar.length} a divulgar · 38 rodadas</p>
-            </div>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>setOcultar(o=>!o)} style={{background:ocultar?"rgba(239,68,68,0.25)":"rgba(255,255,255,0.15)",border:`1px solid ${ocultar?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.3)"}`,borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
-                {ocultar ? "👁 Mostrar" : "🔒 Ocultar"}
-              </button>
-              <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
-                {darkMode ? "☀️ Claro" : "🌙 Escuro"}
-              </button>
             </div>
             <div style={{textAlign:"right"}}>
               <p style={{color:"#86efac",fontSize:10,margin:"0 0 1px"}}>Execução geral</p>
               <p style={{fontSize:26,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0,filter:ocultar?"blur(8px)":"none",transition:"filter 0.2s"}}>{pctGasto}%</p>
             </div>
           </div>
-        </div>
-        {/* Barra de setores */}
-        <div style={{display:"flex",gap:0,marginTop:14,borderBottom:"1px solid rgba(255,255,255,0.15)"}}>
-          {[{k:"orcamento",l:"Orçamento",icon:"📊"},{k:"notas",l:"Notas Fiscais",icon:"📄"}].map(s => (
-            <button key={s.k} onClick={() => handleSetorChange(s.k)} style={{padding:"8px 20px",border:"none",cursor:"pointer",fontSize:13,fontWeight:setor===s.k?700:400,
-              background:setor===s.k?"rgba(255,255,255,0.18)":"transparent",color:setor===s.k?"#fff":"rgba(255,255,255,0.6)",
-              borderBottom:setor===s.k?"2px solid #86efac":"2px solid transparent",transition:"all 0.2s"}}>
-              {s.icon} {s.l}
-            </button>
-          ))}
+          <div style={{display:"flex",gap:2,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+            {TABS.map(t => (
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Abas do setor ativo */}
-        <div style={{display:"flex",gap:2,marginTop:4,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          {TABS.map(t => (
-            <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{padding:"24px 16px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
+        <div style={{padding:"24px 20px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard" && (<>
@@ -288,6 +294,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
       {novoRapido  && <NovoRapidoModal cenario={novoRapido} jogos={jogos} onSave={addJogo} onClose={()=>setNovoRapido(null)} T={T}/>}
       {jogoEdit    && <NovoJogoModal   jogo={jogoEdit} onSave={handleEditSave} onClose={()=>setJogoEdit(null)} T={T}/>}
 
+      </div>{/* /Main */}
     </div>
   );
 }

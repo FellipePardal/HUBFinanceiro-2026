@@ -85,7 +85,21 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [ocultar,         setOcultar]         = useState(false);
 
   const saveJogo       = j => setJogos(js => js.map(x => x.id===j.id ? j : x));
-  const addJogo        = j => { setJogos(js => [...js, j]); setNovo(false); setNovoRapido(null); };
+  const addJogo        = j => {
+    setJogos(js => {
+      // Substituir um placeholder da mesma rodada e categoria, se existir
+      let replaced = false;
+      const next = js.map(x => {
+        if (!replaced && x.mandante === "A definir" && x.rodada === j.rodada && x.categoria === j.categoria) {
+          replaced = true;
+          return { ...j, id: x.id };
+        }
+        return x;
+      });
+      return replaced ? next : [...js, j];
+    });
+    setNovo(false); setNovoRapido(null);
+  };
   const deleteJogo     = id => { if(window.confirm("Excluir este jogo?")) setJogos(js => js.filter(j => j.id !== id)); };
   const editJogo       = j => setJogoEdit(j);
   const handleEditSave = j => { saveJogo(j); setJogoEdit(null); };

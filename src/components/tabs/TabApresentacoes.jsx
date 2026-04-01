@@ -81,10 +81,8 @@ function FormVariaveis({T, onBack}) {
     const rows      = rodadas.map(r => ({label:r.label, orcado:parseBR(r.orcado), realizado:parseBR(r.realizado)}));
     const totOrc    = rows.reduce((s,r) => s+r.orcado, 0);
     const totReal   = rows.reduce((s,r) => s+r.realizado, 0);
-    const orcAteRodV = parseBR(orcAteRod);
-    const saving    = orcAteRodV - totReal;
-    const savPct    = orcAteRodV > 0 ? saving/orcAteRodV*100 : 0;
-    const nfEspV    = parseBR(nfEsp), nfRecV = parseBR(nfRec);
+    const saving    = totOrc - totReal;
+const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
     const nfPend    = Math.max(0, nfEspV - nfRecV);
     const pctRec    = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
     return {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfEspV, nfRecV};

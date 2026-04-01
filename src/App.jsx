@@ -82,6 +82,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [filtroCat,       setFiltroCat]       = useState("Todas");
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [microJogoId,     setMicroJogoId]     = useState(jogos.find(j=>j.mandante!=="A definir")?.id);
+  const [ocultar,         setOcultar]         = useState(false);
 
   const saveJogo       = j => setJogos(js => js.map(x => x.id===j.id ? j : x));
   const addJogo        = j => { setJogos(js => [...js, j]); setNovo(false); setNovoRapido(null); };
@@ -144,12 +145,17 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-            <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
-              {darkMode ? "☀️ Claro" : "🌙 Escuro"}
-            </button>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>setOcultar(o=>!o)} style={{background:ocultar?"rgba(239,68,68,0.25)":"rgba(255,255,255,0.15)",border:`1px solid ${ocultar?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.3)"}`,borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
+                {ocultar ? "👁 Mostrar" : "🔒 Ocultar"}
+              </button>
+              <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,padding:"4px 12px",cursor:"pointer",fontSize:12,color:"#fff",fontWeight:600}}>
+                {darkMode ? "☀️ Claro" : "🌙 Escuro"}
+              </button>
+            </div>
             <div style={{textAlign:"right"}}>
               <p style={{color:"#86efac",fontSize:10,margin:"0 0 1px"}}>Execução geral</p>
-              <p style={{fontSize:26,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0}}>{pctGasto}%</p>
+              <p style={{fontSize:26,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0,filter:ocultar?"blur(8px)":"none",transition:"filter 0.2s"}}>{pctGasto}%</p>
             </div>
           </div>
         </div>
@@ -162,7 +168,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         </div>
       </div>
 
-      <div style={{padding:"24px 16px"}}>
+      <div style={{padding:"24px 16px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard" && (<>

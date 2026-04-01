@@ -181,7 +181,7 @@ const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
         ];
       });
 
-      const savPctTot = orcAteRodV>0 ? saving/orcAteRodV*100 : 0;
+      const savPctTot = totOrc>0 ? saving/totOrc*100 : 0;
       const stc = saving>=0?"A3E635":"FF6B6B";
       const tblTot = [
         {text:"TOTAL",                                                          options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
@@ -191,10 +191,11 @@ const savPct    = totOrc > 0 ? saving/totOrc*100 : 0;
         {text:(savPctTot>=0?"▲ ":"▼ ")+Math.abs(savPctTot).toFixed(1)+"%",     options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
-      sl.addTable([tblHead, ...tblBody, tblTot], {
-        x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
-        border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:0.28,
-      });
+      const rowH = Math.max(0.145, 1.55 / (rows.length + 1));
+sl.addTable([tblHead, ...tblBody, tblTot], {
+  x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
+  border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
+});
 
       // footer escuro
       const fY = 6.55;

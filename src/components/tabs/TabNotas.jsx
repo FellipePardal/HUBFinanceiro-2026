@@ -544,11 +544,6 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
               </button>
             ))}
           </div>
-          {notas.filter(n => n.rodada === rodadaEfetiva).length > 0 && (
-            <button onClick={() => limparRodada(rodadaEfetiva)} style={{...btnStyle,background:"#7f1d1d",fontSize:11,padding:"6px 14px"}}>
-              Limpar Rodada {rodadaEfetiva}
-            </button>
-          )}
         </div>
 
         {jogosRodada.map(jogo => {
@@ -610,6 +605,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                                 {nota.hasFile
                                   ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
                                   : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
+                                <button onClick={() => deleteNota(nota.id)} style={{color:"#ef4444",fontSize:10,fontWeight:600,background:"#ef444422",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Apagar</button>
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>

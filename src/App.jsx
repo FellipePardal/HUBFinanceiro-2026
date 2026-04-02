@@ -323,6 +323,8 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 }
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
+import FormularioPublico from "./components/FormularioPublico";
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
   const [pagina,   setPagina]   = useState("home");
@@ -332,6 +334,9 @@ export default function App() {
     const next = typeof v === "function" ? v(darkMode) : v;
     setDarkMode(next); lsSet(LS_DARK, next);
   };
+
+  // Rota pública para fornecedores
+  if (window.location.hash === "#formulario") return <FormularioPublico/>;
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>

@@ -2,8 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
-import FormularioNF from "./FormularioNF";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -437,6 +436,83 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
   );
 }
 
+// ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
+function RecebidasTab({ notas, addNota, T }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadSubmissions = () => {
+    setLoading(true);
+    getState('nf_submissions').then(data => { setSubmissions(data || []); setLoading(false); });
+  };
+
+  useEffect(() => { loadSubmissions(); }, []);
+
+  const aprovar = (sub) => {
+    const nota = {
+      ...sub,
+      tipo: "prevista",
+      status: "Conferida",
+      codigo: `RD${String(sub.rodada).padStart(2,"0")}_${sub.jogoLabel?.replace(/\s*x\s*/,"x").replace(/\s+/g,"").slice(0,10)}_${Math.round(sub.valorNF||0)}_NF${(sub.numeroNF||"SN").replace(/\s/g,"")}`,
+    };
+    addNota(nota);
+    const next = submissions.filter(s => s.id !== sub.id);
+    setSubmissions(next);
+    setSupabaseState('nf_submissions', next);
+  };
+
+  const rejeitar = (id) => {
+    if (!window.confirm("Rejeitar esta submissão?")) return;
+    deleteNFFile(id);
+    const next = submissions.filter(s => s.id !== id);
+    setSubmissions(next);
+    setSupabaseState('nf_submissions', next);
+  };
+
+  if (loading) return <p style={{color:T.textSm,padding:20}}>Carregando submissões...</p>;
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>{submissions.length} submissão{submissions.length!==1?"ões":""} pendente{submissions.length!==1?"s":""}</span>
+        <button onClick={loadSubmissions} style={{...btnStyle,background:T.border,padding:"5px 14px",fontSize:11,color:T.text}}>Atualizar</button>
+      </div>
+      {submissions.length === 0 && (
+        <div style={{background:T.card,borderRadius:12,padding:40,textAlign:"center"}}>
+          <p style={{color:T.textSm,fontSize:13,margin:0}}>Nenhuma NF recebida pelo formulário externo</p>
+          <p style={{color:T.textSm,fontSize:11,margin:"8px 0 0"}}>Link do formulário: <code style={{color:"#22c55e"}}>{window.location.origin}/#formulario</code></p>
+        </div>
+      )}
+      {submissions.map(sub => (
+        <div key={sub.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:12}}>
+            <div>
+              <span style={{fontWeight:700,fontSize:14,color:T.text}}>{sub.fornecedor}</span>
+              <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{sub.jogoLabel} · Rd {sub.rodada}</span>
+              {sub.numeroNF && <span style={{color:T.textSm,fontSize:11,marginLeft:8}}>NF {sub.numeroNF}</span>}
+            </div>
+            <span style={{color:"#8b5cf6",fontWeight:700,fontSize:16}}>{fmt(sub.valorNF)}</span>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+            {(sub.servicosLabels||[]).map(s => <Pill key={s} label={s} color="#06b6d4"/>)}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12,color:T.textSm,marginBottom:12}}>
+            {sub.dataEmissao && <span>Emissão: {sub.dataEmissao}</span>}
+            {sub.dataEnvio && <span>Envio: {sub.dataEnvio}</span>}
+            {sub.obs && <span>Obs: {sub.obs}</span>}
+            {sub.hasFile && <Pill label="Arquivo anexo" color="#22c55e"/>}
+            <span style={{color:T.textSm}}>Enviado: {new Date(sub.enviadoEm).toLocaleDateString("pt-BR")}</span>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12}}>Aprovar</button>
+            <button onClick={() => rejeitar(sub.id)} style={{...btnStyle,background:"#7f1d1d",padding:"6px 20px",fontSize:12}}>Rejeitar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], T }) {
   const [tab, setTab] = useState("rodada");
@@ -548,7 +624,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     alert("Planilha copiada!");
   };
 
-  const TABS_NF = ["rodada", "planilha", "resumo", "formulário"];
+  const TABS_NF = ["rodada", "planilha", "resumo", "recebidas"];
 
   return (
     <>
@@ -557,7 +633,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           {TABS_NF.map(t => (
             <button key={t} onClick={() => setTab(t)} style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
               background:tab===t?"#8b5cf6":"transparent",color:tab===t?"#fff":T.textMd,textTransform:"capitalize"}}>
-              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : t === "resumo" ? "Resumo" : "Formulário"}
+              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : t === "resumo" ? "Resumo" : "Recebidas"}
             </button>
           ))}
         </div>
@@ -779,9 +855,9 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         </div>
       )}
 
-      {/* ── FORMULÁRIO ── */}
-      {tab === "formulário" && (
-        <FormularioNF jogos={jogos} fornecedores={fornecedores} onSubmit={addNota} T={T}/>
+      {/* ── RECEBIDAS (do formulário externo) ── */}
+      {tab === "recebidas" && (
+        <RecebidasTab notas={notas} addNota={addNota} T={T}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}

@@ -892,7 +892,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               </button>
             ))}
           </div>
-          <button onClick={copyPlanilha} style={{...btnStyle,background:"#22c55e",fontSize:12}}>Copiar Planilha</button>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={() => window.open("#relatorio","_blank")} style={{...btnStyle,background:"#166534",fontSize:12}}>Relatório de Envio</button>
+            <button onClick={copyPlanilha} style={{...btnStyle,background:"#22c55e",fontSize:12}}>Copiar Planilha</button>
+          </div>
         </div>
 
         <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>

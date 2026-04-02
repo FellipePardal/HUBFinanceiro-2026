@@ -9,7 +9,7 @@ export const TIMES      = ["Fluminense","Botafogo","Flamengo","Vasco","Corinthia
 
 // ─── CATEGORIAS DE CUSTO ──────────────────────────────────────────────────────
 export const CATS = [
-  { key:"logistica", label:"Logística", color:"#22c55e", subs:[{key:"outros_log",label:"Outros Logística"},{key:"transporte",label:"Transporte"},{key:"uber",label:"Uber"},{key:"hospedagem",label:"Hospedagem"},{key:"diaria",label:"Diária"}]},
+  { key:"logistica", label:"Logística", color:"#22c55e", subs:[{key:"outros_log",label:"Outros Logística"},{key:"transporte",label:"Transporte"},{key:"uber",label:"Uber"},{key:"hospedagem",label:"Hospedagem"},{key:"diaria",label:"Diária de Alimentação"}]},
   { key:"pessoal",   label:"Pessoal",   color:"#3b82f6", subs:[{key:"coord_um",label:"Coord UM"},{key:"prod_um",label:"Prod UM"},{key:"prod_campo",label:"Prod Campo"},{key:"monitoracao",label:"Monitoração"},{key:"supervisor1",label:"Supervisor 1"},{key:"supervisor2",label:"Supervisor 2"},{key:"dtv",label:"DTV"},{key:"vmix",label:"Vmix"},{key:"audio",label:"Áudio"}]},
   { key:"operacoes", label:"Operações", color:"#f59e0b", subs:[{key:"um_b1",label:"UM B1"},{key:"um_b2",label:"UM B2"},{key:"geradores",label:"Geradores"},{key:"sng",label:"SNG"},{key:"sng_extra",label:"SNG Extra"},{key:"seg_espacial",label:"Seg. Espacial"},{key:"seg_extra",label:"Seg. Extra"},{key:"drone",label:"Drone"},{key:"grua",label:"Grua/Policam"},{key:"dslr",label:"DSLR + Microlink"},{key:"carrinho",label:"Carrinho"},{key:"especial",label:"Especial"},{key:"goalcam",label:"Goalcam"},{key:"minidrone",label:"Minidrone"},{key:"infra",label:"Infra + Distr."},{key:"extra",label:"Extra"}]},
 ];

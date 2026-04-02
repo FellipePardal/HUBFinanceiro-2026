@@ -437,9 +437,13 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 }
 
 // ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
-function RecebidasTab({ notas, addNota, T }) {
+function RecebidasTab({ notas, addNota, jogos, T }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editServicos, setEditServicos] = useState({});
+
+  const divulgados = jogos.filter(j => j.mandante !== "A definir");
 
   const loadSubmissions = () => {
     setLoading(true);
@@ -448,17 +452,51 @@ function RecebidasTab({ notas, addNota, T }) {
 
   useEffect(() => { loadSubmissions(); }, []);
 
+  const startEdit = (sub) => {
+    setEditingId(sub.id);
+    // Copiar servicosValores para edição
+    setEditServicos({...(sub.servicosValores || {})});
+  };
+
+  const toggleEditServico = (sub, subKey) => {
+    setEditServicos(prev => {
+      const next = {...prev};
+      if (next[subKey] !== undefined) { delete next[subKey]; }
+      else { next[subKey] = 0; }
+      return next;
+    });
+  };
+
+  const setEditValor = (subKey, val) => {
+    setEditServicos(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
+  };
+
   const aprovar = (sub) => {
+    const sv = editingId === sub.id ? editServicos : (sub.servicosValores || {});
+    const valorNF = Object.values(sv).reduce((s, v) => s + (v || 0), 0);
+    const jogo = divulgados.find(j => j.id === sub.jogoId);
+    const allServicos = jogo ? extrairServicos(jogo) : [];
+    const servicosKeys = Object.keys(sv).map(sk => `${sub.jogoId}_${sk}`);
+    const servicosLabels = Object.keys(sv).map(sk => {
+      const s = allServicos.find(x => x.subKey === sk);
+      return s ? s.subLabel : sk;
+    });
+
     const nota = {
       ...sub,
+      servicosValores: sv,
+      servicosKeys,
+      servicosLabels,
+      valorNF,
       tipo: "prevista",
       status: "Conferida",
-      codigo: `RD${String(sub.rodada).padStart(2,"0")}_${sub.jogoLabel?.replace(/\s*x\s*/,"x").replace(/\s+/g,"").slice(0,10)}_${Math.round(sub.valorNF||0)}_NF${(sub.numeroNF||"SN").replace(/\s/g,"")}`,
+      codigo: `RD${String(sub.rodada).padStart(2,"0")}_${sub.jogoLabel?.replace(/\s*x\s*/,"x").replace(/\s+/g,"").slice(0,10)}_${Math.round(valorNF)}_NF${(sub.numeroNF||"SN").replace(/\s/g,"")}`,
     };
     addNota(nota);
     const next = submissions.filter(s => s.id !== sub.id);
     setSubmissions(next);
     setSupabaseState('nf_submissions', next);
+    setEditingId(null);
   };
 
   const rejeitar = (id) => {
@@ -483,32 +521,70 @@ function RecebidasTab({ notas, addNota, T }) {
           <p style={{color:T.textSm,fontSize:11,margin:"8px 0 0"}}>Link do formulário: <code style={{color:"#22c55e"}}>{window.location.origin}/#formulario</code></p>
         </div>
       )}
-      {submissions.map(sub => (
-        <div key={sub.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:12}}>
-            <div>
-              <span style={{fontWeight:700,fontSize:14,color:T.text}}>{sub.fornecedor}</span>
-              <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{sub.jogoLabel} · Rd {sub.rodada}</span>
-              {sub.numeroNF && <span style={{color:T.textSm,fontSize:11,marginLeft:8}}>NF {sub.numeroNF}</span>}
+      {submissions.map(sub => {
+        const isEditing = editingId === sub.id;
+        const jogo = divulgados.find(j => j.id === sub.jogoId);
+        const allServicos = jogo ? extrairServicos(jogo) : [];
+        const svAtual = isEditing ? editServicos : (sub.servicosValores || {});
+        const valorAtual = Object.values(svAtual).reduce((s, v) => s + (v || 0), 0);
+
+        return (
+          <div key={sub.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:12}}>
+              <div>
+                <span style={{fontWeight:700,fontSize:14,color:T.text}}>{sub.fornecedor}</span>
+                <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{sub.jogoLabel} · Rd {sub.rodada}</span>
+                {sub.numeroNF && <span style={{color:T.textSm,fontSize:11,marginLeft:8}}>NF {sub.numeroNF}</span>}
+              </div>
+              <span style={{color:"#8b5cf6",fontWeight:700,fontSize:16}}>{fmt(valorAtual)}</span>
             </div>
-            <span style={{color:"#8b5cf6",fontWeight:700,fontSize:16}}>{fmt(sub.valorNF)}</span>
+
+            {/* Serviços — modo visualização ou edição */}
+            {!isEditing ? (
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                {Object.entries(svAtual).map(([sk, val]) => {
+                  const label = allServicos.find(x => x.subKey === sk)?.subLabel || sk;
+                  return <Pill key={sk} label={`${label}: ${fmt(val)}`} color="#06b6d4"/>;
+                })}
+              </div>
+            ) : (
+              <div style={{background:T.bg,borderRadius:8,padding:10,marginBottom:12}}>
+                <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Editar serviços e valores:</p>
+                {allServicos.map(s => {
+                  const ativo = editServicos[s.subKey] !== undefined;
+                  return (
+                    <div key={s.subKey} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,padding:"4px 0"}}>
+                      <input type="checkbox" checked={ativo} onChange={() => toggleEditServico(sub, s.subKey)}/>
+                      <span style={{flex:1,fontSize:12,color:ativo?T.text:T.textSm}}>{s.subLabel}</span>
+                      {ativo && (
+                        <input type="number" value={editServicos[s.subKey]} onChange={e => setEditValor(s.subKey, e.target.value)}
+                          style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:90,textAlign:"right",fontSize:12,fontWeight:600}}/>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{borderTop:`1px solid ${T.border}`,marginTop:6,paddingTop:6,textAlign:"right"}}>
+                  <span style={{fontSize:13,fontWeight:700,color:"#8b5cf6"}}>Total: {fmt(valorAtual)}</span>
+                </div>
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12,color:T.textSm,marginBottom:12}}>
+              {sub.dataEmissao && <span>Emissão: {sub.dataEmissao}</span>}
+              {sub.dataEnvio && <span>Envio: {sub.dataEnvio}</span>}
+              {sub.obs && <span>Obs: {sub.obs}</span>}
+              {sub.hasFile && <Pill label="Arquivo anexo" color="#22c55e"/>}
+              <span style={{color:T.textSm}}>Enviado: {new Date(sub.enviadoEm).toLocaleDateString("pt-BR")}</span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              {!isEditing && <button onClick={() => startEdit(sub)} style={{...btnStyle,background:"#3b82f6",padding:"6px 20px",fontSize:12}}>Editar</button>}
+              {isEditing && <button onClick={() => setEditingId(null)} style={{...btnStyle,background:"#475569",padding:"6px 20px",fontSize:12}}>Cancelar</button>}
+              <button onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12}}>Aprovar</button>
+              <button onClick={() => rejeitar(sub.id)} style={{...btnStyle,background:"#7f1d1d",padding:"6px 20px",fontSize:12}}>Rejeitar</button>
+            </div>
           </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-            {(sub.servicosLabels||[]).map(s => <Pill key={s} label={s} color="#06b6d4"/>)}
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12,color:T.textSm,marginBottom:12}}>
-            {sub.dataEmissao && <span>Emissão: {sub.dataEmissao}</span>}
-            {sub.dataEnvio && <span>Envio: {sub.dataEnvio}</span>}
-            {sub.obs && <span>Obs: {sub.obs}</span>}
-            {sub.hasFile && <Pill label="Arquivo anexo" color="#22c55e"/>}
-            <span style={{color:T.textSm}}>Enviado: {new Date(sub.enviadoEm).toLocaleDateString("pt-BR")}</span>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12}}>Aprovar</button>
-            <button onClick={() => rejeitar(sub.id)} style={{...btnStyle,background:"#7f1d1d",padding:"6px 20px",fontSize:12}}>Rejeitar</button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -845,7 +921,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
       {/* ── RECEBIDAS (do formulário externo) ── */}
       {tab === "recebidas" && (
-        <RecebidasTab notas={notas} addNota={addNota} T={T}/>
+        <RecebidasTab notas={notas} addNota={addNota} jogos={jogos} T={T}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}

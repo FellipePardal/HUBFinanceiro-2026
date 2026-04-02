@@ -6,8 +6,9 @@ import { getState, setState, fileToDataUrl, saveNFFile } from "../lib/supabase";
 const SUBS_MENSAL = new Set(["transporte","uber","hospedagem","seg_espacial"]);
 const T = { bg:"#0f172a", card:"#1e293b", border:"#334155", muted:"#475569", text:"#f1f5f9", textMd:"#94a3b8", textSm:"#64748b" };
 const btnS = { color:"#fff", border:"none", borderRadius:10, padding:"12px 20px", cursor:"pointer", fontWeight:600, fontSize:14, width:"100%" };
-const IS = { background:T.bg, border:`1px solid ${T.muted}`, borderRadius:8, color:T.text, padding:"12px 14px", fontSize:14, width:"100%", boxSizing:"border-box" };
+const IS = { background:T.bg, border:`1px solid ${T.muted}`, borderRadius:8, color:T.text, padding:"12px 14px", fontSize:14, width:"100%", boxSizing:"border-box", MozAppearance:"textfield" };
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const HIDE_SPINNERS = `input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield}`;
 
 function extrairServicos(jogo) {
   const s = [];
@@ -149,6 +150,7 @@ export default function FormularioPublico() {
 
   return (
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Inter',sans-serif"}}>
+      <style>{HIDE_SPINNERS}</style>
       {/* Header */}
       <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"20px 16px"}}>
         <div style={{maxWidth:560,margin:"0 auto"}}>
@@ -186,14 +188,11 @@ export default function FormularioPublico() {
               <div>
                 <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual a rodada?</h3>
                 <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada referente à nota fiscal</p>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-                  {rodadas.map(r => (
-                    <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"14px 0",borderRadius:10,border:`2px solid ${rodadaSel===r?"#22c55e":T.border}`,cursor:"pointer",fontSize:15,fontWeight:700,
-                      background:rodadaSel===r?"#22c55e22":T.bg,color:rodadaSel===r?"#22c55e":T.textMd,textAlign:"center"}}>
-                      {r}
-                    </button>
-                  ))}
-                </div>
+                <select value={rodadaSel||""} onChange={e => setRodadaSel(parseInt(e.target.value))}
+                  style={{...IS,fontSize:16,fontWeight:600,padding:"14px",color:rodadaSel?T.text:T.textSm}}>
+                  <option value="" disabled>Selecione a rodada...</option>
+                  {rodadas.map(r => <option key={r} value={r}>Rodada {r}</option>)}
+                </select>
               </div>
             )}
 

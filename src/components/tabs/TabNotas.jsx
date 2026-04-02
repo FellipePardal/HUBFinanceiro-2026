@@ -41,33 +41,44 @@ function gerarCodigo(rodada, mandante, visitante, valorNF, numeroNF) {
 function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, onClose, T }) {
   const IS = iSty(T);
   const [form, setForm] = useState({
-    numeroNF: "", fornecedor: "", valorNF: 0, dataEmissao: "", dataEnvio: "", obs: "",
+    numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", obs: "",
   });
-  const [selecionados, setSelecionados] = useState([]);
+  const [selecionados, setSelecionados] = useState({}); // { subKey: valorUnit }
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
-  // Serviços que ainda não têm NF conferida
   const servicosLivres = servicosDisponiveis.filter(s => {
     const key = `${jogo.id}_${s.subKey}`;
     const nota = notasExistentes.find(n => n.servicosKeys?.includes(key));
     return !nota || nota.status !== "Conferida";
   });
 
-  const toggleServico = (subKey) => {
-    setSelecionados(prev => prev.includes(subKey) ? prev.filter(k => k !== subKey) : [...prev, subKey]);
+  const toggleServico = (subKey, valorRef) => {
+    setSelecionados(prev => {
+      if (prev[subKey] !== undefined) { const n = {...prev}; delete n[subKey]; return n; }
+      return {...prev, [subKey]: valorRef};
+    });
   };
 
-  const selectAll = () => setSelecionados(servicosLivres.map(s => s.subKey));
-  const valorRefTotal = servicosLivres.filter(s => selecionados.includes(s.subKey)).reduce((sum, s) => sum + s.valorRef, 0);
+  const setValorUnit = (subKey, val) => {
+    setSelecionados(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
+  };
 
-  const codigo = gerarCodigo(jogo.rodada, jogo.mandante, jogo.visitante, form.valorNF, form.numeroNF);
+  const selectAll = () => {
+    const all = {};
+    servicosLivres.forEach(s => { all[s.subKey] = s.valorRef; });
+    setSelecionados(all);
+  };
+
+  const selKeys = Object.keys(selecionados);
+  const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
+  const codigo = gerarCodigo(jogo.rodada, jogo.mandante, jogo.visitante, totalNF, form.numeroNF);
 
   const handleSave = async () => {
     if (!form.numeroNF && !form.fornecedor) return;
-    if (selecionados.length === 0) return;
+    if (selKeys.length === 0) return;
     setUploading(true);
     let filePath = null, fileUrl = null;
     try {
@@ -77,19 +88,22 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
         fileUrl = result.url;
       }
     } catch (e) { console.error("Upload falhou:", e); }
-    const servicosKeys = selecionados.map(sk => `${jogo.id}_${sk}`);
+    const servicosKeys = selKeys.map(sk => `${jogo.id}_${sk}`);
+    const servicosValores = {};
+    selKeys.forEach(sk => { servicosValores[sk] = selecionados[sk]; });
     onSave({
       id: Date.now(),
       codigo,
       ...form,
-      valorNF: parseFloat(form.valorNF) || 0,
+      valorNF: totalNF,
       rodada: jogo.rodada,
       jogoId: jogo.id,
       jogoLabel: `${jogo.mandante} x ${jogo.visitante}`,
       mandante: jogo.mandante,
       visitante: jogo.visitante,
       servicosKeys,
-      servicosLabels: servicosDisponiveis.filter(s => selecionados.includes(s.subKey)).map(s => s.subLabel),
+      servicosLabels: servicosDisponiveis.filter(s => selKeys.includes(s.subKey)).map(s => s.subLabel),
+      servicosValores,
       tipo: "prevista",
       status: "Conferida",
       filePath,
@@ -100,30 +114,48 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
 
   return (
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:620,maxHeight:"90vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 4px",fontSize:16,color:T.text}}>Registrar Nota Fiscal</h3>
         <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Rd {jogo.rodada} · {jogo.mandante} x {jogo.visitante}</p>
 
-        {/* Seleção de serviços */}
+        {/* Seleção de serviços com valor unitário */}
         <div style={{marginBottom:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <label style={{color:T.textMd,fontSize:12,fontWeight:600}}>Serviços cobertos por esta NF:</label>
             <button onClick={selectAll} style={{...btnStyle,background:T.border,padding:"3px 10px",fontSize:10,color:T.text}}>Selecionar todos</button>
           </div>
-          <div style={{background:T.bg,borderRadius:8,padding:8,maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
+          <div style={{background:T.bg,borderRadius:8,padding:8,maxHeight:280,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
             {servicosLivres.length === 0 && <p style={{color:T.textSm,fontSize:12,padding:8,margin:0}}>Todos os serviços já possuem NF</p>}
-            {servicosLivres.map(s => (
-              <label key={s.subKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,cursor:"pointer",
-                background:selecionados.includes(s.subKey)?s.catColor+"18":"transparent"}}>
-                <input type="checkbox" checked={selecionados.includes(s.subKey)} onChange={() => toggleServico(s.subKey)}/>
-                <span style={{fontSize:13,color:T.text,flex:1}}>{s.subLabel}</span>
-                <Pill label={s.catLabel} color={s.catColor}/>
-                <span style={{fontSize:11,color:T.textSm,minWidth:70,textAlign:"right"}}>{fmt(s.valorRef)}</span>
-              </label>
-            ))}
+            {/* Header */}
+            {servicosLivres.length > 0 && (
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",fontSize:10,color:T.textSm}}>
+                <span style={{width:20}}/>
+                <span style={{flex:1}}>Serviço</span>
+                <span style={{width:70,textAlign:"right"}}>Ref.</span>
+                <span style={{width:100,textAlign:"right"}}>Valor NF</span>
+              </div>
+            )}
+            {servicosLivres.map(s => {
+              const checked = selecionados[s.subKey] !== undefined;
+              return (
+                <div key={s.subKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
+                  background:checked?s.catColor+"18":"transparent"}}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleServico(s.subKey, s.valorRef)}/>
+                  <span style={{fontSize:13,color:T.text,flex:1}}>{s.subLabel}</span>
+                  <span style={{fontSize:11,color:T.textSm,width:70,textAlign:"right"}}>{fmt(s.valorRef)}</span>
+                  {checked
+                    ? <input type="number" value={selecionados[s.subKey]} onChange={e => setValorUnit(s.subKey, e.target.value)}
+                        style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#8b5cf6",fontWeight:600}}/>
+                    : <span style={{width:100}}/>}
+                </div>
+              );
+            })}
           </div>
-          {selecionados.length > 0 && (
-            <p style={{color:T.textMd,fontSize:11,margin:"6px 0 0",textAlign:"right"}}>{selecionados.length} serviço{selecionados.length>1?"s":""} · Valor ref: <b style={{color:"#8b5cf6"}}>{fmt(valorRefTotal)}</b></p>
+          {selKeys.length > 0 && (
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,padding:"0 8px"}}>
+              <span style={{color:T.textMd,fontSize:11}}>{selKeys.length} serviço{selKeys.length>1?"s":""}</span>
+              <span style={{fontSize:14,fontWeight:700,color:"#8b5cf6"}}>Total NF: {fmt(totalNF)}</span>
+            </div>
           )}
         </div>
 
@@ -430,18 +462,28 @@ export default function TabNotas({ notas, setNotas, jogos, T }) {
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
                   <thead><tr style={{background:T.bg}}>
-                    {["Serviço","Categoria","Valor Ref.","Status","NF Vinculada"].map(h =>
+                    {["Serviço","Categoria","Valor Ref.","Valor NF","Status","NF Vinculada"].map(h =>
                       <th key={h} style={{padding:"8px 14px",textAlign:"left",color:T.textSm,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {servicos.map(s => {
                       const key = `${jogo.id}_${s.subKey}`;
                       const nota = nfsDoJogo.find(n => n.servicosKeys?.includes(key));
+                      const valorUnit = nota?.servicosValores?.[s.subKey];
+                      const diff = valorUnit != null ? valorUnit - s.valorRef : null;
                       return (
                         <tr key={s.subKey} style={{borderTop:`1px solid ${T.border}`}}>
                           <td style={{padding:"8px 14px",fontWeight:600,fontSize:13,color:T.text}}>{s.subLabel}</td>
                           <td style={{padding:"8px 14px"}}><Pill label={s.catLabel} color={s.catColor}/></td>
-                          <td style={{padding:"8px 14px",color:T.textMd,fontSize:12}}>{fmt(s.valorRef)}</td>
+                          <td style={{padding:"8px 14px",color:T.textSm,fontSize:12}}>{fmt(s.valorRef)}</td>
+                          <td style={{padding:"8px 14px",fontSize:12}}>
+                            {valorUnit != null ? (
+                              <span style={{display:"flex",alignItems:"center",gap:4}}>
+                                <span style={{color:"#8b5cf6",fontWeight:600}}>{fmt(valorUnit)}</span>
+                                {diff !== 0 && <span style={{fontSize:10,color:diff>0?"#ef4444":"#22c55e",fontWeight:600}}>{diff>0?"+":""}{fmt(diff)}</span>}
+                              </span>
+                            ) : <span style={{color:T.textSm}}>—</span>}
+                          </td>
                           <td style={{padding:"8px 14px"}}>
                             <Pill label={nota ? "Conferida" : "Pendente"} color={nota ? "#22c55e" : "#f59e0b"}/>
                           </td>
@@ -449,7 +491,7 @@ export default function TabNotas({ notas, setNotas, jogos, T }) {
                             {nota ? (
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
-                                <span style={{color:T.textSm}}>{nota.fornecedor} · {fmt(nota.valorNF)}</span>
+                                <span style={{color:T.textSm}}>{nota.fornecedor}</span>
                                 {nota.fileUrl && <a href={nota.fileUrl} target="_blank" rel="noreferrer" style={{color:"#3b82f6",fontSize:10,fontWeight:600,textDecoration:"none",background:"#3b82f622",padding:"2px 6px",borderRadius:4}}>Ver</a>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}

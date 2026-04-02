@@ -423,6 +423,17 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
   const [showAvulsa, setShowAvulsa] = useState(false);
   const [filtroPlanilha, setFiltroPlanilha] = useState("Todas");
   const [preview, setPreview] = useState(null);
+  const uploadRef = useRef(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
+
+  const handleUploadLater = async (file, nota) => {
+    if (!file || !nota) return;
+    try {
+      const result = await uploadNF(nota.codigo, file);
+      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, filePath: result.path, fileUrl: result.url} : n));
+    } catch (e) { console.error("Upload falhou:", e); }
+    setUploadTarget(null);
+  };
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
@@ -559,7 +570,9 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
                                 <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                {nota.fileUrl && <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>}
+                                {nota.fileUrl
+                                  ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
+                                  : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>
@@ -631,7 +644,9 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                     <td style={{padding:"10px 12px"}}><Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/></td>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",gap:4}}>
-                        {n.fileUrl && <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>}
+                        {n.fileUrl
+                          ? <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>
+                          : <button onClick={() => {setUploadTarget(n); uploadRef.current?.click();}} style={{...btnStyle,background:"#f59e0b",padding:"4px 8px",fontSize:10}}>Enviar</button>}
                         <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>
                       </div>
                     </td>
@@ -695,6 +710,8 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
       {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
+      <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}
+        onChange={e => {if (e.target.files[0] && uploadTarget) handleUploadLater(e.target.files[0], uploadTarget); e.target.value="";}}/>
     </>
   );
 }

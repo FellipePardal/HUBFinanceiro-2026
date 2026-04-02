@@ -557,13 +557,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const totalValor     = notas.reduce((s, n) => s + (n.valorNF || 0), 0);
   const notasAvulsas   = notas.filter(n => n.tipo === "avulsa").length;
 
-  // Recalcula o realizado de todos os jogos baseado nas notas
-  const syncAllRealizado = (notasList) => {
+  // Recalcula o realizado sempre que as notas mudam
+  useEffect(() => {
     setJogos(js => js.map(j => {
-      const nfsDoJogo = notasList.filter(n => n.jogoId === j.id && n.servicosValores);
-      if (nfsDoJogo.length === 0 && Object.values(j.realizado || {}).every(v => v === 0)) return j;
+      const nfsDoJogo = notas.filter(n => n.jogoId === j.id && n.servicosValores);
       const realizado = {...(j.realizado || {})};
-      // Zerar apenas os sub-keys que NFs controlam (não-mensais)
+      // Zerar sub-keys controlados por NFs (não-mensais)
       CATS.forEach(cat => cat.subs.forEach(sub => {
         if (!SUBS_MENSAL.has(sub.key)) realizado[sub.key] = 0;
       }));
@@ -575,12 +574,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       });
       return {...j, realizado};
     }));
-  };
+  }, [notas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addNota = nota => {
-    const next = [...notas, nota];
-    setNotas(next);
-    syncAllRealizado(next);
+    setNotas(ns => [...ns, nota]);
     setShowRegistrar(null);
     setShowAvulsa(false);
   };
@@ -588,25 +585,16 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const deleteNota = id => {
     if (window.confirm("Excluir esta NF?")) {
       deleteNFFile(id);
-      const next = notas.filter(n => n.id !== id);
-      setNotas(next);
-      syncAllRealizado(next);
+      setNotas(ns => ns.filter(n => n.id !== id));
     }
   };
-
-  // Sync ao carregar (para notas registradas antes do link existir)
-  useEffect(() => {
-    if (notas.length > 0) syncAllRealizado(notas);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const limparRodada = (rodada) => {
     const nfsRodada = notas.filter(n => n.rodada === rodada);
     if (nfsRodada.length === 0) return;
     if (!window.confirm(`Apagar todas as ${nfsRodada.length} NFs da rodada ${rodada}? Os arquivos também serão removidos.`)) return;
     nfsRodada.forEach(n => deleteNFFile(n.id));
-    const next = notas.filter(n => n.rodada !== rodada);
-    setNotas(next);
-    syncAllRealizado(next);
+    setNotas(ns => ns.filter(n => n.rodada !== rodada));
   };
 
   // Planilha

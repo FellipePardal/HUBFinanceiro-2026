@@ -251,12 +251,10 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Mês:</span>
-          {mesesExibir.map(m => (
-            <button key={m} onClick={() => setMesSel(m)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
-              background:mesSel===m?"#06b6d4":T.card,color:mesSel===m?"#fff":T.textMd}}>
-              {MESES[m]?.slice(0,3)}
-            </button>
-          ))}
+          <select value={mesSel} onChange={e => setMesSel(parseInt(e.target.value))}
+            style={{background:T.bg,border:`1px solid ${T.muted}`,borderRadius:8,color:T.text,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
           <div style={{width:1,height:24,background:T.border}}/>
           {["Todas",...CATEGORIAS_MENSAL].map(c => (
             <button key={c} onClick={() => setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,

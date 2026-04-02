@@ -12,7 +12,6 @@ import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
 import TabFornecedores  from "./components/tabs/TabFornecedores";
-import TabNotasMensal  from "./components/tabs/TabNotasMensal";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -163,14 +162,14 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   }, [jogos]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
-  const TABS_NF   = ["jogos","mensal"];
+  const TABS_NF   = ["notas fiscais"];
   const TABS_FORN = ["cadastro"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_FORN;
 
   const handleSetorChange = s => {
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
-    else if (s === "notas") setTab("jogos");
+    else if (s === "notas") setTab("notas fiscais");
     else setTab("cadastro");
   };
 
@@ -229,14 +228,11 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
             </div>
           </div>
           <div style={{display:"flex",gap:2,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            {TABS.map(t => {
-              const label = setor==="notas" ? (t==="jogos"?"NF (Jogos)":"NF (Mensal)") : t;
-              return (
-                <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
-                  {label}
-                </button>
-              );
-            })}
+            {TABS.map(t => (
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
+                {t}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -310,8 +306,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
-        {tab==="jogos" && setor==="notas" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} fornecedores={fornecedores} T={T}/>}
-        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} notasMensais={notasMensais} setNotasMensais={setNotasMensais} jogos={jogos} fornecedores={fornecedores} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
 
       </div>

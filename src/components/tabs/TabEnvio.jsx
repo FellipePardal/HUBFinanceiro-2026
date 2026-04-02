@@ -14,6 +14,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const [selJogosNFs, setSelJogosNFs] = useState(new Set());
   const [selMensaisNFs, setSelMensaisNFs] = useState(new Set());
   const [obs, setObs] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
 
   const IS = iSty(T);
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
@@ -41,11 +42,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
       id: Date.now(),
       numero,
       criadoEm: new Date().toISOString(),
+      dataPagamento,
       obs,
       notasIds: [...selJogosNFs],
       mensaisIds: [...selMensaisNFs],
-      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:n.dataPagamento,hasFile:n.hasFile})),
-      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:n.dataPagamento,hasFile:n.hasFile})),
+      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       totalJogos: selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0),
       totalMensais: selMensaisArr.reduce((s, n) => s + (n.valor||0), 0),
       totalGeral: totalSelValor,
@@ -56,6 +58,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     setSelJogosNFs(new Set());
     setSelMensaisNFs(new Set());
     setObs("");
+    setDataPagamento("");
   };
 
   const excluirEnvio = (id) => {
@@ -122,9 +125,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               </div>
               <span style={{color:"#06b6d4",fontWeight:700,fontSize:16}}>{fmt(envio.totalGeral)}</span>
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
               {envio.totalJogos > 0 && <Pill label={`Jogos: ${fmt(envio.totalJogos)}`} color="#22c55e"/>}
               {envio.totalMensais > 0 && <Pill label={`Mensais: ${fmt(envio.totalMensais)}`} color="#06b6d4"/>}
+              {envio.dataPagamento && <Pill label={`Pgto: ${envio.dataPagamento}`} color="#8b5cf6"/>}
               {envio.obs && <span style={{color:T.textSm,fontSize:11}}>Obs: {envio.obs}</span>}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -205,10 +209,16 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
           )}
         </div>
 
-        {/* Obs */}
-        <div style={{marginBottom:16}}>
-          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações do envio (opcional)</label>
-          <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Ex: Inclui NF atrasada da Rd 8" style={IS}/>
+        {/* Data pagamento + Obs */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:16}}>
+          <div>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Pagamento</label>
+            <input value={dataPagamento} onChange={e => setDataPagamento(e.target.value)} placeholder="dd/mm/aaaa" style={IS}/>
+          </div>
+          <div>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações (opcional)</label>
+            <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Ex: Inclui NF atrasada da Rd 8" style={IS}/>
+          </div>
         </div>
 
         {/* Resumo + Criar */}

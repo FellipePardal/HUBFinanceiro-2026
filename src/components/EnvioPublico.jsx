@@ -50,6 +50,7 @@ export default function EnvioPublico({ numero }) {
               <p style={{fontSize:13,margin:"6px 0 0",color:"#bbf7d0"}}>
                 {new Date(envio.criadoEm).toLocaleDateString("pt-BR")} · {envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}
               </p>
+              {envio.dataPagamento && <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>Pagamento: {envio.dataPagamento}</p>}
               {envio.obs && <p style={{fontSize:12,margin:"4px 0 0",color:"#bbf7d0",fontStyle:"italic"}}>{envio.obs}</p>}
             </div>
             <div style={{textAlign:"right"}}>

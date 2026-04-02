@@ -128,7 +128,7 @@ function gerarCodigo(rodada, mandante, visitante, valorNF, numeroNF) {
 function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, fornecedores, onSave, onClose, T }) {
   const IS = iSty(T);
   const [form, setForm] = useState({
-    numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", dataPagamento: "", obs: "",
+    numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", obs: "",
   });
   const [selecionados, setSelecionados] = useState({}); // { subKey: valorUnit }
   const [arquivo, setArquivo] = useState(null);
@@ -267,10 +267,6 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, forneced
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
             <input value={form.dataEnvio} onChange={e => set("dataEnvio", e.target.value)} placeholder="dd/mm" style={IS}/>
           </div>
-          <div style={{marginBottom:12}}>
-            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Pagamento</label>
-            <input value={form.dataPagamento} onChange={e => set("dataPagamento", e.target.value)} placeholder="dd/mm" style={IS}/>
-          </div>
         </div>
         <div style={{marginBottom:12}}>
           <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações</label>
@@ -321,7 +317,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
   const [jogoId, setJogoId] = useState(divulgados[0]?.id || null);
   const jogo = divulgados.find(j => j.id === parseInt(jogoId)) || divulgados[0];
   const [form, setForm] = useState({
-    numeroNF: "", fornecedor: "", valorNF: 0, dataEmissao: "", dataEnvio: "", dataPagamento: "", obs: "", descricao: "",
+    numeroNF: "", fornecedor: "", valorNF: 0, dataEmissao: "", dataEnvio: "", obs: "", descricao: "",
   });
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -393,10 +389,6 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
             <input value={form.dataEnvio} onChange={e => set("dataEnvio", e.target.value)} placeholder="dd/mm" style={IS}/>
-          </div>
-          <div style={{marginBottom:12}}>
-            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Pagamento</label>
-            <input value={form.dataPagamento} onChange={e => set("dataPagamento", e.target.value)} placeholder="dd/mm" style={IS}/>
           </div>
         </div>
         <div style={{marginBottom:12}}>
@@ -610,7 +602,6 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
             <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12,color:T.textSm,marginBottom:12}}>
               {sub.dataEmissao && <span>Emissão: {sub.dataEmissao}</span>}
               {sub.dataEnvio && <span>Envio: {sub.dataEnvio}</span>}
-              {sub.dataPagamento && <span>Pagamento: {sub.dataPagamento}</span>}
               {sub.obs && <span>Obs: {sub.obs}</span>}
               {sub.hasFile && <Pill label="Arquivo anexo" color="#22c55e"/>}
               <span style={{color:T.textSm}}>Enviado: {new Date(sub.enviadoEm).toLocaleDateString("pt-BR")}</span>
@@ -692,7 +683,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   // Mapa de notaId → número do envio
   const envioMap = useMemo(() => {
     const map = {};
-    (envios || []).forEach(e => { (e.notasIds || []).forEach(id => { map[id] = e.numero; }); });
+    (envios || []).forEach(e => {
+      const info = { numero: e.numero, dataPagamento: e.dataPagamento };
+      (e.notasIds || []).forEach(id => { map[id] = info; });
+    });
     return map;
   }, [envios]);
 
@@ -763,7 +757,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const copyPlanilha = () => {
     const header = "Código\tNº NF\tFornecedor\tValor\tEmissão\tEnvio\tPagamento\tJogo\tRodada\tServiços\tTipo\tObs";
     const rows = planilhaItens.map(n =>
-      `${n.codigo}\t${n.numeroNF}\t${n.fornecedor}\t${n.valorNF || 0}\t${n.dataEmissao}\t${n.dataEnvio}\t${n.dataPagamento || ""}\t${n.jogoLabel}\t${n.rodada || ""}\t${(n.servicosLabels||[]).join(", ")}\t${n.tipo||"prevista"}\t${n.obs || ""}`
+      `${n.codigo}\t${n.numeroNF}\t${n.fornecedor}\t${n.valorNF || 0}\t${n.dataEmissao}\t${n.dataEnvio}\t${envioMap[n.id]?.dataPagamento || ""}\t${n.jogoLabel}\t${n.rodada || ""}\t${(n.servicosLabels||[]).join(", ")}\t${n.tipo||"prevista"}\t${n.obs || ""}`
     );
     navigator.clipboard.writeText([header, ...rows].join("\n"));
     alert("Planilha copiada!");
@@ -862,7 +856,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
                                 <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id]}`} color="#8b5cf6"/>}
+                                {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color="#8b5cf6"/>}
                                 {nota.hasFile
                                   ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
                                   : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
@@ -932,14 +926,14 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     <td style={{padding:"10px 12px",color:"#8b5cf6",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(n.valorNF || 0)}</td>
                     <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEmissao}</td>
                     <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEnvio}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataPagamento}</td>
+                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{envioMap[n.id]?.dataPagamento || "—"}</td>
                     <td style={{padding:"10px 12px",color:T.text,fontSize:12,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
                     <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.rodada}</td>
                     <td style={{padding:"10px 12px",color:T.textSm,fontSize:11,maxWidth:200}}>{(n.servicosLabels||[]).join(", ")}</td>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",gap:4}}>
                         <Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/>
-                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id]}`} color="#8b5cf6"/>}
+                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id].numero}`} color="#8b5cf6"/>}
                       </div>
                     </td>
                     <td style={{padding:"10px 12px"}}>

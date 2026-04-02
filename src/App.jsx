@@ -13,6 +13,7 @@ import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
 import TabFornecedores  from "./components/tabs/TabFornecedores";
 import TabNotasMensal  from "./components/tabs/TabNotasMensal";
+import TabEnvio        from "./components/tabs/TabEnvio";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -162,16 +163,18 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     return Object.values(map).sort((a,b) => parseInt(a.name.slice(1))-parseInt(b.name.slice(1)));
   }, [jogos]);
 
-  const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
+  const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
   const TABS_NF   = ["notas fiscais","mensal"];
   const TABS_FORN = ["cadastro"];
-  const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_FORN;
+  const TABS_REL  = ["apresentações","envio"];
+  const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "fornecedores" ? TABS_FORN : TABS_REL;
 
   const handleSetorChange = s => {
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
-    else setTab("cadastro");
+    else if (s === "fornecedores") setTab("cadastro");
+    else if (s === "relatorio") setTab("apresentações");
   };
 
   if (loading) return (
@@ -184,6 +187,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     {k:"orcamento", l:"Orçamento",     icon:"📊"},
     {k:"notas",     l:"Notas Fiscais", icon:"📄"},
     {k:"fornecedores", l:"Fornecedores", icon:"👥"},
+    {k:"relatorio",    l:"Relatório",    icon:"📋"},
   ];
 
   return (
@@ -306,10 +310,11 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
-        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
+        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} servicos={servicos} T={T}/>}
 
       </div>
 
@@ -324,7 +329,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 import FormularioPublico from "./components/FormularioPublico";
-import RelatorioEnvio from "./components/RelatorioEnvio";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
@@ -338,7 +342,6 @@ export default function App() {
 
   // Rotas públicas
   if (window.location.hash === "#formulario") return <FormularioPublico/>;
-  if (window.location.hash === "#relatorio") return <RelatorioEnvio/>;
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>

@@ -41,6 +41,38 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
   );
 }
 
+function PreviewModal({ nota, onClose, T }) {
+  if (!nota) return null;
+  const isPdf = nota.filePath?.endsWith('.pdf');
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000000dd",zIndex:200,display:"flex",flexDirection:"column"}}
+      onClick={onClose}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",flexShrink:0}}
+        onClick={e => e.stopPropagation()}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <code style={{color:"#22c55e",fontSize:13,fontWeight:700}}>{nota.codigo}</code>
+          <span style={{color:"#fff",fontSize:13}}>{nota.fornecedor}</span>
+          <span style={{color:"#8b5cf6",fontWeight:600,fontSize:13}}>{fmt(nota.valorNF)}</span>
+          <span style={{color:"#94a3b8",fontSize:12}}>{nota.jogoLabel} · Rd {nota.rodada}</span>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <a href={nota.fileUrl} download style={{...btnStyle,background:"#3b82f6",padding:"6px 14px",fontSize:12,textDecoration:"none"}}>Download</a>
+          <button onClick={onClose} style={{...btnStyle,background:"#475569",padding:"6px 14px",fontSize:12}}>Fechar</button>
+        </div>
+      </div>
+      <div style={{flex:1,padding:"0 20px 20px",minHeight:0}} onClick={e => e.stopPropagation()}>
+        {isPdf ? (
+          <iframe src={nota.fileUrl} style={{width:"100%",height:"100%",border:"none",borderRadius:12,background:"#fff"}}/>
+        ) : (
+          <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",overflow:"auto"}}>
+            <img src={nota.fileUrl} alt={nota.codigo} style={{maxWidth:"100%",maxHeight:"100%",borderRadius:12,objectFit:"contain"}}/>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function extrairServicos(jogo) {
   const servicos = [];
   CATS.forEach(cat => {
@@ -387,9 +419,10 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
-  const [showRegistrar, setShowRegistrar] = useState(null); // jogo
+  const [showRegistrar, setShowRegistrar] = useState(null);
   const [showAvulsa, setShowAvulsa] = useState(false);
   const [filtroPlanilha, setFiltroPlanilha] = useState("Todas");
+  const [preview, setPreview] = useState(null);
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
@@ -526,7 +559,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
                                 <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                {nota.fileUrl && <a href={nota.fileUrl} target="_blank" rel="noreferrer" style={{color:"#3b82f6",fontSize:10,fontWeight:600,textDecoration:"none",background:"#3b82f622",padding:"2px 6px",borderRadius:4}}>Ver</a>}
+                                {nota.fileUrl && <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>
@@ -598,7 +631,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                     <td style={{padding:"10px 12px"}}><Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/></td>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",gap:4}}>
-                        {n.fileUrl && <a href={n.fileUrl} target="_blank" rel="noreferrer" style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10,textDecoration:"none"}}>Ver</a>}
+                        {n.fileUrl && <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>}
                         <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>
                       </div>
                     </td>
@@ -661,6 +694,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
+      {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
     </>
   );
 }

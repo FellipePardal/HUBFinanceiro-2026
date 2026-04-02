@@ -336,6 +336,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 import FormularioPublico from "./components/FormularioPublico";
+import EnvioPublico from "./components/EnvioPublico";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
@@ -349,6 +350,8 @@ export default function App() {
 
   // Rotas públicas
   if (window.location.hash === "#formulario") return <FormularioPublico/>;
+  const envioMatch = window.location.hash.match(/^#envio\/(\d+)$/);
+  if (envioMatch) return <EnvioPublico numero={parseInt(envioMatch[1])}/>;
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>

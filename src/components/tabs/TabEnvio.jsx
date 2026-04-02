@@ -127,9 +127,11 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               {envio.totalMensais > 0 && <Pill label={`Mensais: ${fmt(envio.totalMensais)}`} color="#06b6d4"/>}
               {envio.obs && <span style={{color:T.textSm,fontSize:11}}>Obs: {envio.obs}</span>}
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={() => { setEnvioDetalhe(envio); setView("detalhe"); }} style={{...btnStyle,background:"#3b82f6",padding:"5px 16px",fontSize:11}}>Ver detalhes</button>
-              <button onClick={() => copyEnvioPlanilha(envio)} style={{...btnStyle,background:"#22c55e",padding:"5px 16px",fontSize:11}}>Copiar Planilha</button>
+              <button onClick={() => { const url = `${window.location.origin}${window.location.pathname}#envio/${envio.numero}`; navigator.clipboard.writeText(url); alert("Link copiado!\n"+url); }}
+                style={{...btnStyle,background:"#8b5cf6",padding:"5px 16px",fontSize:11}}>Compartilhar link</button>
+              <button onClick={() => window.open(`#envio/${envio.numero}`,"_blank")} style={{...btnStyle,background:"#166534",padding:"5px 16px",fontSize:11}}>Abrir página</button>
               <button onClick={() => excluirEnvio(envio.id)} style={{...btnStyle,background:"#7f1d1d",padding:"5px 16px",fontSize:11}}>Excluir</button>
             </div>
           </div>
@@ -231,7 +233,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
             <span style={{color:T.textSm,fontSize:12}}>{new Date(envioDetalhe.criadoEm).toLocaleDateString("pt-BR")}</span>
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={() => copyEnvioPlanilha(envioDetalhe)} style={{...btnStyle,background:"#22c55e",padding:"6px 16px",fontSize:12}}>Copiar Planilha</button>
+            <button onClick={() => { const url = `${window.location.origin}${window.location.pathname}#envio/${envioDetalhe.numero}`; navigator.clipboard.writeText(url); alert("Link copiado!"); }}
+              style={{...btnStyle,background:"#8b5cf6",padding:"6px 16px",fontSize:12}}>Compartilhar link</button>
+            <button onClick={() => window.open(`#envio/${envioDetalhe.numero}`,"_blank")} style={{...btnStyle,background:"#166534",padding:"6px 16px",fontSize:12}}>Abrir página</button>
             <button onClick={() => setView("lista")} style={{...btnStyle,background:"#475569",padding:"6px 16px",fontSize:12}}>Voltar</button>
           </div>
         </div>

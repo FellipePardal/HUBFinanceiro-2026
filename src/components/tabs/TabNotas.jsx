@@ -655,7 +655,7 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
-export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], T }) {
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);
@@ -679,6 +679,13 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
   const rodadaEfetiva = rodadaSel ?? (rodadas.length ? rodadas[rodadas.length - 1] : 1);
   const jogosRodada = divulgados.filter(j => j.rodada === rodadaEfetiva);
+
+  // Mapa de notaId → número do envio
+  const envioMap = useMemo(() => {
+    const map = {};
+    (envios || []).forEach(e => { (e.notasIds || []).forEach(id => { map[id] = e.numero; }); });
+    return map;
+  }, [envios]);
 
   // Stats
   const allServicos = useMemo(() => {
@@ -846,6 +853,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
                                 <span style={{color:T.textSm}}>{nota.fornecedor}</span>
+                                {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id]}`} color="#8b5cf6"/>}
                                 {nota.hasFile
                                   ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
                                   : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
@@ -918,7 +926,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     <td style={{padding:"10px 12px",color:T.text,fontSize:12,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
                     <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.rodada}</td>
                     <td style={{padding:"10px 12px",color:T.textSm,fontSize:11,maxWidth:200}}>{(n.servicosLabels||[]).join(", ")}</td>
-                    <td style={{padding:"10px 12px"}}><Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/></td>
+                    <td style={{padding:"10px 12px"}}>
+                      <div style={{display:"flex",gap:4}}>
+                        <Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/>
+                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id]}`} color="#8b5cf6"/>}
+                      </div>
+                    </td>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",gap:4}}>
                         {n.hasFile

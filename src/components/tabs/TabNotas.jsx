@@ -480,42 +480,56 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const totalValor     = notas.reduce((s, n) => s + (n.valorNF || 0), 0);
   const notasAvulsas   = notas.filter(n => n.tipo === "avulsa").length;
 
-  // Atualiza o realizado do jogo com os valores da NF
-  const syncRealizado = (nota, acao) => {
-    if (!nota.jogoId || !nota.servicosValores) return;
+  // Recalcula o realizado de todos os jogos baseado nas notas
+  const syncAllRealizado = (notasList) => {
     setJogos(js => js.map(j => {
-      if (j.id !== nota.jogoId) return j;
+      const nfsDoJogo = notasList.filter(n => n.jogoId === j.id && n.servicosValores);
+      if (nfsDoJogo.length === 0 && Object.values(j.realizado || {}).every(v => v === 0)) return j;
       const realizado = {...(j.realizado || {})};
-      Object.entries(nota.servicosValores).forEach(([subKey, valor]) => {
-        if (acao === "add") realizado[subKey] = (realizado[subKey] || 0) + valor;
-        if (acao === "remove") realizado[subKey] = Math.max(0, (realizado[subKey] || 0) - valor);
+      // Zerar apenas os sub-keys que NFs controlam (não-mensais)
+      CATS.forEach(cat => cat.subs.forEach(sub => {
+        if (!SUBS_MENSAL.has(sub.key)) realizado[sub.key] = 0;
+      }));
+      // Somar valores de todas as NFs
+      nfsDoJogo.forEach(n => {
+        Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
+          realizado[subKey] = (realizado[subKey] || 0) + valor;
+        });
       });
       return {...j, realizado};
     }));
   };
 
   const addNota = nota => {
-    setNotas(ns => [...ns, nota]);
-    syncRealizado(nota, "add");
+    const next = [...notas, nota];
+    setNotas(next);
+    syncAllRealizado(next);
     setShowRegistrar(null);
     setShowAvulsa(false);
   };
 
   const deleteNota = id => {
     if (window.confirm("Excluir esta NF?")) {
-      const nota = notas.find(n => n.id === id);
       deleteNFFile(id);
-      setNotas(ns => ns.filter(n => n.id !== id));
-      if (nota) syncRealizado(nota, "remove");
+      const next = notas.filter(n => n.id !== id);
+      setNotas(next);
+      syncAllRealizado(next);
     }
   };
+
+  // Sync ao carregar (para notas registradas antes do link existir)
+  useEffect(() => {
+    if (notas.length > 0) syncAllRealizado(notas);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const limparRodada = (rodada) => {
     const nfsRodada = notas.filter(n => n.rodada === rodada);
     if (nfsRodada.length === 0) return;
     if (!window.confirm(`Apagar todas as ${nfsRodada.length} NFs da rodada ${rodada}? Os arquivos também serão removidos.`)) return;
     nfsRodada.forEach(n => deleteNFFile(n.id));
-    setNotas(ns => ns.filter(n => n.rodada !== rodada));
+    const next = notas.filter(n => n.rodada !== rodada);
+    setNotas(next);
+    syncAllRealizado(next);
   };
 
   // Planilha

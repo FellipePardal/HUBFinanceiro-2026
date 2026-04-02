@@ -11,23 +11,27 @@ import TabServicos      from "./components/tabs/TabServicos";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
+import TabFornecedores  from "./components/tabs/TabFornecedores";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
+import { FORNECEDORES_INIT } from "./data/fornecedores";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
 function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [jogos, setJogosRaw]       = useState(ALL_JOGOS);
   const [servicos, setServicosRaw] = useState(SERVICOS_INIT);
-  const [notas, setNotasRaw]       = useState([]);
-  const [loading, setLoading]      = useState(true);
+  const [notas, setNotasRaw]             = useState([]);
+  const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
+  const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas')]);
+      const [j, s, n, f] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
+      if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
       setLoading(false);
     }
     load();
@@ -35,9 +39,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     const channel = supabase
       .channel('app_state_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
-        if (payload.new.key === 'jogos')    setJogosRaw(payload.new.value);
-        if (payload.new.key === 'servicos') setServicosRaw(payload.new.value);
-        if (payload.new.key === 'notas')    setNotasRaw(payload.new.value);
+        if (payload.new.key === 'jogos')        setJogosRaw(payload.new.value);
+        if (payload.new.key === 'servicos')     setServicosRaw(payload.new.value);
+        if (payload.new.key === 'notas')        setNotasRaw(payload.new.value);
+        if (payload.new.key === 'fornecedores') setFornecedoresRaw(payload.new.value);
       })
       .subscribe();
 
@@ -55,6 +60,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const setNotas = fn => setNotasRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('notas', next); return next;
+  });
+  const setFornecedores = fn => setFornecedoresRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('fornecedores', next); return next;
   });
 
   const varCalc = useMemo(() => {
@@ -145,13 +154,16 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     return Object.values(map).sort((a,b) => parseInt(a.name.slice(1))-parseInt(b.name.slice(1)));
   }, [jogos]);
 
-  const TABS_ORC = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
-  const TABS_NF  = ["notas fiscais"];
-  const TABS = setor === "orcamento" ? TABS_ORC : TABS_NF;
+  const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
+  const TABS_NF   = ["notas fiscais"];
+  const TABS_FORN = ["cadastro"];
+  const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_FORN;
 
   const handleSetorChange = s => {
     setSetor(s);
-    setTab(s === "orcamento" ? "dashboard" : "notas fiscais");
+    if (s === "orcamento") setTab("dashboard");
+    else if (s === "notas") setTab("notas fiscais");
+    else setTab("cadastro");
   };
 
   if (loading) return (
@@ -163,6 +175,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const SETORES = [
     {k:"orcamento", l:"Orçamento",     icon:"📊"},
     {k:"notas",     l:"Notas Fiscais", icon:"📄"},
+    {k:"fornecedores", l:"Fornecedores", icon:"👥"},
   ];
 
   return (
@@ -287,6 +300,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} T={T}/>}
+        {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
 
       </div>
 

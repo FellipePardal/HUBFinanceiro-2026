@@ -3,7 +3,6 @@ import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
-import TabNotasMensal from "./TabNotasMensal";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -435,7 +434,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
-export default function TabNotas({ notas, setNotas, notasMensais, setNotasMensais, jogos, fornecedores = [], T }) {
+export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);
@@ -510,7 +509,7 @@ export default function TabNotas({ notas, setNotas, notasMensais, setNotasMensai
     alert("Planilha copiada!");
   };
 
-  const TABS_NF = ["rodada", "planilha", "resumo", "mensal"];
+  const TABS_NF = ["rodada", "planilha", "resumo"];
 
   return (
     <>
@@ -519,21 +518,19 @@ export default function TabNotas({ notas, setNotas, notasMensais, setNotasMensai
           {TABS_NF.map(t => (
             <button key={t} onClick={() => setTab(t)} style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
               background:tab===t?"#8b5cf6":"transparent",color:tab===t?"#fff":T.textMd,textTransform:"capitalize"}}>
-              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : t === "resumo" ? "Resumo" : "Mensal"}
+              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : "Resumo"}
             </button>
           ))}
         </div>
-        {tab !== "mensal" && <button onClick={() => setShowAvulsa(true)} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ NF Avulsa</button>}
+        <button onClick={() => setShowAvulsa(true)} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ NF Avulsa</button>
       </div>
 
-      {tab !== "mensal" && (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
-          <KPI label="Serviços Pendentes" value={String(totalPendente)} sub="Sem NF" color="#f59e0b" T={T}/>
-          <KPI label="Serviços Conferidos" value={String(totalConferida)} sub="Com NF" color="#22c55e" T={T}/>
-          <KPI label="Notas Registradas" value={`${totalNotas} (${notasAvulsas} avulsa${notasAvulsas!==1?"s":""})`} sub="" color="#8b5cf6" T={T}/>
-          <KPI label="Valor Total NFs" value={fmt(totalValor)} sub={`${totalNotas} notas`} color="#06b6d4" T={T}/>
-        </div>
-      )}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+        <KPI label="Serviços Pendentes" value={String(totalPendente)} sub="Sem NF" color="#f59e0b" T={T}/>
+        <KPI label="Serviços Conferidos" value={String(totalConferida)} sub="Com NF" color="#22c55e" T={T}/>
+        <KPI label="Notas Registradas" value={`${totalNotas} (${notasAvulsas} avulsa${notasAvulsas!==1?"s":""})`} sub="" color="#8b5cf6" T={T}/>
+        <KPI label="Valor Total NFs" value={fmt(totalValor)} sub={`${totalNotas} notas`} color="#06b6d4" T={T}/>
+      </div>
 
       {/* ── POR RODADA ── */}
       {tab === "rodada" && (<>
@@ -741,11 +738,6 @@ export default function TabNotas({ notas, setNotas, notasMensais, setNotasMensai
             </table>
           </div>
         </div>
-      )}
-
-      {/* ── MENSAL ── */}
-      {tab === "mensal" && (
-        <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}

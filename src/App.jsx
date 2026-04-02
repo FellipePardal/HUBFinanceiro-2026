@@ -12,6 +12,7 @@ import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
 import TabFornecedores  from "./components/tabs/TabFornecedores";
+import TabNotasMensal  from "./components/tabs/TabNotasMensal";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -162,7 +163,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   }, [jogos]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
-  const TABS_NF   = ["notas fiscais"];
+  const TABS_NF   = ["notas fiscais","mensal"];
   const TABS_FORN = ["cadastro"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_FORN;
 
@@ -306,7 +307,8 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} notasMensais={notasMensais} setNotasMensais={setNotasMensais} jogos={jogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
 
       </div>

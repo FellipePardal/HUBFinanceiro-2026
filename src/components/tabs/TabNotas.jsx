@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
-import { uploadNF, deleteNFFile, getNFUrl } from "../../lib/supabase";
+import { fileToDataUrl } from "../../lib/supabase";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -43,29 +43,30 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
 
 function PreviewModal({ nota, onClose, T }) {
   if (!nota) return null;
-  const isPdf = nota.filePath?.endsWith('.pdf');
+  const src = nota.fileData;
+  const isPdf = src?.startsWith('data:application/pdf');
   return (
     <div style={{position:"fixed",inset:0,background:"#000000dd",zIndex:200,display:"flex",flexDirection:"column"}}
       onClick={onClose}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",flexShrink:0}}
         onClick={e => e.stopPropagation()}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <code style={{color:"#22c55e",fontSize:13,fontWeight:700}}>{nota.codigo}</code>
           <span style={{color:"#fff",fontSize:13}}>{nota.fornecedor}</span>
           <span style={{color:"#8b5cf6",fontWeight:600,fontSize:13}}>{fmt(nota.valorNF)}</span>
           <span style={{color:"#94a3b8",fontSize:12}}>{nota.jogoLabel} · Rd {nota.rodada}</span>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <a href={nota.fileUrl} download style={{...btnStyle,background:"#3b82f6",padding:"6px 14px",fontSize:12,textDecoration:"none"}}>Download</a>
+          <a href={src} download={nota.codigo} style={{...btnStyle,background:"#3b82f6",padding:"6px 14px",fontSize:12,textDecoration:"none"}}>Download</a>
           <button onClick={onClose} style={{...btnStyle,background:"#475569",padding:"6px 14px",fontSize:12}}>Fechar</button>
         </div>
       </div>
       <div style={{flex:1,padding:"0 20px 20px",minHeight:0}} onClick={e => e.stopPropagation()}>
         {isPdf ? (
-          <iframe src={nota.fileUrl} style={{width:"100%",height:"100%",border:"none",borderRadius:12,background:"#fff"}}/>
+          <iframe src={src} style={{width:"100%",height:"100%",border:"none",borderRadius:12,background:"#fff"}}/>
         ) : (
           <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",overflow:"auto"}}>
-            <img src={nota.fileUrl} alt={nota.codigo} style={{maxWidth:"100%",maxHeight:"100%",borderRadius:12,objectFit:"contain"}}/>
+            <img src={src} alt={nota.codigo} style={{maxWidth:"100%",maxHeight:"100%",borderRadius:12,objectFit:"contain"}}/>
           </div>
         )}
       </div>
@@ -146,14 +147,10 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, forneced
     if (!form.numeroNF && !form.fornecedor) return;
     if (selKeys.length === 0) return;
     setUploading(true);
-    let filePath = null, fileUrl = null;
-    try {
-      if (arquivo) {
-        const result = await uploadNF(codigo, arquivo);
-        filePath = result.path;
-        fileUrl = result.url;
-      }
-    } catch (e) { console.error("Upload falhou:", e); }
+    let fileData = null;
+    if (arquivo) {
+      try { fileData = await fileToDataUrl(arquivo); } catch(_){}
+    }
     const servicosKeys = selKeys.map(sk => `${jogo.id}_${sk}`);
     const servicosValores = {};
     selKeys.forEach(sk => { servicosValores[sk] = selecionados[sk]; });
@@ -172,8 +169,7 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, forneced
       servicosValores,
       tipo: "prevista",
       status: "Conferida",
-      filePath,
-      fileUrl,
+      fileData,
     });
     setUploading(false);
   };
@@ -308,14 +304,10 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
   const handleSave = async () => {
     if (!jogo || (!form.numeroNF && !form.fornecedor)) return;
     setUploading(true);
-    let filePath = null, fileUrl = null;
-    try {
-      if (arquivo) {
-        const result = await uploadNF(codigo, arquivo);
-        filePath = result.path;
-        fileUrl = result.url;
-      }
-    } catch (e) { console.error("Upload falhou:", e); }
+    let fileData = null;
+    if (arquivo) {
+      try { fileData = await fileToDataUrl(arquivo); } catch(_){}
+    }
     onSave({
       id: Date.now(),
       codigo,
@@ -330,8 +322,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
       servicosLabels: [form.descricao || "Avulsa"],
       tipo: "avulsa",
       status: "Conferida",
-      filePath,
-      fileUrl,
+      fileData,
     });
     setUploading(false);
   };
@@ -429,9 +420,9 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
   const handleUploadLater = async (file, nota) => {
     if (!file || !nota) return;
     try {
-      const result = await uploadNF(nota.codigo, file);
-      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, filePath: result.path, fileUrl: result.url} : n));
-    } catch (e) { console.error("Upload falhou:", e); }
+      const fileData = await fileToDataUrl(file);
+      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, fileData} : n));
+    } catch (e) { console.error("Leitura falhou:", e); }
     setUploadTarget(null);
   };
 
@@ -570,7 +561,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                               <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
                                 <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                {nota.fileUrl
+                                {nota.fileData
                                   ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
                                   : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
                               </span>
@@ -644,7 +635,7 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
                     <td style={{padding:"10px 12px"}}><Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/></td>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",gap:4}}>
-                        {n.fileUrl
+                        {n.fileData
                           ? <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>
                           : <button onClick={() => {setUploadTarget(n); uploadRef.current?.click();}} style={{...btnStyle,background:"#f59e0b",padding:"4px 8px",fontSize:10}}>Enviar</button>}
                         <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>

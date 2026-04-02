@@ -25,17 +25,19 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [servicos, setServicosRaw] = useState(SERVICOS_INIT);
   const [notas, setNotasRaw]               = useState([]);
   const [notasMensais, setNotasMensaisRaw] = useState([]);
+  const [envios, setEnviosRaw]             = useState([]);
   const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
   const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais')]);
+      const [j, s, n, f, nm, ev] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
       if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
       if (nm) setNotasMensaisRaw(nm); else setSupabaseState('notas_mensais', []);
+      if (ev) setEnviosRaw(ev); else setSupabaseState('envios', []);
       setLoading(false);
     }
     load();
@@ -48,6 +50,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         if (payload.new.key === 'notas')        setNotasRaw(payload.new.value);
         if (payload.new.key === 'fornecedores')   setFornecedoresRaw(payload.new.value);
         if (payload.new.key === 'notas_mensais') setNotasMensaisRaw(payload.new.value);
+        if (payload.new.key === 'envios')        setEnviosRaw(payload.new.value);
       })
       .subscribe();
 
@@ -65,6 +68,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const setNotas = fn => setNotasRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('notas', next); return next;
+  });
+  const setEnvios = fn => setEnviosRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('envios', next); return next;
   });
   const setNotasMensais = fn => setNotasMensaisRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
@@ -314,7 +321,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
-        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} servicos={servicos} T={T}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} servicos={servicos} envios={envios} setEnvios={setEnvios} T={T}/>}
 
       </div>
 

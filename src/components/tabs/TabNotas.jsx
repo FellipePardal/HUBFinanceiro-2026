@@ -480,7 +480,18 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
   const addNota = nota => { setNotas(ns => [...ns, nota]); setShowRegistrar(null); setShowAvulsa(false); };
 
   const deleteNota = id => {
-    if (window.confirm("Excluir esta NF?")) setNotas(ns => ns.filter(n => n.id !== id));
+    if (window.confirm("Excluir esta NF?")) {
+      deleteNFFile(id);
+      setNotas(ns => ns.filter(n => n.id !== id));
+    }
+  };
+
+  const limparRodada = (rodada) => {
+    const nfsRodada = notas.filter(n => n.rodada === rodada);
+    if (nfsRodada.length === 0) return;
+    if (!window.confirm(`Apagar todas as ${nfsRodada.length} NFs da rodada ${rodada}? Os arquivos também serão removidos.`)) return;
+    nfsRodada.forEach(n => deleteNFFile(n.id));
+    setNotas(ns => ns.filter(n => n.rodada !== rodada));
   };
 
   // Planilha
@@ -523,14 +534,21 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
 
       {/* ── POR RODADA ── */}
       {tab === "rodada" && (<>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20,alignItems:"center"}}>
-          <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Rodada:</span>
-          {rodadas.map(r => (
-            <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-              background:rodadaEfetiva===r?"#8b5cf6":T.card,color:rodadaEfetiva===r?"#fff":T.textMd}}>
-              {r}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Rodada:</span>
+            {rodadas.map(r => (
+              <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                background:rodadaEfetiva===r?"#8b5cf6":T.card,color:rodadaEfetiva===r?"#fff":T.textMd}}>
+                {r}
+              </button>
+            ))}
+          </div>
+          {notas.filter(n => n.rodada === rodadaEfetiva).length > 0 && (
+            <button onClick={() => limparRodada(rodadaEfetiva)} style={{...btnStyle,background:"#7f1d1d",fontSize:11,padding:"6px 14px"}}>
+              Limpar Rodada {rodadaEfetiva}
             </button>
-          ))}
+          )}
         </div>
 
         {jogosRodada.map(jogo => {

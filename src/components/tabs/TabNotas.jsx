@@ -3,6 +3,7 @@ import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
+import FormularioNF from "./FormularioNF";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -547,7 +548,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     alert("Planilha copiada!");
   };
 
-  const TABS_NF = ["rodada", "planilha", "resumo"];
+  const TABS_NF = ["rodada", "planilha", "resumo", "formulário"];
 
   return (
     <>
@@ -556,7 +557,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           {TABS_NF.map(t => (
             <button key={t} onClick={() => setTab(t)} style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
               background:tab===t?"#8b5cf6":"transparent",color:tab===t?"#fff":T.textMd,textTransform:"capitalize"}}>
-              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : "Resumo"}
+              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : t === "resumo" ? "Resumo" : "Formulário"}
             </button>
           ))}
         </div>
@@ -776,6 +777,11 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── FORMULÁRIO ── */}
+      {tab === "formulário" && (
+        <FormularioNF jogos={jogos} fornecedores={fornecedores} onSubmit={addNota} T={T}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}

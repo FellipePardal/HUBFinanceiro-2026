@@ -7,6 +7,40 @@ import { uploadNF, deleteNFFile, getNFUrl } from "../../lib/supabase";
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
 
+function FornecedorInput({ value, onChange, fornecedores, T }) {
+  const IS = iSty(T);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const query = value.toLowerCase();
+  const filtered = query.length > 0
+    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(query) || f.razaoSocial.toLowerCase().includes(query) || f.funcao.toLowerCase().includes(query)).slice(0, 8)
+    : [];
+
+  return (
+    <div style={{position:"relative"}} ref={ref}>
+      <input value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Digite para buscar..." style={IS}/>
+      {open && filtered.length > 0 && (
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:8,marginTop:4,maxHeight:200,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
+          {filtered.map(f => (
+            <div key={f.id} onMouseDown={() => { onChange(f.apelido); setOpen(false); }}
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:2}}
+              onMouseEnter={e => e.currentTarget.style.background = T.bg}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:13,fontWeight:600,color:T.text}}>{f.apelido}</span>
+                <span style={{fontSize:10,color:T.textSm,background:T.bg,padding:"1px 6px",borderRadius:4}}>{f.tipo}</span>
+              </div>
+              <span style={{fontSize:11,color:T.textSm}}>{f.funcao} · {f.razaoSocial.slice(0,40)}{f.razaoSocial.length>40?"...":""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function extrairServicos(jogo) {
   const servicos = [];
   CATS.forEach(cat => {
@@ -38,7 +72,7 @@ function gerarCodigo(rodada, mandante, visitante, valorNF, numeroNF) {
 }
 
 // ─── Modal para registrar NF (suporta multi-serviço) ─────────────────────────
-function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, onClose, T }) {
+function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, fornecedores, onSave, onClose, T }) {
   const IS = iSty(T);
   const [form, setForm] = useState({
     numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", obs: "",
@@ -162,7 +196,7 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor</label>
-            <input value={form.fornecedor} onChange={e => set("fornecedor", e.target.value)} style={IS}/>
+            <FornecedorInput value={form.fornecedor} onChange={v => set("fornecedor", v)} fornecedores={fornecedores} T={T}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota</label>
@@ -224,7 +258,7 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
 }
 
 // ─── Modal para NF avulsa (não prevista) ─────────────────────────────────────
-function NFAvulsaModal({ jogos, onSave, onClose, T }) {
+function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
   const IS = iSty(T);
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const [jogoId, setJogoId] = useState(divulgados[0]?.id || null);
@@ -285,7 +319,7 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor</label>
-            <input value={form.fornecedor} onChange={e => set("fornecedor", e.target.value)} style={IS}/>
+            <FornecedorInput value={form.fornecedor} onChange={v => set("fornecedor", v)} fornecedores={fornecedores} T={T}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota</label>
@@ -350,7 +384,7 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
-export default function TabNotas({ notas, setNotas, jogos, T }) {
+export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null); // jogo
@@ -625,8 +659,8 @@ export default function TabNotas({ notas, setNotas, jogos, T }) {
         </div>
       )}
 
-      {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
-      {showAvulsa && <NFAvulsaModal jogos={jogos} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
+      {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
+      {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
     </>
   );
 }

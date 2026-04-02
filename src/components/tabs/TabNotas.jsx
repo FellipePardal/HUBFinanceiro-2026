@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
+import { uploadNF, deleteNFFile, getNFUrl } from "../../lib/supabase";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -43,6 +44,9 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
     numeroNF: "", fornecedor: "", valorNF: 0, dataEmissao: "", dataEnvio: "", obs: "",
   });
   const [selecionados, setSelecionados] = useState([]);
+  const [arquivo, setArquivo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
   // Serviços que ainda não têm NF conferida
@@ -61,9 +65,18 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
 
   const codigo = gerarCodigo(jogo.rodada, jogo.mandante, jogo.visitante, form.valorNF, form.numeroNF);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.numeroNF && !form.fornecedor) return;
     if (selecionados.length === 0) return;
+    setUploading(true);
+    let filePath = null, fileUrl = null;
+    try {
+      if (arquivo) {
+        const result = await uploadNF(codigo, arquivo);
+        filePath = result.path;
+        fileUrl = result.url;
+      }
+    } catch (e) { console.error("Upload falhou:", e); }
     const servicosKeys = selecionados.map(sk => `${jogo.id}_${sk}`);
     onSave({
       id: Date.now(),
@@ -79,7 +92,10 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
       servicosLabels: servicosDisponiveis.filter(s => selecionados.includes(s.subKey)).map(s => s.subLabel),
       tipo: "prevista",
       status: "Conferida",
+      filePath,
+      fileUrl,
     });
+    setUploading(false);
   };
 
   return (
@@ -138,10 +154,25 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
           <input value={form.obs} onChange={e => set("obs", e.target.value)} style={IS}/>
         </div>
 
+        {/* Upload de arquivo */}
+        <div style={{marginBottom:16}}>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF (PDF/imagem)</label>
+          <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0] || null)} style={{display:"none"}}/>
+          <div onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0] || null);}}
+            style={{border:`2px dashed ${arquivo?'#22c55e':T.muted}`,borderRadius:8,padding:"14px 16px",cursor:"pointer",textAlign:"center",
+              background:arquivo?"#22c55e11":T.bg,transition:"all 0.2s"}}>
+            {arquivo
+              ? <p style={{margin:0,color:"#22c55e",fontSize:13,fontWeight:600}}>{arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB)</p>
+              : <p style={{margin:0,color:T.textSm,fontSize:12}}>Clique ou arraste o arquivo aqui</p>}
+          </div>
+        </div>
+
         {/* Código gerado */}
         {(form.numeroNF || form.valorNF > 0) && (
           <div style={{background:T.bg,borderRadius:8,padding:"12px 16px",marginBottom:16}}>
-            <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>Código para renomear o arquivo:</p>
+            <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>Código do arquivo:</p>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <code style={{fontSize:15,fontWeight:700,color:"#22c55e",letterSpacing:0.5,flex:1}}>{codigo}</code>
               <button onClick={() => {navigator.clipboard.writeText(codigo);}} style={{...btnStyle,background:T.border,padding:"4px 10px",fontSize:10,color:T.text}}>Copiar</button>
@@ -151,7 +182,9 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, onSave, 
 
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-          <button onClick={handleSave} disabled={selecionados.length===0} style={{...btnStyle,background:selecionados.length>0?"#22c55e":"#475569",opacity:selecionados.length>0?1:0.5}}>Salvar NF</button>
+          <button onClick={handleSave} disabled={selecionados.length===0||uploading} style={{...btnStyle,background:selecionados.length>0?"#22c55e":"#475569",opacity:selecionados.length>0&&!uploading?1:0.5}}>
+            {uploading ? "Enviando..." : "Salvar NF"}
+          </button>
         </div>
       </div>
     </div>
@@ -167,12 +200,24 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
   const [form, setForm] = useState({
     numeroNF: "", fornecedor: "", valorNF: 0, dataEmissao: "", dataEnvio: "", obs: "", descricao: "",
   });
+  const [arquivo, setArquivo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
   const codigo = jogo ? gerarCodigo(jogo.rodada, jogo.mandante, jogo.visitante, form.valorNF, form.numeroNF) : "";
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!jogo || (!form.numeroNF && !form.fornecedor)) return;
+    setUploading(true);
+    let filePath = null, fileUrl = null;
+    try {
+      if (arquivo) {
+        const result = await uploadNF(codigo, arquivo);
+        filePath = result.path;
+        fileUrl = result.url;
+      }
+    } catch (e) { console.error("Upload falhou:", e); }
     onSave({
       id: Date.now(),
       codigo,
@@ -187,7 +232,10 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
       servicosLabels: [form.descricao || "Avulsa"],
       tipo: "avulsa",
       status: "Conferida",
+      filePath,
+      fileUrl,
     });
+    setUploading(false);
   };
 
   return (
@@ -233,9 +281,24 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
           <input value={form.obs} onChange={e => set("obs", e.target.value)} style={IS}/>
         </div>
 
+        {/* Upload */}
+        <div style={{marginBottom:16}}>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF (PDF/imagem)</label>
+          <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0] || null)} style={{display:"none"}}/>
+          <div onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0] || null);}}
+            style={{border:`2px dashed ${arquivo?'#22c55e':T.muted}`,borderRadius:8,padding:"14px 16px",cursor:"pointer",textAlign:"center",
+              background:arquivo?"#22c55e11":T.bg}}>
+            {arquivo
+              ? <p style={{margin:0,color:"#22c55e",fontSize:13,fontWeight:600}}>{arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB)</p>
+              : <p style={{margin:0,color:T.textSm,fontSize:12}}>Clique ou arraste o arquivo aqui</p>}
+          </div>
+        </div>
+
         {(form.numeroNF || form.valorNF > 0) && (
           <div style={{background:T.bg,borderRadius:8,padding:"12px 16px",marginBottom:16}}>
-            <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>Código para renomear o arquivo:</p>
+            <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>Código do arquivo:</p>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <code style={{fontSize:15,fontWeight:700,color:"#22c55e",letterSpacing:0.5,flex:1}}>{codigo}</code>
               <button onClick={() => {navigator.clipboard.writeText(codigo);}} style={{...btnStyle,background:T.border,padding:"4px 10px",fontSize:10,color:T.text}}>Copiar</button>
@@ -245,7 +308,9 @@ function NFAvulsaModal({ jogos, onSave, onClose, T }) {
 
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-          <button onClick={handleSave} style={{...btnStyle,background:"#f59e0b",color:"#000"}}>Salvar NF Avulsa</button>
+          <button onClick={handleSave} disabled={uploading} style={{...btnStyle,background:"#f59e0b",color:"#000",opacity:uploading?0.5:1}}>
+            {uploading ? "Enviando..." : "Salvar NF Avulsa"}
+          </button>
         </div>
       </div>
     </div>
@@ -382,9 +447,10 @@ export default function TabNotas({ notas, setNotas, jogos, T }) {
                           </td>
                           <td style={{padding:"8px 14px",fontSize:11}}>
                             {nota ? (
-                              <span style={{color:T.text}}>
+                              <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
                                 <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
-                                <span style={{color:T.textSm,marginLeft:8}}>{nota.fornecedor} · {fmt(nota.valorNF)}</span>
+                                <span style={{color:T.textSm}}>{nota.fornecedor} · {fmt(nota.valorNF)}</span>
+                                {nota.fileUrl && <a href={nota.fileUrl} target="_blank" rel="noreferrer" style={{color:"#3b82f6",fontSize:10,fontWeight:600,textDecoration:"none",background:"#3b82f622",padding:"2px 6px",borderRadius:4}}>Ver</a>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>
@@ -455,7 +521,10 @@ export default function TabNotas({ notas, setNotas, jogos, T }) {
                     <td style={{padding:"10px 12px",color:T.textSm,fontSize:11,maxWidth:200}}>{(n.servicosLabels||[]).join(", ")}</td>
                     <td style={{padding:"10px 12px"}}><Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/></td>
                     <td style={{padding:"10px 12px"}}>
-                      <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>
+                      <div style={{display:"flex",gap:4}}>
+                        {n.fileUrl && <a href={n.fileUrl} target="_blank" rel="noreferrer" style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10,textDecoration:"none"}}>Ver</a>}
+                        <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

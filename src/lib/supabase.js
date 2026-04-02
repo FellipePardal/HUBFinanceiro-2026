@@ -13,3 +13,26 @@ export async function getState(key) {
 export async function setState(key, value) {
   await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
+
+// ─── STORAGE (Notas Fiscais) ─────────────────────────────────────────────────
+const BUCKET = 'notas-fiscais';
+
+export async function uploadNF(codigo, file) {
+  const ext = file.name.split('.').pop();
+  const path = `${codigo}.${ext}`;
+  const { data, error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return { path, url: urlData.publicUrl };
+}
+
+export async function deleteNFFile(path) {
+  if (!path) return;
+  await supabase.storage.from(BUCKET).remove([path]);
+}
+
+export function getNFUrl(path) {
+  if (!path) return null;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}

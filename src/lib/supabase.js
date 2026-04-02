@@ -14,7 +14,7 @@ export async function setState(key, value) {
   await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
 
-// ─── ARQUIVO NF (base64) ─────────────────────────────────────────────────────
+// ─── ARQUIVOS NF ─────────────────────────────────────────────────────────────
 export function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -22,4 +22,16 @@ export function fileToDataUrl(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+export async function saveNFFile(notaId, dataUrl) {
+  await setState(`nf_file_${notaId}`, dataUrl);
+}
+
+export async function getNFFile(notaId) {
+  return getState(`nf_file_${notaId}`);
+}
+
+export async function deleteNFFile(notaId) {
+  await supabase.from('app_state').delete().eq('key', `nf_file_${notaId}`);
 }

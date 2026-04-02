@@ -437,7 +437,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
-export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T }) {
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);
@@ -480,12 +480,33 @@ export default function TabNotas({ notas, setNotas, jogos, fornecedores = [], T 
   const totalValor     = notas.reduce((s, n) => s + (n.valorNF || 0), 0);
   const notasAvulsas   = notas.filter(n => n.tipo === "avulsa").length;
 
-  const addNota = nota => { setNotas(ns => [...ns, nota]); setShowRegistrar(null); setShowAvulsa(false); };
+  // Atualiza o realizado do jogo com os valores da NF
+  const syncRealizado = (nota, acao) => {
+    if (!nota.jogoId || !nota.servicosValores) return;
+    setJogos(js => js.map(j => {
+      if (j.id !== nota.jogoId) return j;
+      const realizado = {...(j.realizado || {})};
+      Object.entries(nota.servicosValores).forEach(([subKey, valor]) => {
+        if (acao === "add") realizado[subKey] = (realizado[subKey] || 0) + valor;
+        if (acao === "remove") realizado[subKey] = Math.max(0, (realizado[subKey] || 0) - valor);
+      });
+      return {...j, realizado};
+    }));
+  };
+
+  const addNota = nota => {
+    setNotas(ns => [...ns, nota]);
+    syncRealizado(nota, "add");
+    setShowRegistrar(null);
+    setShowAvulsa(false);
+  };
 
   const deleteNota = id => {
     if (window.confirm("Excluir esta NF?")) {
+      const nota = notas.find(n => n.id === id);
       deleteNFFile(id);
       setNotas(ns => ns.filter(n => n.id !== id));
+      if (nota) syncRealizado(nota, "remove");
     }
   };
 

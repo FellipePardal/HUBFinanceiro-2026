@@ -12,6 +12,7 @@ import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
 import TabFornecedores  from "./components/tabs/TabFornecedores";
+import TabNotasMensal  from "./components/tabs/TabNotasMensal";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -21,17 +22,19 @@ import { FORNECEDORES_INIT } from "./data/fornecedores";
 function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [jogos, setJogosRaw]       = useState(ALL_JOGOS);
   const [servicos, setServicosRaw] = useState(SERVICOS_INIT);
-  const [notas, setNotasRaw]             = useState([]);
+  const [notas, setNotasRaw]               = useState([]);
+  const [notasMensais, setNotasMensaisRaw] = useState([]);
   const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
   const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores')]);
+      const [j, s, n, f, nm] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
       if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
+      if (nm) setNotasMensaisRaw(nm); else setSupabaseState('notas_mensais', []);
       setLoading(false);
     }
     load();
@@ -42,7 +45,8 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         if (payload.new.key === 'jogos')        setJogosRaw(payload.new.value);
         if (payload.new.key === 'servicos')     setServicosRaw(payload.new.value);
         if (payload.new.key === 'notas')        setNotasRaw(payload.new.value);
-        if (payload.new.key === 'fornecedores') setFornecedoresRaw(payload.new.value);
+        if (payload.new.key === 'fornecedores')   setFornecedoresRaw(payload.new.value);
+        if (payload.new.key === 'notas_mensais') setNotasMensaisRaw(payload.new.value);
       })
       .subscribe();
 
@@ -60,6 +64,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const setNotas = fn => setNotasRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('notas', next); return next;
+  });
+  const setNotasMensais = fn => setNotasMensaisRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('notas_mensais', next); return next;
   });
   const setFornecedores = fn => setFornecedoresRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
@@ -155,14 +163,14 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   }, [jogos]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos","apresentações"];
-  const TABS_NF   = ["notas fiscais"];
+  const TABS_NF   = ["jogos","mensal"];
   const TABS_FORN = ["cadastro"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_FORN;
 
   const handleSetorChange = s => {
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
-    else if (s === "notas") setTab("notas fiscais");
+    else if (s === "notas") setTab("jogos");
     else setTab("cadastro");
   };
 
@@ -221,11 +229,14 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
             </div>
           </div>
           <div style={{display:"flex",gap:2,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            {TABS.map(t => (
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
-                {t}
-              </button>
-            ))}
+            {TABS.map(t => {
+              const label = setor==="notas" ? (t==="jogos"?"NF (Jogos)":"NF (Mensal)") : t;
+              return (
+                <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -299,7 +310,8 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="jogos" && setor==="notas" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
 
       </div>

@@ -439,18 +439,26 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 // ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
 function RecebidasTab({ notas, addNota, jogos, T }) {
   const [submissions, setSubmissions] = useState([]);
+  const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editServicos, setEditServicos] = useState({});
+  const [viewTab, setViewTab] = useState("pendentes"); // "pendentes" | "historico"
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
 
-  const loadSubmissions = () => {
+  const loadAll = () => {
     setLoading(true);
-    getState('nf_submissions').then(data => { setSubmissions(data || []); setLoading(false); });
+    Promise.all([getState('nf_submissions'), getState('nf_historico')]).then(([s, h]) => {
+      setSubmissions(s || []);
+      setHistorico(h || []);
+      setLoading(false);
+    });
   };
 
-  useEffect(() => { loadSubmissions(); }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  const salvarHistorico = (next) => { setHistorico(next); setSupabaseState('nf_historico', next); };
 
   const startEdit = (sub) => {
     setEditingId(sub.id);
@@ -493,6 +501,7 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
       codigo: `RD${String(sub.rodada).padStart(2,"0")}_${sub.jogoLabel?.replace(/\s*x\s*/,"x").replace(/\s+/g,"").slice(0,10)}_${Math.round(valorNF)}_NF${(sub.numeroNF||"SN").replace(/\s/g,"")}`,
     };
     addNota(nota);
+    salvarHistorico([...historico, {...sub, decisao:"aprovada", decidoEm: new Date().toISOString()}]);
     const next = submissions.filter(s => s.id !== sub.id);
     setSubmissions(next);
     setSupabaseState('nf_submissions', next);
@@ -501,10 +510,24 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
 
   const rejeitar = (id) => {
     if (!window.confirm("Rejeitar esta submissão?")) return;
-    deleteNFFile(id);
+    const sub = submissions.find(s => s.id === id);
+    salvarHistorico([...historico, {...sub, decisao:"rejeitada", decidoEm: new Date().toISOString()}]);
     const next = submissions.filter(s => s.id !== id);
     setSubmissions(next);
     setSupabaseState('nf_submissions', next);
+  };
+
+  const recuperar = (item) => {
+    const next = [...submissions, {...item, decisao:undefined, decidoEm:undefined}];
+    setSubmissions(next);
+    setSupabaseState('nf_submissions', next);
+    salvarHistorico(historico.filter(h => h.id !== item.id));
+  };
+
+  const excluirDefinitivo = (id) => {
+    if (!window.confirm("Excluir definitivamente do histórico?")) return;
+    deleteNFFile(id);
+    salvarHistorico(historico.filter(h => h.id !== id));
   };
 
   if (loading) return <p style={{color:T.textSm,padding:20}}>Carregando submissões...</p>;
@@ -512,16 +535,23 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>{submissions.length} submissão{submissions.length!==1?"ões":""} pendente{submissions.length!==1?"s":""}</span>
-        <button onClick={loadSubmissions} style={{...btnStyle,background:T.border,padding:"5px 14px",fontSize:11,color:T.text}}>Atualizar</button>
+        <div style={{display:"flex",gap:4}}>
+          {[{k:"pendentes",l:`Pendentes (${submissions.length})`},{k:"historico",l:`Histórico (${historico.length})`}].map(t => (
+            <button key={t.k} onClick={() => setViewTab(t.k)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+              background:viewTab===t.k?"#8b5cf6":"transparent",color:viewTab===t.k?"#fff":T.textMd}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+        <button onClick={loadAll} style={{...btnStyle,background:T.border,padding:"5px 14px",fontSize:11,color:T.text}}>Atualizar</button>
       </div>
-      {submissions.length === 0 && (
+      {viewTab === "pendentes" && submissions.length === 0 && (
         <div style={{background:T.card,borderRadius:12,padding:40,textAlign:"center"}}>
           <p style={{color:T.textSm,fontSize:13,margin:0}}>Nenhuma NF recebida pelo formulário externo</p>
           <p style={{color:T.textSm,fontSize:11,margin:"8px 0 0"}}>Link do formulário: <code style={{color:"#22c55e"}}>{window.location.origin}/#formulario</code></p>
         </div>
       )}
-      {submissions.map(sub => {
+      {viewTab === "pendentes" && submissions.map(sub => {
         const isEditing = editingId === sub.id;
         const jogo = divulgados.find(j => j.id === sub.jogoId);
         const allServicos = jogo ? extrairServicos(jogo) : [];
@@ -585,6 +615,41 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
           </div>
         );
       })}
+
+      {/* Histórico */}
+      {viewTab === "historico" && (
+        <>
+          {historico.length === 0 && (
+            <div style={{background:T.card,borderRadius:12,padding:40,textAlign:"center"}}>
+              <p style={{color:T.textSm,fontSize:13,margin:0}}>Nenhum registro no histórico</p>
+            </div>
+          )}
+          {[...historico].reverse().map(item => (
+            <div key={item.id} style={{background:T.card,borderRadius:12,padding:"14px 20px",marginBottom:10,opacity:item.decisao==="rejeitada"?0.7:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <Pill label={item.decisao==="aprovada"?"Aprovada":"Rejeitada"} color={item.decisao==="aprovada"?"#22c55e":"#ef4444"}/>
+                  <span style={{fontWeight:700,fontSize:13,color:T.text}}>{item.fornecedor}</span>
+                  <span style={{color:T.textSm,fontSize:11}}>{item.jogoLabel} · Rd {item.rodada}</span>
+                </div>
+                <span style={{color:"#8b5cf6",fontWeight:700,fontSize:14}}>{fmt(item.valorNF)}</span>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                {(item.servicosLabels||[]).map(s => <Pill key={s} label={s} color="#06b6d4"/>)}
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:11,color:T.textSm,marginBottom:10}}>
+                {item.numeroNF && <span>NF {item.numeroNF}</span>}
+                {item.decidoEm && <span>{item.decisao==="aprovada"?"Aprovada":"Rejeitada"} em {new Date(item.decidoEm).toLocaleDateString("pt-BR")}</span>}
+                {item.enviadoEm && <span>Enviada em {new Date(item.enviadoEm).toLocaleDateString("pt-BR")}</span>}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={() => recuperar(item)} style={{...btnStyle,background:"#3b82f6",padding:"5px 16px",fontSize:11}}>Recuperar</button>
+                <button onClick={() => excluirDefinitivo(item.id)} style={{...btnStyle,background:"#7f1d1d",padding:"5px 16px",fontSize:11}}>Excluir</button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

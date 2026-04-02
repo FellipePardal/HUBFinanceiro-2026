@@ -1,31 +1,56 @@
 import { useState, useRef, useEffect } from "react";
 import { Pill } from "./shared";
-import { CATS, iSty } from "../constants";
+import { CATS } from "../constants";
 import { getState, setState, fileToDataUrl, saveNFFile } from "../lib/supabase";
 
 const SUBS_MENSAL = new Set(["transporte","uber","hospedagem","seg_espacial"]);
-const DARK = { bg:"#0f172a", card:"#1e293b", border:"#334155", muted:"#475569", text:"#f1f5f9", textMd:"#94a3b8", textSm:"#64748b" };
-const btnS = { color:"#fff", border:"none", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontWeight:600, fontSize:13 };
+const T = { bg:"#0f172a", card:"#1e293b", border:"#334155", muted:"#475569", text:"#f1f5f9", textMd:"#94a3b8", textSm:"#64748b" };
+const btnS = { color:"#fff", border:"none", borderRadius:10, padding:"12px 20px", cursor:"pointer", fontWeight:600, fontSize:14, width:"100%" };
+const IS = { background:T.bg, border:`1px solid ${T.muted}`, borderRadius:8, color:T.text, padding:"12px 14px", fontSize:14, width:"100%", boxSizing:"border-box" };
+const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 
 function extrairServicos(jogo) {
-  const servicos = [];
-  CATS.forEach(cat => {
-    cat.subs.forEach(sub => {
-      if (SUBS_MENSAL.has(sub.key)) return;
-      const val = (jogo.provisionado?.[sub.key] || jogo.orcado?.[sub.key] || 0);
-      if (val > 0) servicos.push({ subKey: sub.key, subLabel: sub.label, catLabel: cat.label, catColor: cat.color });
-    });
-  });
-  return servicos;
+  const s = [];
+  CATS.forEach(cat => { cat.subs.forEach(sub => {
+    if (SUBS_MENSAL.has(sub.key)) return;
+    if ((jogo.provisionado?.[sub.key] || jogo.orcado?.[sub.key] || 0) > 0)
+      s.push({ subKey:sub.key, subLabel:sub.label, catLabel:cat.label, catColor:cat.color });
+  })});
+  return s;
 }
 
-const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+function FornecedorInput({ value, onChange, fornecedores }) {
+  const [open, setOpen] = useState(false);
+  const q = value.toLowerCase();
+  const filtered = q.length > 0
+    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(q) || f.razaoSocial.toLowerCase().includes(q) || f.funcao?.toLowerCase().includes(q)).slice(0,6) : [];
+  return (
+    <div style={{position:"relative"}}>
+      <input value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Digite seu nome ou empresa..." style={IS}/>
+      {open && filtered.length > 0 && (
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,marginTop:4,maxHeight:240,overflowY:"auto",boxShadow:"0 12px 32px rgba(0,0,0,0.5)"}}>
+          {filtered.map(f => (
+            <div key={f.id} onMouseDown={() => { onChange(f.apelido); setOpen(false); }}
+              style={{padding:"12px 16px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e => e.currentTarget.style.background = T.bg}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <div style={{fontSize:14,fontWeight:600,color:T.text}}>{f.apelido}</div>
+              <div style={{fontSize:12,color:T.textSm,marginTop:2}}>{f.funcao}{f.razaoSocial ? ` · ${f.razaoSocial.slice(0,35)}${f.razaoSocial.length>35?"...":""}` : ""}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEPS = ["Rodada","Jogos","Serviços","Valores","Nota Fiscal"];
 
 export default function FormularioPublico() {
-  const T = DARK;
-  const IS = iSty(T);
   const [jogos, setJogos] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [step, setStep] = useState(0);
@@ -41,7 +66,11 @@ export default function FormularioPublico() {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    getState('jogos').then(j => { if (j) setJogos(j); setLoading(false); });
+    Promise.all([getState('jogos'), getState('fornecedores')]).then(([j, f]) => {
+      if (j) setJogos(j);
+      if (f) setFornecedores(f);
+      setLoading(false);
+    });
   }, []);
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
@@ -51,13 +80,13 @@ export default function FormularioPublico() {
   const canNext = () => {
     if (step === 0) return rodadaSel != null;
     if (step === 1) return jogosSel.length === qtdJogos;
-    if (step === 2) return Object.values(servicosSel).some(arr => arr.length > 0);
+    if (step === 2) return Object.values(servicosSel).some(a => a.length > 0);
     if (step === 3) return Object.values(valores).some(v => v > 0);
     if (step === 4) return nfData.fornecedor.length > 0;
     return false;
   };
 
-  const toggleJogo = (id) => {
+  const toggleJogo = id => {
     setJogosSel(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
       if (prev.length >= qtdJogos) return [...prev.slice(1), id];
@@ -90,26 +119,16 @@ export default function FormularioPublico() {
       const submissionId = Date.now() + jogoId;
       let hasFile = false;
       if (arquivo) {
-        try { const dataUrl = await fileToDataUrl(arquivo); await saveNFFile(submissionId, dataUrl); hasFile = true; } catch(_){}
+        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
       }
       submissions.push({
-        id: submissionId,
-        ...nfData,
-        valorNF,
-        rodada: jogo.rodada,
-        jogoId: jogo.id,
-        jogoLabel: `${jogo.mandante} x ${jogo.visitante}`,
-        mandante: jogo.mandante,
-        visitante: jogo.visitante,
+        id: submissionId, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
+        jogoLabel: `${jogo.mandante} x ${jogo.visitante}`, mandante: jogo.mandante, visitante: jogo.visitante,
         servicosKeys: subs.map(sk => `${jogo.id}_${sk}`),
         servicosLabels: allServicos.filter(s => subs.includes(s.subKey)).map(s => s.subLabel),
-        servicosValores,
-        status: "pendente",
-        hasFile,
-        enviadoEm: new Date().toISOString(),
+        servicosValores, status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
       });
     }
-    // Salvar nas submissões pendentes
     const current = (await getState('nf_submissions')) || [];
     await setState('nf_submissions', [...current, ...submissions]);
     setSubmitting(false);
@@ -131,47 +150,47 @@ export default function FormularioPublico() {
   return (
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Inter',sans-serif"}}>
       {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"24px 20px"}}>
-        <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 4px"}}>FFU — Transmissões</p>
-        <h1 style={{fontSize:20,fontWeight:700,margin:0,color:"#fff"}}>Envio de Nota Fiscal</h1>
-        <p style={{color:"#bbf7d0",fontSize:12,margin:"4px 0 0"}}>Brasileirão Série A 2026</p>
+      <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"20px 16px"}}>
+        <div style={{maxWidth:560,margin:"0 auto"}}>
+          <p style={{color:"#86efac",fontSize:10,letterSpacing:2,textTransform:"uppercase",margin:"0 0 4px"}}>FFU — Transmissões</p>
+          <h1 style={{fontSize:18,fontWeight:700,margin:0,color:"#fff"}}>Envio de Nota Fiscal</h1>
+          <p style={{color:"#bbf7d0",fontSize:12,margin:"4px 0 0"}}>Brasileirão Série A 2026</p>
+        </div>
       </div>
 
-      <div style={{padding:"24px 16px",maxWidth:640,margin:"0 auto"}}>
+      <div style={{padding:"20px 16px",maxWidth:560,margin:"0 auto"}}>
 
         {done ? (
-          <div style={{background:T.card,borderRadius:16,padding:40,textAlign:"center"}}>
+          <div style={{background:T.card,borderRadius:16,padding:"40px 24px",textAlign:"center"}}>
             <div style={{fontSize:48,marginBottom:16}}>✅</div>
-            <h3 style={{color:T.text,margin:"0 0 8px",fontSize:18}}>Nota fiscal enviada com sucesso!</h3>
-            <p style={{color:T.textMd,fontSize:13,margin:"0 0 8px"}}>Sua NF será analisada pela equipe.</p>
-            <p style={{color:T.textSm,fontSize:12,margin:"0 0 24px"}}>Obrigado!</p>
-            <button onClick={reset} style={{...btnS,background:"#8b5cf6",padding:"10px 28px",fontSize:14}}>Enviar outra NF</button>
+            <h3 style={{color:T.text,margin:"0 0 8px",fontSize:18}}>Nota fiscal enviada!</h3>
+            <p style={{color:T.textMd,fontSize:13,margin:"0 0 24px"}}>Sua NF será analisada pela equipe. Obrigado!</p>
+            <button onClick={reset} style={{...btnS,background:"#22c55e",maxWidth:280,margin:"0 auto"}}>Enviar outra NF</button>
           </div>
         ) : (<>
 
           {/* Progress */}
-          <div style={{display:"flex",gap:4,marginBottom:24}}>
+          <div style={{display:"flex",gap:3,marginBottom:20}}>
             {STEPS.map((s, i) => (
               <div key={s} style={{flex:1,textAlign:"center"}}>
-                <div style={{height:4,borderRadius:2,background:i<=step?"#22c55e":T.border,marginBottom:6}}/>
-                <span style={{fontSize:11,color:i<=step?"#22c55e":T.textSm,fontWeight:i===step?700:400}}>{s}</span>
+                <div style={{height:4,borderRadius:2,background:i<=step?"#22c55e":T.border,marginBottom:4}}/>
+                <span style={{fontSize:10,color:i<=step?"#22c55e":T.textSm,fontWeight:i===step?700:400}}>{s}</span>
               </div>
             ))}
           </div>
 
-          <div style={{background:T.card,borderRadius:16,padding:28,minHeight:300}}>
+          <div style={{background:T.card,borderRadius:16,padding:"24px 20px",minHeight:200}}>
 
             {/* STEP 0: Rodada */}
             {step === 0 && (
               <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Selecione a Rodada</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 20px"}}>Qual rodada essa nota fiscal se refere?</p>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual a rodada?</h3>
+                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada referente à nota fiscal</p>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
                   {rodadas.map(r => (
-                    <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"12px 20px",borderRadius:12,border:"none",cursor:"pointer",fontSize:15,fontWeight:700,
-                      background:rodadaSel===r?"#22c55e":T.bg,color:rodadaSel===r?"#fff":T.textMd,
-                      boxShadow:rodadaSel===r?"0 4px 12px rgba(34,197,94,0.3)":"none"}}>
-                      Rodada {r}
+                    <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"14px 0",borderRadius:10,border:`2px solid ${rodadaSel===r?"#22c55e":T.border}`,cursor:"pointer",fontSize:15,fontWeight:700,
+                      background:rodadaSel===r?"#22c55e22":T.bg,color:rodadaSel===r?"#22c55e":T.textMd,textAlign:"center"}}>
+                      {r}
                     </button>
                   ))}
                 </div>
@@ -181,27 +200,27 @@ export default function FormularioPublico() {
             {/* STEP 1: Jogos */}
             {step === 1 && (
               <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Selecione os Jogos</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Quantos jogos essa NF cobre na rodada {rodadaSel}?</p>
-                <div style={{display:"flex",gap:8,marginBottom:20}}>
+                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Quantos jogos?</h3>
+                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Essa NF cobre quantos jogos da rodada {rodadaSel}?</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
                   {[1,2].map(n => (
-                    <button key={n} onClick={() => { setQtdJogos(n); setJogosSel([]); }} style={{padding:"10px 24px",borderRadius:10,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,
-                      background:qtdJogos===n?"#22c55e":T.bg,color:qtdJogos===n?"#fff":T.textMd}}>
+                    <button key={n} onClick={() => { setQtdJogos(n); setJogosSel([]); }} style={{padding:"14px",borderRadius:10,border:`2px solid ${qtdJogos===n?"#22c55e":T.border}`,cursor:"pointer",fontSize:15,fontWeight:700,
+                      background:qtdJogos===n?"#22c55e22":T.bg,color:qtdJogos===n?"#22c55e":T.textMd,textAlign:"center"}}>
                       {n} jogo{n>1?"s":""}
                     </button>
                   ))}
                 </div>
-                <p style={{color:T.textMd,fontSize:12,margin:"0 0 12px",fontWeight:600}}>Selecione {qtdJogos} jogo{qtdJogos>1?"s":""}:</p>
+                <p style={{color:T.textMd,fontSize:12,margin:"0 0 10px",fontWeight:600}}>Selecione o{qtdJogos>1?"s":""} jogo{qtdJogos>1?"s":""}:</p>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {jogosRodada.map(j => {
                     const sel = jogosSel.includes(j.id);
                     return (
                       <button key={j.id} onClick={() => toggleJogo(j.id)}
-                        style={{padding:"14px 20px",borderRadius:12,border:`2px solid ${sel?"#22c55e":T.border}`,cursor:"pointer",
+                        style={{padding:"14px 16px",borderRadius:12,border:`2px solid ${sel?"#22c55e":T.border}`,cursor:"pointer",
                           background:sel?"#22c55e22":T.bg,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <div>
-                          <span style={{fontWeight:700,fontSize:14,color:T.text}}>{j.mandante} x {j.visitante}</span>
-                          <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{j.data} · {j.cidade}</span>
+                          <div style={{fontWeight:700,fontSize:14,color:T.text}}>{j.mandante} x {j.visitante}</div>
+                          <div style={{color:T.textSm,fontSize:12,marginTop:2}}>{j.data} · {j.cidade}</div>
                         </div>
                         <Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/>
                       </button>
@@ -214,31 +233,31 @@ export default function FormularioPublico() {
             {/* STEP 2: Serviços */}
             {step === 2 && (
               <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Serviços Prestados</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 20px"}}>Selecione os serviços que você prestou</p>
+                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Serviços prestados</h3>
+                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione os serviços que você realizou</p>
                 {jogosSel.map(jogoId => {
                   const jogo = divulgados.find(j => j.id === jogoId);
                   if (!jogo) return null;
                   const servicos = extrairServicos(jogo);
                   const selected = servicosSel[jogoId] || [];
                   const byCat = {};
-                  servicos.forEach(s => { if (!byCat[s.catLabel]) byCat[s.catLabel] = { color: s.catColor, items: [] }; byCat[s.catLabel].items.push(s); });
+                  servicos.forEach(s => { if (!byCat[s.catLabel]) byCat[s.catLabel] = {color:s.catColor,items:[]}; byCat[s.catLabel].items.push(s); });
                   return (
                     <div key={jogoId} style={{marginBottom:20}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
                         <Pill label={jogo.categoria} color={jogo.categoria==="B1"?"#22c55e":"#f59e0b"}/>
                         <span style={{fontWeight:700,fontSize:14,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
                       </div>
-                      {Object.entries(byCat).map(([catName, { color, items }]) => (
+                      {Object.entries(byCat).map(([catName, {color, items}]) => (
                         <div key={catName} style={{marginBottom:12}}>
-                          <p style={{color,fontSize:12,fontWeight:700,margin:"0 0 6px"}}>{catName}</p>
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          <p style={{color,fontSize:12,fontWeight:700,margin:"0 0 8px"}}>{catName}</p>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                             {items.map(s => {
                               const sel = selected.includes(s.subKey);
                               return (
                                 <button key={s.subKey} onClick={() => toggleServico(jogoId, s.subKey)}
-                                  style={{padding:"8px 14px",borderRadius:8,border:`2px solid ${sel?color:T.border}`,cursor:"pointer",fontSize:12,fontWeight:sel?700:400,
-                                    background:sel?color+"22":"transparent",color:sel?color:T.textMd}}>
+                                  style={{padding:"10px 12px",borderRadius:8,border:`2px solid ${sel?color:T.border}`,cursor:"pointer",fontSize:13,fontWeight:sel?700:400,
+                                    background:sel?color+"22":"transparent",color:sel?color:T.textMd,textAlign:"center"}}>
                                   {s.subLabel}
                                 </button>
                               );
@@ -255,8 +274,8 @@ export default function FormularioPublico() {
             {/* STEP 3: Valores */}
             {step === 3 && (
               <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Valores por Serviço</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 20px"}}>Informe o valor de cada serviço na nota</p>
+                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Valores</h3>
+                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Informe o valor de cada serviço</p>
                 {jogosSel.map(jogoId => {
                   const jogo = divulgados.find(j => j.id === jogoId);
                   if (!jogo) return null;
@@ -264,21 +283,23 @@ export default function FormularioPublico() {
                   const allServicos = extrairServicos(jogo);
                   return (
                     <div key={jogoId} style={{marginBottom:20}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                        <Pill label={jogo.categoria} color={jogo.categoria==="B1"?"#22c55e":"#f59e0b"}/>
-                        <span style={{fontWeight:700,fontSize:14,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
-                      </div>
+                      {jogosSel.length > 1 && (
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                          <Pill label={jogo.categoria} color={jogo.categoria==="B1"?"#22c55e":"#f59e0b"}/>
+                          <span style={{fontWeight:700,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
+                        </div>
+                      )}
                       {subs.map(sk => {
                         const s = allServicos.find(x => x.subKey === sk);
                         if (!s) return null;
                         const key = `${jogoId}_${sk}`;
                         return (
-                          <div key={sk} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:T.bg,borderRadius:8,marginBottom:6}}>
-                            <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{s.subLabel}</span>
-                            <div style={{display:"flex",alignItems:"center",gap:4}}>
-                              <span style={{fontSize:12,color:T.textMd}}>R$</span>
+                          <div key={sk} style={{marginBottom:10}}>
+                            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>{s.subLabel}</label>
+                            <div style={{display:"flex",alignItems:"center",gap:0}}>
+                              <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
                               <input type="number" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
-                                style={{...IS,width:120,textAlign:"right",padding:"8px 12px",fontWeight:600,color:"#22c55e",fontSize:14}}/>
+                                placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:600,color:"#22c55e",fontSize:16}}/>
                             </div>
                           </div>
                         );
@@ -286,8 +307,9 @@ export default function FormularioPublico() {
                     </div>
                   );
                 })}
-                <div style={{borderTop:`2px solid ${T.border}`,marginTop:12,paddingTop:12,display:"flex",justifyContent:"flex-end"}}>
-                  <span style={{fontSize:16,fontWeight:700,color:"#22c55e"}}>Total: {fmt(totalGeral)}</span>
+                <div style={{background:T.bg,borderRadius:10,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:T.textMd,fontWeight:600,fontSize:14}}>Total</span>
+                  <span style={{fontSize:20,fontWeight:700,color:"#22c55e"}}>{fmt(totalGeral)}</span>
                 </div>
               </div>
             )}
@@ -296,44 +318,44 @@ export default function FormularioPublico() {
             {step === 4 && (
               <div>
                 <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Dados da Nota Fiscal</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 20px"}}>Preencha as informações da sua NF</p>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-                  <div style={{marginBottom:14}}>
-                    <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor / Razão Social</label>
-                    <input value={nfData.fornecedor} onChange={e => setNfData(d => ({...d, fornecedor: e.target.value}))} style={IS}/>
-                  </div>
-                  <div style={{marginBottom:14}}>
-                    <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota</label>
-                    <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF: e.target.value}))} style={IS}/>
-                  </div>
-                  <div style={{marginBottom:14}}>
+                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Preencha os dados e anexe o arquivo</p>
+                <div style={{marginBottom:14}}>
+                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor / Razão Social</label>
+                  <FornecedorInput value={nfData.fornecedor} onChange={v => setNfData(d => ({...d, fornecedor:v}))} fornecedores={fornecedores}/>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota Fiscal</label>
+                  <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF:e.target.value}))} style={IS}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                  <div>
                     <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Emissão</label>
-                    <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao: e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+                    <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
                   </div>
-                  <div style={{marginBottom:14}}>
+                  <div>
                     <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Envio</label>
-                    <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio: e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+                    <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
                   </div>
                 </div>
                 <div style={{marginBottom:14}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações</label>
-                  <input value={nfData.obs} onChange={e => setNfData(d => ({...d, obs: e.target.value}))} style={IS}/>
+                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações (opcional)</label>
+                  <input value={nfData.obs} onChange={e => setNfData(d => ({...d, obs:e.target.value}))} style={IS}/>
                 </div>
-                <div style={{marginBottom:14}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF (PDF ou imagem)</label>
-                  <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0] || null)} style={{display:"none"}}/>
+                <div style={{marginBottom:16}}>
+                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF</label>
+                  <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
                   <div onClick={() => fileRef.current?.click()}
                     onDragOver={e => e.preventDefault()}
-                    onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0] || null);}}
-                    style={{border:`2px dashed ${arquivo?"#22c55e":T.muted}`,borderRadius:8,padding:"16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
+                    onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0]||null);}}
+                    style={{border:`2px dashed ${arquivo?"#22c55e":T.muted}`,borderRadius:10,padding:"20px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
                     {arquivo
-                      ? <p style={{margin:0,color:"#22c55e",fontSize:13,fontWeight:600}}>{arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB)</p>
-                      : <p style={{margin:0,color:T.textSm,fontSize:12}}>Clique ou arraste o arquivo aqui</p>}
+                      ? <p style={{margin:0,color:"#22c55e",fontSize:14,fontWeight:600}}>{arquivo.name}<br/><span style={{fontSize:12,fontWeight:400}}>({(arquivo.size/1024).toFixed(0)} KB)</span></p>
+                      : <p style={{margin:0,color:T.textSm,fontSize:13}}>Toque para selecionar ou arraste o arquivo<br/><span style={{fontSize:11}}>PDF, PNG, JPG (máx. 10MB)</span></p>}
                   </div>
                 </div>
                 {/* Resumo */}
-                <div style={{background:T.bg,borderRadius:10,padding:"14px 18px",marginTop:8}}>
-                  <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo do envio</p>
+                <div style={{background:T.bg,borderRadius:10,padding:"14px 16px"}}>
+                  <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo</p>
                   {jogosSel.map(jogoId => {
                     const jogo = divulgados.find(j => j.id === jogoId);
                     if (!jogo) return null;
@@ -341,16 +363,16 @@ export default function FormularioPublico() {
                     const allServicos = extrairServicos(jogo);
                     const total = subs.reduce((s, sk) => s + (valores[`${jogoId}_${sk}`] || 0), 0);
                     return (
-                      <div key={jogoId} style={{marginBottom:6}}>
-                        <span style={{fontSize:12,color:T.text,fontWeight:600}}>{jogo.mandante} x {jogo.visitante}</span>
-                        <span style={{fontSize:11,color:T.textSm,marginLeft:8}}>{subs.map(sk => allServicos.find(x => x.subKey === sk)?.subLabel).filter(Boolean).join(", ")}</span>
-                        <span style={{fontSize:12,color:"#22c55e",fontWeight:700,marginLeft:8}}>{fmt(total)}</span>
+                      <div key={jogoId} style={{marginBottom:8}}>
+                        <div style={{fontWeight:600,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</div>
+                        <div style={{fontSize:11,color:T.textSm,margin:"2px 0"}}>{subs.map(sk => allServicos.find(x => x.subKey === sk)?.subLabel).filter(Boolean).join(", ")}</div>
+                        <div style={{fontSize:13,color:"#22c55e",fontWeight:700}}>{fmt(total)}</div>
                       </div>
                     );
                   })}
                   <div style={{borderTop:`1px solid ${T.border}`,marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between"}}>
-                    <span style={{fontSize:13,fontWeight:700,color:T.text}}>Total</span>
-                    <span style={{fontSize:15,fontWeight:700,color:"#22c55e"}}>{fmt(totalGeral)}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:T.text}}>Total</span>
+                    <span style={{fontSize:18,fontWeight:700,color:"#22c55e"}}>{fmt(totalGeral)}</span>
                   </div>
                 </div>
               </div>
@@ -358,27 +380,26 @@ export default function FormularioPublico() {
           </div>
 
           {/* Navigation */}
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:16}}>
-            <button onClick={() => setStep(s => Math.max(0, s-1))} disabled={step===0}
-              style={{...btnS,background:step===0?T.border:"#475569",padding:"10px 24px",opacity:step===0?0.4:1}}>
-              Voltar
-            </button>
+          <div style={{display:"grid",gridTemplateColumns:step===0?"1fr":"1fr 1fr",gap:10,marginTop:16}}>
+            {step > 0 && (
+              <button onClick={() => setStep(s => s-1)} style={{...btnS,background:"#475569"}}>Voltar</button>
+            )}
             {step < 4 ? (
               <button onClick={() => setStep(s => s+1)} disabled={!canNext()}
-                style={{...btnS,background:canNext()?"#22c55e":"#475569",padding:"10px 24px",opacity:canNext()?1:0.4}}>
+                style={{...btnS,background:canNext()?"#22c55e":"#334155",opacity:canNext()?1:0.5}}>
                 Próximo
               </button>
             ) : (
               <button onClick={handleSubmit} disabled={!canNext()||submitting}
-                style={{...btnS,background:canNext()&&!submitting?"#22c55e":"#475569",padding:"10px 28px",fontSize:14,opacity:canNext()&&!submitting?1:0.5}}>
-                {submitting ? "Enviando..." : "Enviar Nota Fiscal"}
+                style={{...btnS,background:canNext()&&!submitting?"#22c55e":"#334155",opacity:canNext()&&!submitting?1:0.5,fontSize:16}}>
+                {submitting ? "Enviando..." : "Enviar NF"}
               </button>
             )}
           </div>
         </>)}
       </div>
 
-      <div style={{textAlign:"center",padding:"24px",color:T.textSm,fontSize:11}}>
+      <div style={{textAlign:"center",padding:"20px",color:T.textSm,fontSize:10}}>
         FFU — Transmissões · Brasileirão 2026
       </div>
     </div>

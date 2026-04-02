@@ -44,8 +44,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
       obs,
       notasIds: [...selJogosNFs],
       mensaisIds: [...selMensaisNFs],
-      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,hasFile:n.hasFile})),
-      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,hasFile:n.hasFile})),
+      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:n.dataPagamento,hasFile:n.hasFile})),
+      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:n.dataPagamento,hasFile:n.hasFile})),
       totalJogos: selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0),
       totalMensais: selMensaisArr.reduce((s, n) => s + (n.valor||0), 0),
       totalGeral: totalSelValor,
@@ -70,12 +70,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   };
 
   const copyEnvioPlanilha = (envio) => {
-    const header = "Tipo\tCódigo\tNº NF\tFornecedor\tValor\tEmissão\tJogo/Mês\tRodada\tServiços";
+    const header = "Tipo\tCódigo\tNº NF\tFornecedor\tValor\tEmissão\tData Pgto\tJogo/Mês\tRodada\tServiços";
     const jogosRows = (envio.notasResumo||[]).map(n =>
-      `Jogo\t${n.codigo}\t${n.numeroNF}\t${n.fornecedor}\t${n.valorNF||0}\t${n.dataEmissao}\t${n.jogoLabel}\t${n.rodada}\t${(n.servicosLabels||[]).join(", ")}`
+      `Jogo\t${n.codigo}\t${n.numeroNF}\t${n.fornecedor}\t${n.valorNF||0}\t${n.dataEmissao}\t${n.dataPagamento||""}\t${n.jogoLabel}\t${n.rodada}\t${(n.servicosLabels||[]).join(", ")}`
     );
     const mensaisRows = (envio.mensaisResumo||[]).map(n =>
-      `Mensal\t—\t${n.numeroNF}\t${n.fornecedor}\t${n.valor||0}\t${n.dataEmissao}\t${n.mesLabel} · ${n.categoria}\t—\t${n.categoria}`
+      `Mensal\t—\t${n.numeroNF}\t${n.fornecedor}\t${n.valor||0}\t${n.dataEmissao}\t${n.dataPagamento||""}\t${n.mesLabel} · ${n.categoria}\t—\t${n.categoria}`
     );
     navigator.clipboard.writeText([header, ...jogosRows, ...mensaisRows].join("\n"));
     alert("Planilha copiada!");
@@ -261,7 +261,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
                 <thead><tr style={{background:T.bg}}>
-                  {["Código","Nº NF","Fornecedor","Valor","Emissão","Jogo","Rd","Serviços",""].map(h => <th key={h} style={thS}>{h}</th>)}
+                  {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços",""].map(h => <th key={h} style={thS}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {envioDetalhe.notasResumo.map(n => (
@@ -271,6 +271,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                       <td style={tdS}>{n.fornecedor}</td>
                       <td style={{...tdS,color:"#8b5cf6",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(n.valorNF)}</td>
                       <td style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
+                      <td style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
                       <td style={{...tdS,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
                       <td style={tdS}>{n.rodada}</td>
                       <td style={{...tdS,fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>
@@ -292,7 +293,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr style={{background:T.bg}}>
-                  {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão",""].map(h => <th key={h} style={thS}>{h}</th>)}
+                  {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto",""].map(h => <th key={h} style={thS}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {envioDetalhe.mensaisResumo.map(n => (
@@ -303,6 +304,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                       <td style={tdS}>{n.numeroNF||"—"}</td>
                       <td style={{...tdS,color:"#8b5cf6",fontWeight:600}}>{fmt(n.valor)}</td>
                       <td style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
+                      <td style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
                       <td style={tdS}>{n.hasFile && <button onClick={() => downloadNF(n.id, `NF_${n.fornecedor}`)} style={{...btnStyle,background:"#3b82f6",padding:"3px 8px",fontSize:10}}>Baixar</button>}</td>
                     </tr>
                   ))}

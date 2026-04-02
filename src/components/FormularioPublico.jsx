@@ -60,7 +60,7 @@ export default function FormularioPublico() {
   const [jogosSel, setJogosSel] = useState([]);
   const [servicosSel, setServicosSel] = useState({});
   const [valores, setValores] = useState({});
-  const [nfData, setNfData] = useState({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", obs:"" });
+  const [nfData, setNfData] = useState({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", dataPagamento:"", obs:"" });
   const [arquivo, setArquivo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -138,7 +138,7 @@ export default function FormularioPublico() {
 
   const reset = () => {
     setStep(0); setRodadaSel(null); setQtdJogos(1); setJogosSel([]);
-    setServicosSel({}); setValores({}); setNfData({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", obs:"" });
+    setServicosSel({}); setValores({}); setNfData({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", dataPagamento:"", obs:"" });
     setArquivo(null); setDone(false);
   };
 
@@ -335,6 +335,10 @@ export default function FormularioPublico() {
                     <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Envio</label>
                     <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
                   </div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Pagamento</label>
+                  <input value={nfData.dataPagamento} onChange={e => setNfData(d => ({...d, dataPagamento:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
                 </div>
                 <div style={{marginBottom:14}}>
                   <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações (opcional)</label>

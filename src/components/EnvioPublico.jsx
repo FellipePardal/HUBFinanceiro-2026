@@ -97,7 +97,7 @@ export default function EnvioPublico({ numero }) {
           <h2 style={{fontSize:16,fontWeight:700,margin:"0 0 16px",color:"#166534"}}>Notas Fiscais — Jogos</h2>
           <table style={{width:"100%",borderCollapse:"collapse",marginBottom:32,background:T.card,borderRadius:10,overflow:"hidden"}}>
             <thead><tr style={{background:"#f1f5f9"}}>
-              {["Código","Nº NF","Fornecedor","Valor","Emissão","Jogo","Rd","Serviços",""].map(h => <th key={h} style={thS}>{h}</th>)}
+              {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços",""].map(h => <th key={h} style={thS}>{h}</th>)}
             </tr></thead>
             <tbody>
               {(envio.notasResumo||[]).map(n => (
@@ -107,6 +107,7 @@ export default function EnvioPublico({ numero }) {
                   <td style={tdS}>{n.fornecedor}</td>
                   <td style={{...tdS,fontWeight:600,color:"#8b5cf6",whiteSpace:"nowrap"}}>{fmt(n.valorNF)}</td>
                   <td style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
+                  <td style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
                   <td style={{...tdS,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
                   <td style={tdS}>{n.rodada}</td>
                   <td style={{...tdS,fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>
@@ -118,7 +119,7 @@ export default function EnvioPublico({ numero }) {
               <tr style={{background:"#f1f5f9",fontWeight:700}}>
                 <td colSpan={3} style={tdS}>TOTAL</td>
                 <td style={{...tdS,color:"#8b5cf6"}}>{fmt(envio.totalJogos)}</td>
-                <td colSpan={5}/>
+                <td colSpan={6}/>
               </tr>
             </tbody>
           </table>
@@ -129,7 +130,7 @@ export default function EnvioPublico({ numero }) {
           <h2 style={{fontSize:16,fontWeight:700,margin:"0 0 16px",color:"#166534"}}>Notas Fiscais — Mensais</h2>
           <table style={{width:"100%",borderCollapse:"collapse",marginBottom:32,background:T.card,borderRadius:10,overflow:"hidden"}}>
             <thead><tr style={{background:"#f1f5f9"}}>
-              {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão",""].map(h => <th key={h} style={thS}>{h}</th>)}
+              {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto",""].map(h => <th key={h} style={thS}>{h}</th>)}
             </tr></thead>
             <tbody>
               {(envio.mensaisResumo||[]).map(n => (
@@ -140,6 +141,7 @@ export default function EnvioPublico({ numero }) {
                   <td style={tdS}>{n.numeroNF||"—"}</td>
                   <td style={{...tdS,fontWeight:600,color:"#8b5cf6"}}>{fmt(n.valor)}</td>
                   <td style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
+                  <td style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
                   <td style={tdS} className="no-print">
                     {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_${n.fornecedor}`)} style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:10,fontWeight:600}}>Baixar</button>}
                   </td>
@@ -148,7 +150,7 @@ export default function EnvioPublico({ numero }) {
               <tr style={{background:"#f1f5f9",fontWeight:700}}>
                 <td colSpan={4} style={tdS}>TOTAL</td>
                 <td style={{...tdS,color:"#8b5cf6"}}>{fmt(envio.totalMensais)}</td>
-                <td colSpan={2}/>
+                <td colSpan={3}/>
               </tr>
             </tbody>
           </table>

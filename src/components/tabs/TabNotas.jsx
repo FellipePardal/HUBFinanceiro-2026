@@ -91,18 +91,16 @@ function PreviewModal({ nota, onClose, T }) {
   );
 }
 
-const SUBS_MENSAL = new Set(["transporte","uber","hospedagem","seg_espacial"]);
+const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra"]);
 
 function extrairServicos(jogo) {
   const servicos = [];
   CATS.forEach(cat => {
     cat.subs.forEach(sub => {
-      if (SUBS_MENSAL.has(sub.key)) return;
-      const valOrc  = jogo.orcado?.[sub.key] || 0;
+      if (SUBS_EXCLUIR.has(sub.key)) return;
       const valProv = jogo.provisionado?.[sub.key] || 0;
-      const val = valProv || valOrc;
-      if (val > 0) {
-        servicos.push({ subKey: sub.key, subLabel: sub.label, catLabel: cat.label, catColor: cat.color, valorRef: val });
+      if (valProv > 0) {
+        servicos.push({ subKey: sub.key, subLabel: sub.label, catLabel: cat.label, catColor: cat.color, valorRef: valProv });
       }
     });
   });

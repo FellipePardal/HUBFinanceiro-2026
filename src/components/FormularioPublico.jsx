@@ -3,7 +3,7 @@ import { Pill } from "./shared";
 import { CATS } from "../constants";
 import { getState, setState, fileToDataUrl, saveNFFile } from "../lib/supabase";
 
-const SUBS_MENSAL = new Set(["transporte","uber","hospedagem","seg_espacial"]);
+const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra"]);
 const T = { bg:"#0f172a", card:"#1e293b", border:"#334155", muted:"#475569", text:"#f1f5f9", textMd:"#94a3b8", textSm:"#64748b" };
 const btnS = { color:"#fff", border:"none", borderRadius:10, padding:"12px 20px", cursor:"pointer", fontWeight:600, fontSize:14, width:"100%" };
 const IS = { background:T.bg, border:`1px solid ${T.muted}`, borderRadius:8, color:T.text, padding:"12px 14px", fontSize:14, width:"100%", boxSizing:"border-box", MozAppearance:"textfield" };
@@ -13,8 +13,8 @@ const HIDE_SPINNERS = `input[type=number]::-webkit-outer-spin-button,input[type=
 function extrairServicos(jogo) {
   const s = [];
   CATS.forEach(cat => { cat.subs.forEach(sub => {
-    if (SUBS_MENSAL.has(sub.key)) return;
-    if ((jogo.provisionado?.[sub.key] || jogo.orcado?.[sub.key] || 0) > 0)
+    if (SUBS_EXCLUIR.has(sub.key)) return;
+    if ((jogo.provisionado?.[sub.key] || 0) > 0)
       s.push({ subKey:sub.key, subLabel:sub.label, catLabel:cat.label, catColor:cat.color });
   })});
   return s;

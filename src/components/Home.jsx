@@ -10,7 +10,7 @@ export default function Home({onEnter, T, darkMode, setDarkMode}) {
             <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,#22c55e,#16a34a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📡</div>
             <div>
               <p style={{color:"#94a3b8",fontSize:11,letterSpacing:3,textTransform:"uppercase",margin:"0 0 2px"}}>Portal Financeiro</p>
-              <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#f1f5f9"}}>FFU — Transmissões</h1>
+              <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#f1f5f9"}}>Transmissões</h1>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -74,7 +74,7 @@ export default function Home({onEnter, T, darkMode, setDarkMode}) {
             </div>
           ))}
         </div>
-        <div style={{marginTop:48,textAlign:"center",color:T.textSm,fontSize:11}}>FFU Portal Financeiro · Temporada 2026 · Todos os campeonatos</div>
+        <div style={{marginTop:48,textAlign:"center",color:T.textSm,fontSize:11}}>Portal Financeiro · Temporada 2026 · Todos os campeonatos</div>
       </div>
     </div>
   );

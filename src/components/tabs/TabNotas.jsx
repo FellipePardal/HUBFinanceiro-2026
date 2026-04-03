@@ -713,7 +713,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       const realizado = {...(j.realizado || {})};
       // Zerar sub-keys controlados por NFs (não-mensais)
       CATS.forEach(cat => cat.subs.forEach(sub => {
-        if (!SUBS_MENSAL.has(sub.key)) realizado[sub.key] = 0;
+        if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
       }));
       // Somar valores de todas as NFs
       nfsDoJogo.forEach(n => {

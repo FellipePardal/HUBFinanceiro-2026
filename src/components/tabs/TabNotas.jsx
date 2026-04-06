@@ -122,44 +122,48 @@ function gerarCodigo(rodada, mandante, visitante, valorNF, numeroNF) {
   return `RD${rd}_${m}x${v}_${val}_NF${nf}`;
 }
 
-// ─── Modal para registrar NF (suporta multi-serviço) ─────────────────────────
-function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, fornecedores, onSave, onClose, T }) {
+// ─── Modal para registrar NF (suporta multi-jogo e multi-serviço) ────────────
+function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, onClose, T }) {
   const IS = iSty(T);
   const [form, setForm] = useState({
     numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", obs: "",
   });
-  const [selecionados, setSelecionados] = useState({}); // { subKey: valorUnit }
+  // selecionados: { "jogoId_subKey": valor }
+  const [selecionados, setSelecionados] = useState({});
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
-  const servicosLivres = servicosDisponiveis.filter(s => {
-    const key = `${jogo.id}_${s.subKey}`;
-    const nota = notasExistentes.find(n => n.servicosKeys?.includes(key));
-    return !nota || nota.status !== "Conferida";
-  });
+  // Serviços livres por jogo
+  const jogosComServicos = jogosRodada.map(jogo => {
+    const servicos = extrairServicos(jogo).filter(s => {
+      const key = `${jogo.id}_${s.subKey}`;
+      const nota = notasExistentes.find(n => n.servicosKeys?.includes(key));
+      return !nota || nota.status !== "Conferida";
+    });
+    return { jogo, servicos };
+  }).filter(j => j.servicos.length > 0);
 
-  const toggleServico = (subKey, valorRef) => {
+  const toggleServico = (jogoId, subKey, valorRef) => {
+    const key = `${jogoId}_${subKey}`;
     setSelecionados(prev => {
-      if (prev[subKey] !== undefined) { const n = {...prev}; delete n[subKey]; return n; }
-      return {...prev, [subKey]: valorRef};
+      if (prev[key] !== undefined) { const n = {...prev}; delete n[key]; return n; }
+      return {...prev, [key]: valorRef};
     });
   };
 
-  const setValorUnit = (subKey, val) => {
-    setSelecionados(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
-  };
-
-  const selectAll = () => {
-    const all = {};
-    servicosLivres.forEach(s => { all[s.subKey] = s.valorRef; });
-    setSelecionados(all);
+  const setValorUnit = (key, val) => {
+    setSelecionados(prev => ({...prev, [key]: parseFloat(val) || 0}));
   };
 
   const selKeys = Object.keys(selecionados);
   const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
-  const codigo = gerarCodigo(jogo.rodada, jogo.mandante, jogo.visitante, totalNF, form.numeroNF);
+  const rodada = jogosRodada[0]?.rodada;
+  const jogoIds = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
+  const jogoLabel = jogoIds.map(id => { const j = jogosRodada.find(x => x.id === id); return j ? `${j.mandante} x ${j.visitante}` : ""; }).join(" + ");
+  const firstJogo = jogosRodada.find(j => j.id === jogoIds[0]) || jogosRodada[0];
+  const codigo = firstJogo ? gerarCodigo(rodada, firstJogo.mandante, firstJogo.visitante, totalNF, form.numeroNF) : "";
 
   const handleSave = async () => {
     if (!form.numeroNF && !form.fornecedor) return;
@@ -168,28 +172,35 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, forneced
     const notaId = Date.now();
     let hasFile = false;
     if (arquivo) {
-      try {
-        const dataUrl = await fileToDataUrl(arquivo);
-        await saveNFFile(notaId, dataUrl);
-        hasFile = true;
-      } catch(_){}
+      try { const dataUrl = await fileToDataUrl(arquivo); await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_){}
     }
-    const servicosKeys = selKeys.map(sk => `${jogo.id}_${sk}`);
+    // servicosValores agrupado por subKey (para sync realizado), mas servicosKeys com jogoId
     const servicosValores = {};
-    selKeys.forEach(sk => { servicosValores[sk] = selecionados[sk]; });
+    selKeys.forEach(k => {
+      const subKey = k.split("_").slice(1).join("_");
+      servicosValores[subKey] = (servicosValores[subKey] || 0) + selecionados[k];
+    });
+    // jogoIds envolvidos — salvar array para sync multi-jogo
+    const jogosEnvolvidos = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
+    const allLabels = selKeys.map(k => {
+      const subKey = k.split("_").slice(1).join("_");
+      for (const jcs of jogosComServicos) { const s = jcs.servicos.find(x => x.subKey === subKey); if (s) return s.subLabel; }
+      return subKey;
+    });
+
     onSave({
       id: notaId,
       codigo,
       ...form,
       valorNF: totalNF,
-      rodada: jogo.rodada,
-      jogoId: jogo.id,
-      jogoLabel: `${jogo.mandante} x ${jogo.visitante}`,
-      mandante: jogo.mandante,
-      visitante: jogo.visitante,
-      servicosKeys,
-      servicosLabels: servicosDisponiveis.filter(s => selKeys.includes(s.subKey)).map(s => s.subLabel),
+      rodada,
+      jogoId: jogosEnvolvidos.length === 1 ? jogosEnvolvidos[0] : jogosEnvolvidos[0],
+      jogoIds: jogosEnvolvidos,
+      jogoLabel,
+      servicosKeys: selKeys,
+      servicosLabels: [...new Set(allLabels)],
       servicosValores,
+      servicosDetalhe: {...selecionados}, // "jogoId_subKey": valor (granular)
       tipo: "prevista",
       status: "Conferida",
       hasFile,
@@ -199,46 +210,47 @@ function RegistrarNFModal({ jogo, servicosDisponiveis, notasExistentes, forneced
 
   return (
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:620,maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:660,maxHeight:"90vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 4px",fontSize:16,color:T.text}}>Registrar Nota Fiscal</h3>
-        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Rd {jogo.rodada} · {jogo.mandante} x {jogo.visitante}</p>
+        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Rodada {rodada} · Selecione serviços de um ou mais jogos</p>
 
-        {/* Seleção de serviços com valor unitário */}
+        {/* Seleção por jogo */}
         <div style={{marginBottom:16}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <label style={{color:T.textMd,fontSize:12,fontWeight:600}}>Serviços cobertos por esta NF:</label>
-            <button onClick={selectAll} style={{...btnStyle,background:T.border,padding:"3px 10px",fontSize:10,color:T.text}}>Selecionar todos</button>
-          </div>
-          <div style={{background:T.bg,borderRadius:8,padding:8,maxHeight:280,overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
-            {servicosLivres.length === 0 && <p style={{color:T.textSm,fontSize:12,padding:8,margin:0}}>Todos os serviços já possuem NF</p>}
-            {/* Header */}
-            {servicosLivres.length > 0 && (
-              <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",fontSize:10,color:T.textSm}}>
-                <span style={{width:20}}/>
-                <span style={{flex:1}}>Serviço</span>
-                <span style={{width:70,textAlign:"right"}}>Ref.</span>
-                <span style={{width:100,textAlign:"right"}}>Valor NF</span>
+          {jogosComServicos.map(({ jogo, servicos }) => (
+            <div key={jogo.id} style={{marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <Pill label={jogo.categoria} color={jogo.categoria==="B1"?"#22c55e":"#f59e0b"}/>
+                <span style={{fontWeight:700,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
               </div>
-            )}
-            {servicosLivres.map(s => {
-              const checked = selecionados[s.subKey] !== undefined;
-              return (
-                <div key={s.subKey} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
-                  background:checked?s.catColor+"18":"transparent"}}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleServico(s.subKey, s.valorRef)}/>
-                  <span style={{fontSize:13,color:T.text,flex:1}}>{s.subLabel}</span>
-                  <span style={{fontSize:11,color:T.textSm,width:70,textAlign:"right"}}>{fmt(s.valorRef)}</span>
-                  {checked
-                    ? <input type="number" value={selecionados[s.subKey]} onChange={e => setValorUnit(s.subKey, e.target.value)}
-                        style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#8b5cf6",fontWeight:600}}/>
-                    : <span style={{width:100}}/>}
+              <div style={{background:T.bg,borderRadius:8,padding:8,display:"flex",flexDirection:"column",gap:2}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 8px",fontSize:10,color:T.textSm}}>
+                  <span style={{width:20}}/><span style={{flex:1}}>Serviço</span>
+                  <span style={{width:70,textAlign:"right"}}>Ref.</span>
+                  <span style={{width:100,textAlign:"right"}}>Valor NF</span>
                 </div>
-              );
-            })}
-          </div>
+                {servicos.map(s => {
+                  const key = `${jogo.id}_${s.subKey}`;
+                  const checked = selecionados[key] !== undefined;
+                  return (
+                    <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
+                      background:checked?s.catColor+"18":"transparent"}}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleServico(jogo.id, s.subKey, s.valorRef)}/>
+                      <span style={{fontSize:13,color:T.text,flex:1}}>{s.subLabel}</span>
+                      <span style={{fontSize:11,color:T.textSm,width:70,textAlign:"right"}}>{fmt(s.valorRef)}</span>
+                      {checked
+                        ? <input type="number" value={selecionados[key]} onChange={e => setValorUnit(key, e.target.value)}
+                            style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#8b5cf6",fontWeight:600}}/>
+                        : <span style={{width:100}}/>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {jogosComServicos.length === 0 && <p style={{color:T.textSm,fontSize:12}}>Todos os serviços já possuem NF</p>}
           {selKeys.length > 0 && (
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,padding:"0 8px"}}>
-              <span style={{color:T.textMd,fontSize:11}}>{selKeys.length} serviço{selKeys.length>1?"s":""}</span>
+              <span style={{color:T.textMd,fontSize:11}}>{selKeys.length} serviço{selKeys.length>1?"s":""}{jogoIds.length>1?` em ${jogoIds.length} jogos`:""}</span>
               <span style={{fontSize:14,fontWeight:700,color:"#8b5cf6"}}>Total NF: {fmt(totalNF)}</span>
             </div>
           )}
@@ -709,17 +721,27 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   // Recalcula o realizado sempre que as notas mudam
   useEffect(() => {
     setJogos(js => js.map(j => {
-      const nfsDoJogo = notas.filter(n => n.jogoId === j.id && n.servicosValores);
       const realizado = {...(j.realizado || {})};
-      // Zerar sub-keys controlados por NFs (não-mensais)
       CATS.forEach(cat => cat.subs.forEach(sub => {
         if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
       }));
-      // Somar valores de todas as NFs
-      nfsDoJogo.forEach(n => {
-        Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
-          realizado[subKey] = (realizado[subKey] || 0) + valor;
-        });
+      // Somar valores — usa servicosDetalhe (granular por jogo) se disponível
+      notas.forEach(n => {
+        if (n.servicosDetalhe) {
+          // Multi-jogo: pegar só as chaves deste jogo
+          Object.entries(n.servicosDetalhe).forEach(([k, valor]) => {
+            const [jId, ...rest] = k.split("_");
+            if (parseInt(jId) === j.id) {
+              const subKey = rest.join("_");
+              realizado[subKey] = (realizado[subKey] || 0) + valor;
+            }
+          });
+        } else if (n.jogoId === j.id && n.servicosValores) {
+          // Formato antigo: jogoId simples
+          Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
+            realizado[subKey] = (realizado[subKey] || 0) + valor;
+          });
+        }
       });
       return {...j, realizado};
     }));
@@ -796,11 +818,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               </button>
             ))}
           </div>
+          <button onClick={() => setShowRegistrar(true)} style={{...btnStyle,background:"#8b5cf6",fontSize:12,padding:"8px 20px"}}>+ Registrar NF (Rodada {rodadaEfetiva})</button>
         </div>
 
         {jogosRodada.map(jogo => {
           const servicos = extrairServicos(jogo);
-          const nfsDoJogo = notas.filter(n => n.jogoId === jogo.id);
+          const nfsDoJogo = notas.filter(n => n.servicosKeys?.some(k => k.startsWith(`${jogo.id}_`)));
           const servicosComNF = new Set(nfsDoJogo.flatMap(n => n.servicosKeys || []));
           const pendentes = servicos.filter(s => !servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
           const conferidas = servicos.filter(s => servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
@@ -816,7 +839,6 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
                   <span style={{color:"#f59e0b",fontSize:12}}>{pendentes} pendente{pendentes!==1?"s":""}</span>
                   <span style={{color:"#22c55e",fontSize:12}}>{conferidas}/{servicos.length}</span>
-                  <button onClick={() => setShowRegistrar(jogo)} style={{...btnStyle,background:"#8b5cf6",padding:"5px 14px",fontSize:11}}>+ Registrar NF</button>
                 </div>
               </div>
 
@@ -1004,7 +1026,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         <RecebidasTab notas={notas} addNota={addNota} jogos={jogos} T={T}/>
       )}
 
-      {showRegistrar && <RegistrarNFModal jogo={showRegistrar} servicosDisponiveis={extrairServicos(showRegistrar)} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
+      {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
       {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
       <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}

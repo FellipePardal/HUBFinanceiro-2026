@@ -46,7 +46,12 @@ export default function EnvioPublico({ numero }) {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
             <div>
               <p style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",margin:"0 0 6px",color:"#86efac"}}>FFU — Transmissões · Brasileirão 2026</p>
-              <h1 style={{fontSize:24,fontWeight:700,margin:0}}>Envio {envio.numero}</h1>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <h1 style={{fontSize:24,fontWeight:700,margin:0}}>Envio {envio.numero}</h1>
+                <span style={{background:envio.pago?"#22c55e":"#ef4444",color:"#fff",borderRadius:8,padding:"4px 12px",fontSize:11,fontWeight:700,letterSpacing:0.5,textTransform:"uppercase"}}>
+                  {envio.pago?"Pago":"Aguardando Pgto"}
+                </span>
+              </div>
               <p style={{fontSize:13,margin:"6px 0 0",color:"#bbf7d0"}}>
                 {new Date(envio.criadoEm).toLocaleDateString("pt-BR")} · {envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}
               </p>

@@ -84,21 +84,31 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     alert("Planilha copiada!");
   };
 
+  const togglePago = (envioId) => {
+    setEnvios(ev => ev.map(e => e.id === envioId ? {...e, pago: !e.pago} : e));
+  };
+
   // KPIs gerais
   const totalEnvios = envios.length;
   const totalNFsEnviadas = envios.reduce((s, e) => s + e.qtdNotas, 0);
   const totalValorEnviado = envios.reduce((s, e) => s + e.totalGeral, 0);
+  const totalPago = envios.filter(e => e.pago).reduce((s, e) => s + e.totalGeral, 0);
+  const totalPendentePgto = envios.filter(e => !e.pago).reduce((s, e) => s + e.totalGeral, 0);
 
   const thS = { padding:"8px 12px", textAlign:"left", fontSize:11, color:T.textSm, whiteSpace:"nowrap" };
   const tdS = { padding:"8px 12px", fontSize:12 };
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:12}}>
         <KPI label="Total Envios" value={String(totalEnvios)} sub="Pacotes enviados" color="#8b5cf6" T={T}/>
         <KPI label="NFs Enviadas" value={String(totalNFsEnviadas)} sub="Jogos + Mensais" color="#22c55e" T={T}/>
-        <KPI label="Valor Enviado" value={fmt(totalValorEnviado)} sub="Acumulado" color="#06b6d4" T={T}/>
-        <KPI label="Pendentes" value={String(nfsDisponiveis.length + mensaisDisponiveis.length)} sub="Não enviadas" color="#f59e0b" T={T}/>
+        <KPI label="NFs Pendentes" value={String(nfsDisponiveis.length + mensaisDisponiveis.length)} sub="Não enviadas" color="#f59e0b" T={T}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
+        <KPI label="Valor Enviado" value={fmt(totalValorEnviado)} sub="Total acumulado" color="#06b6d4" T={T}/>
+        <KPI label="Pago" value={fmt(totalPago)} sub={`${envios.filter(e=>e.pago).length} envio${envios.filter(e=>e.pago).length!==1?"s":""}`} color="#22c55e" T={T}/>
+        <KPI label="Aguardando Pgto" value={fmt(totalPendentePgto)} sub={`${envios.filter(e=>!e.pago).length} envio${envios.filter(e=>!e.pago).length!==1?"s":""}`} color="#ef4444" T={T}/>
       </div>
 
       {/* ── LISTA DE ENVIOS ── */}
@@ -116,10 +126,13 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
         )}
 
         {[...envios].reverse().map(envio => (
-          <div key={envio.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
+          <div key={envio.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12,borderLeft:`4px solid ${envio.pago?"#22c55e":"#ef4444"}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <span style={{background:"#8b5cf6",color:"#fff",borderRadius:8,padding:"4px 12px",fontSize:14,fontWeight:700}}>Envio {envio.numero}</span>
+                <span style={{background:envio.pago?"#22c55e":"#ef4444",color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,letterSpacing:0.5,textTransform:"uppercase"}}>
+                  {envio.pago?"Pago":"Aguardando Pgto"}
+                </span>
                 <span style={{color:T.textSm,fontSize:12}}>{new Date(envio.criadoEm).toLocaleDateString("pt-BR")}</span>
                 <span style={{color:T.textMd,fontSize:12}}>{envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}</span>
               </div>
@@ -132,6 +145,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               {envio.obs && <span style={{color:T.textSm,fontSize:11}}>Obs: {envio.obs}</span>}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={() => togglePago(envio.id)} style={{...btnStyle,background:envio.pago?"#475569":"#22c55e",padding:"5px 16px",fontSize:11}}>
+                {envio.pago?"Marcar como pendente":"Marcar como pago"}
+              </button>
               <button onClick={() => { setEnvioDetalhe(envio); setView("detalhe"); }} style={{...btnStyle,background:"#3b82f6",padding:"5px 16px",fontSize:11}}>Ver detalhes</button>
               <button onClick={() => { const url = `${window.location.origin}${window.location.pathname}#envio/${envio.numero}`; navigator.clipboard.writeText(url); alert("Link copiado!\n"+url); }}
                 style={{...btnStyle,background:"#8b5cf6",padding:"5px 16px",fontSize:11}}>Compartilhar link</button>
@@ -237,12 +253,18 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
 
       {/* ── DETALHE DO ENVIO ── */}
       {view === "detalhe" && envioDetalhe && (<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <span style={{background:"#8b5cf6",color:"#fff",borderRadius:8,padding:"4px 14px",fontSize:16,fontWeight:700}}>Envio {envioDetalhe.numero}</span>
+            <span style={{background:(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"#22c55e":"#ef4444",color:"#fff",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:700,letterSpacing:0.5,textTransform:"uppercase"}}>
+              {(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"Pago":"Aguardando Pgto"}
+            </span>
             <span style={{color:T.textSm,fontSize:12}}>{new Date(envioDetalhe.criadoEm).toLocaleDateString("pt-BR")}</span>
           </div>
-          <div style={{display:"flex",gap:6}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <button onClick={() => togglePago(envioDetalhe.id)} style={{...btnStyle,background:(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"#475569":"#22c55e",padding:"6px 16px",fontSize:12}}>
+              {(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"Marcar como pendente":"Marcar como pago"}
+            </button>
             <button onClick={() => { const url = `${window.location.origin}${window.location.pathname}#envio/${envioDetalhe.numero}`; navigator.clipboard.writeText(url); alert("Link copiado!"); }}
               style={{...btnStyle,background:"#8b5cf6",padding:"6px 16px",fontSize:12}}>Compartilhar link</button>
             <button onClick={() => window.open(`#envio/${envioDetalhe.numero}`,"_blank")} style={{...btnStyle,background:"#166534",padding:"6px 16px",fontSize:12}}>Abrir página</button>

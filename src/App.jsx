@@ -347,7 +347,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
-        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
+        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 
       </div>

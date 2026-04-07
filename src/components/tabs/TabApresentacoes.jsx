@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import PptxGenJS from "pptxgenjs";
 import { btnStyle, iSty, ORC_PADRAO, REAL_PADRAO } from "../../constants";
 import { parseBR, fmtNum, fmtR, fmtRs, subTotal } from "../../utils";
-import { CATS_FIXOS_INIT } from "../../data";
 
 const fmtBRL = v => "R$ " + Number(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
 
@@ -366,47 +365,67 @@ function FormVariaveis({T, onBack, jogos = []}) {
 }
 
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
-function FormFixos({T, onBack}) {
-  const [rodadaAtual, setRodadaAtual] = useState(4);
-  const [orcTotal,    setOrcTotal]    = useState("1.410.212,00");
-  const [status,      setStatus]      = useState({msg:"Aguardando...", cls:""});
-  const [loading,     setLoading]     = useState(false);
-  const [cats,        setCats]        = useState(() => JSON.parse(JSON.stringify(CATS_FIXOS_INIT)));
-  const [collapsed,   setCollapsed]   = useState({});
+const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-  const toggleCat = id => setCollapsed(p=>({...p,[id]:!p[id]}));
+function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
+  const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
+  const [loading, setLoading] = useState(false);
+  const [mesAtual, setMesAtual] = useState(() => new Date().getMonth());
 
-  const updateItem    = (catId,subId,itemId,field,val) => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:cat.subs.map(sub=>sub.id!==subId?sub:{...sub,itens:sub.itens.map(it=>it.id!==itemId?it:{...it,[field]:field==="nome"?val:(parseBR(val)||0)})})}));
-  const addItem       = (catId,subId) => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:cat.subs.map(sub=>sub.id!==subId?sub:{...sub,itens:[...sub.itens,{id:Date.now(),nome:"",orc:0,gasto:0,prov:0}]})}));
-  const removeItem    = (catId,subId,itemId) => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:cat.subs.map(sub=>sub.id!==subId?sub:{...sub,itens:sub.itens.filter(it=>it.id!==itemId)})}));
-  const addSub        = catId => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:[...cat.subs,{id:Date.now(),nome:"Nova Subcategoria",itens:[{id:Date.now()+1,nome:"",orc:0,gasto:0,prov:0}]}]}));
-  const removeSub     = (catId,subId) => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:cat.subs.filter(s=>s.id!==subId)}));
-  const updateSubNome = (catId,subId,val) => setCats(prev=>prev.map(cat=>cat.id!==catId?cat:{...cat,subs:cat.subs.map(sub=>sub.id!==subId?sub:{...sub,nome:val})}));
+  // Auto: para cada seção do portal, somar orçado dos itens e gasto = NFs mensais até o mês selecionado
+  const computed = useMemo(() => {
+    const sections = servicos.map(sec => {
+      const idsItens = sec.itens.map(it => it.id);
+      const orcAuto  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
+      const gastoAuto = notasMensais
+        .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
+        .reduce((s, n) => s + (n.valor || 0), 0);
+      return { secao: sec.secao, orcAuto, gastoAuto };
+    });
+    const orcTotalAuto = sections.reduce((s, x) => s + x.orcAuto, 0);
+    return { sections, orcTotalAuto };
+  }, [servicos, notasMensais, mesAtual]);
 
-  const calcCat = cat => {
-    const subs = cat.subs.map(sub => ({
-      orc:   sub.itens.reduce((s,it)=>s+it.orc,0),
-      gasto: sub.itens.reduce((s,it)=>s+it.gasto,0),
-      prov:  sub.itens.reduce((s,it)=>s+it.prov,0),
-    }));
-    return {
-      orc:   subs.reduce((s,x)=>s+x.orc,0),
-      gasto: subs.reduce((s,x)=>s+x.gasto,0),
-      prov:  subs.reduce((s,x)=>s+x.prov,0),
-      saldo: subs.reduce((s,x)=>s+x.orc-x.gasto-x.prov,0),
-    };
-  };
-  const totals = useMemo(()=>{
-    const cs = cats.map(cat => ({...cat,...calcCat(cat)}));
-    return {cats:cs,orc:cs.reduce((s,c)=>s+c.orc,0),gasto:cs.reduce((s,c)=>s+c.gasto,0),prov:cs.reduce((s,c)=>s+c.prov,0),saldo:cs.reduce((s,c)=>s+c.saldo,0)};
-  },[cats]);
+  // Overrides por seção (secao → {orc?, gasto?})
+  const [overrides, setOverrides] = useState({});
+  const setSecField = (secao, field, val) =>
+    setOverrides(prev => ({...prev, [secao]: {...prev[secao], [field]: val}}));
+  const resetOverrides = () => setOverrides({});
 
-  const IS = iSty(T);
+  // View aplicando overrides
+  const sectionsView = computed.sections.map(s => ({
+    ...s,
+    orc:   overrides[s.secao]?.orc   ?? fmtNum(s.orcAuto),
+    gasto: overrides[s.secao]?.gasto ?? fmtNum(s.gastoAuto),
+  }));
+
+  const parsed = useMemo(() => {
+    const rows = sectionsView.map(s => {
+      const orc   = parseBR(s.orc);
+      const gasto = parseBR(s.gasto);
+      return { secao: s.secao, orc, gasto, saldo: orc - gasto };
+    });
+    const orcTotal   = rows.reduce((s, r) => s + r.orc, 0);
+    const gastoTotal = rows.reduce((s, r) => s + r.gasto, 0);
+    const saldoTotal = orcTotal - gastoTotal;
+    return { rows, orcTotal, gastoTotal, saldoTotal };
+  }, [sectionsView]);
+
+  const { rows, orcTotal, gastoTotal, saldoTotal } = parsed;
+  const orcTotalFmt = fmtNum(orcTotal);
+  const IS    = {...iSty(T), width:"100%"};
+  const IS_RO = {...IS, background:T.bg, cursor:"default"};
+  const grid3  = {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20};
+  const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:T.text,marginBottom:16};
+  const secNum = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
 
   async function gerarPPTX() {
     setLoading(true); setStatus({msg:"Gerando...", cls:""});
     try {
-      const orcTotalV = parseBR(orcTotal);
+      const orcTotalV    = orcTotal;
+      const gastoTotalV  = gastoTotal;
+      const saldoTotalV  = saldoTotal;
+      const mesLabel     = MESES_FIX[mesAtual];
 
       const pptx = new PptxGenJS();
       pptx.layout = "LAYOUT_WIDE";
@@ -421,20 +440,16 @@ function FormFixos({T, onBack}) {
       sl.addText("Custos Fixos – Brasileirão 2026", {
         x:0.3,y:0.08,w:12.7,h:0.38,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"
       });
-      sl.addText(`Serviços Fixos  ·  Rodada ${rodadaAtual} de 38`, {
+      sl.addText(`Serviços Fixos  ·  Acumulado até ${mesLabel}`, {
         x:0.3,y:0.46,w:12.7,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
       });
       sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
 
-      // Saldo "visual atual" = orçado - gasto (sem considerar provisionado)
-      const catSaldoAtual = c => c.orc - c.gasto;
-      const totSaldoAtual = totals.orc - totals.gasto;
-
       // 3 KPIs
       const kpis = [
-        {label:"ORÇADO TOTAL", val:fmtBRL(orcTotalV),    border:"D1D5DB", valColor:"111827"},
-        {label:"GASTO TOTAL",  val:fmtBRL(totals.gasto), border:"D1D5DB", valColor:"111827"},
-        {label:"SALDO TOTAL",  val:fmtBRL(totSaldoAtual), border:"22C55E", valColor:totSaldoAtual>=0?"22C55E":"EF4444"},
+        {label:"ORÇADO TOTAL", val:fmtBRL(orcTotalV),   border:"D1D5DB", valColor:"111827"},
+        {label:"GASTO TOTAL",  val:fmtBRL(gastoTotalV), border:"D1D5DB", valColor:"111827"},
+        {label:"SALDO TOTAL",  val:fmtBRL(saldoTotalV), border:"22C55E", valColor:saldoTotalV>=0?"22C55E":"EF4444"},
       ];
       const kW=4.27, kH=0.92, kY=0.82;
       kpis.forEach(({label,val,border,valColor}, i) => {
@@ -445,11 +460,11 @@ function FormFixos({T, onBack}) {
         sl.addText(val,   {x:x+0.1,y:kY+0.34,w:kW-0.2,h:0.46,fontSize:18,color:valColor,fontFace:"Segoe UI"});
       });
 
-      // gráfico barras por categoria
-      const catLabels = totals.cats.map(c => c.label.length>18 ? c.label.substring(0,18)+"…" : c.label);
+      // gráfico barras por seção
+      const secLabels = rows.map(r => r.secao.length>18 ? r.secao.substring(0,18)+"…" : r.secao);
       sl.addChart(pptx.ChartType.bar, [
-        {name:"Orçado", labels:catLabels, values:totals.cats.map(c=>c.orc)},
-        {name:"Gasto",  labels:catLabels, values:totals.cats.map(c=>c.gasto)},
+        {name:"Orçado", labels:secLabels, values:rows.map(r=>r.orc)},
+        {name:"Gasto",  labels:secLabels, values:rows.map(r=>r.gasto)},
       ], {
         x:0.3, y:1.88, w:12.73, h:2.72,
         barDir:"col", barGrouping:"clustered",
@@ -460,50 +475,38 @@ function FormFixos({T, onBack}) {
         valGridLine:{style:"none"},
       });
 
-      // tabela por categoria (sem provisionado)
+      // tabela por seção
       const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-      const tblHead = [th("CATEGORIA"), th("ORÇADO","right"), th("GASTO","right"), th("SALDO","right")];
+      const tblHead = [th("SEÇÃO"), th("ORÇADO","right"), th("GASTO","right"), th("SALDO","right")];
 
-      const tblBody = totals.cats.map((cat, i) => {
-        const saldoAtual = catSaldoAtual(cat);
+      const tblBody = rows.map((r, i) => {
         const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
-        const sc = saldoAtual>=0?"16A34A":"DC2626";
+        const sc = r.saldo>=0?"16A34A":"DC2626";
         return [
-          {text:cat.label,         options:{fontSize:8.5,bold:true,color:"111827",fill}},
-          {text:fmtBRL(cat.orc),   options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-          {text:fmtBRL(cat.gasto), options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-          {text:fmtBRL(saldoAtual),options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
+          {text:r.secao,         options:{fontSize:8.5,bold:true,color:"111827",fill}},
+          {text:fmtBRL(r.orc),   options:{fontSize:8.5,color:"111827",fill,align:"right"}},
+          {text:fmtBRL(r.gasto), options:{fontSize:8.5,color:"111827",fill,align:"right"}},
+          {text:fmtBRL(r.saldo), options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
         ];
       });
 
-      const stc = totSaldoAtual>=0?"A3E635":"FF6B6B";
+      const stc = saldoTotalV>=0?"A3E635":"FF6B6B";
       const tblTot = [
-        {text:"TOTAL",                options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
-        {text:fmtBRL(totals.orc),     options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(totals.gasto),   options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(totSaldoAtual),  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
+        {text:"TOTAL",              options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
+        {text:fmtBRL(orcTotalV),    options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
+        {text:fmtBRL(gastoTotalV),  options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
+        {text:fmtBRL(saldoTotalV),  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
+      const rowH = Math.max(0.18, 2.6 / (rows.length + 1));
       sl.addTable([tblHead, ...tblBody, tblTot], {
         x:0.3, y:4.72, w:12.73, colW:[5.5,2.4,2.4,2.43],
-        border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:0.28,
+        border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
       });
 
-      // footer escuro
-      const fY = 6.55;
-      sl.addShape(pptx.ShapeType.rect, {x:0,y:fY,w:13.33,h:0.95,fill:{color:"111827"},line:{width:0}});
-      sl.addText("RODADA",                  {x:0.3, y:fY+0.08,w:2,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(`${rodadaAtual} / 38`,     {x:0.3, y:fY+0.26,w:2,   h:0.5, fontSize:24,bold:true,color:"FFFFFF",fontFace:"Segoe UI"});
-      sl.addText("ORÇADO TOTAL CAMPEONATO", {x:2.8, y:fY+0.08,w:6,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(fmtBRL(orcTotalV),         {x:2.8, y:fY+0.26,w:6,   h:0.5, fontSize:16,color:"FFFFFF",fontFace:"Segoe UI"});
-      sl.addText("SALDO TOTAL",             {x:9.5, y:fY+0.08,w:3.5, h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText((totSaldoAtual>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(totSaldoAtual)), {
-        x:9.5,y:fY+0.26,w:3.5,h:0.5,fontSize:16,
-        color:totSaldoAtual>=0?"22C55E":"EF4444",fontFace:"Segoe UI"
-      });
-
-      await pptx.writeFile({fileName:`custos_fixos_R${rodadaAtual}_brasileirao2026.pptx`});
-      setStatus({msg:`✅ custos_fixos_R${rodadaAtual}.pptx baixado!`, cls:"ok"});
+      const fileMes = mesLabel.toLowerCase();
+      await pptx.writeFile({fileName:`custos_fixos_${fileMes}_brasileirao2026.pptx`});
+      setStatus({msg:`✅ custos_fixos_${fileMes}.pptx baixado!`, cls:"ok"});
     } catch(e) {
       setStatus({msg:"❌ Erro: "+e.message, cls:"err"});
       console.error(e);
@@ -515,53 +518,84 @@ function FormFixos({T, onBack}) {
     <div style={{paddingBottom:80}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
         <button onClick={onBack} style={{...btnStyle,background:T.border,color:T.text,padding:"6px 14px",fontSize:12}}>← Voltar</button>
-        <h2 style={{margin:0,fontSize:15,color:T.text,fontWeight:700}}>🔒 Custos Fixos</h2>
-      </div>
-      <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:20}}>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4}}>Rodada Atual</label><input type="number" min={1} max={38} value={rodadaAtual} onChange={e=>setRodadaAtual(parseInt(e.target.value)||1)} style={{...IS}}/></div>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4}}>Orçado Total</label><input value={orcTotal} onChange={e=>setOrcTotal(e.target.value)} style={{...IS}}/></div>
+        <div>
+          <h2 style={{margin:0,fontSize:15,color:T.text,fontWeight:700}}>🔒 Custos Fixos</h2>
+          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento mensal · vinculado às NFs Mensais</p>
         </div>
-        {cats.map(cat => {
-          const ct = totals.cats.find(c=>c.id===cat.id)||{orc:0,gasto:0,prov:0,saldo:0};
-          return (
-            <div key={cat.id} style={{background:T.bg,borderRadius:10,marginBottom:12,overflow:"hidden"}}>
-              <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>toggleCat(cat.id)}>
-                <span style={{fontWeight:700,color:T.text}}>{cat.label}</span>
-                <div style={{display:"flex",gap:12,fontSize:12,alignItems:"center"}}>
-                  <span style={{color:"#3b82f6"}}>Orç: {ct.orc.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0})}</span>
-                  <span style={{color:ct.saldo>=0?"#a3e635":"#ef4444"}}>Saldo: {ct.saldo.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0})}</span>
-                  <button onClick={e=>{e.stopPropagation();addSub(cat.id);}} style={{...btnStyle,background:"#3b82f633",color:"#3b82f6",padding:"2px 10px",fontSize:11}}>+ sub</button>
-                  <span style={{color:T.textSm}}>{collapsed[cat.id]?"▲":"▼"}</span>
-                </div>
-              </div>
-              {!collapsed[cat.id] && cat.subs.map(sub => (
-                <div key={sub.id} style={{borderTop:`1px solid ${T.border}`,padding:"10px 20px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <input value={sub.nome} onChange={e=>updateSubNome(cat.id,sub.id,e.target.value)} style={{...IS,width:"auto",flex:1,marginRight:12,fontSize:12,fontWeight:600}}/>
-                    <div style={{display:"flex",gap:6}}>
-                      <button onClick={()=>addItem(cat.id,sub.id)} style={{...btnStyle,background:"#22c55e33",color:"#22c55e",padding:"2px 10px",fontSize:11}}>+ item</button>
-                      <button onClick={()=>removeSub(cat.id,sub.id)} style={{...btnStyle,background:"#7f1d1d",padding:"2px 8px",fontSize:11}}>🗑</button>
-                    </div>
-                  </div>
-                  {sub.itens.map(item => (
-                    <div key={item.id} style={{display:"grid",gridTemplateColumns:"1fr 100px 100px 100px 28px",gap:8,marginBottom:6,alignItems:"center"}}>
-                      <input value={item.nome} onChange={e=>updateItem(cat.id,sub.id,item.id,"nome",e.target.value)} placeholder="Nome do item" style={{...IS,fontSize:12}}/>
-                      {["orc","gasto","prov"].map(f=>(
-                        <input key={f} value={item[f]} onChange={e=>updateItem(cat.id,sub.id,item.id,f,e.target.value)} placeholder={f==="orc"?"Orç":f==="gasto"?"Gasto":"Prov"} style={{...IS,fontSize:12,textAlign:"right",color:f==="orc"?"#3b82f6":f==="gasto"?T.text:"#f59e0b"}}/>
-                      ))}
-                      <button onClick={()=>removeItem(cat.id,sub.id,item.id)} style={{...btnStyle,background:"#7f1d1d",padding:"2px 6px",fontSize:11}}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          );
-        })}
       </div>
+
+      <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>01</span><span style={secHdr}>Configuração Base</span></div>
+        <div style={grid3}>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Mês de Referência *</label>
+            <select value={mesAtual} onChange={e=>setMesAtual(parseInt(e.target.value))} style={{...IS}}>
+              {MESES_FIX.map((m,i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Serviços <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={orcTotalFmt} style={{...IS_RO}}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
+          </div>
+        </div>
+      </div>
+
+      <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8,marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:8}}><span style={secNum}>02</span><span style={secHdr}>Dados por Seção</span></div>
+          <button onClick={resetOverrides} style={{...btnStyle,background:T.border,color:T.text,padding:"5px 12px",fontSize:11}}>🔄 Re-sincronizar com portal</button>
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+            <thead><tr style={{background:T.bg}}>
+              {["Seção","Orçado (R$)","Gasto (R$)","Saldo (R$)"].map((h,i) => (
+                <th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {sectionsView.map((s, i) => {
+                const orcVal   = parseBR(s.orc);
+                const gastoVal = parseBR(s.gasto);
+                const sav      = orcVal - gastoVal;
+                return (
+                  <tr key={s.secao} style={{borderBottom:`1px solid ${T.border}`}}>
+                    <td style={{padding:"6px 12px",fontWeight:700,color:"#3b82f6",fontSize:13}}>{s.secao}</td>
+                    <td style={{padding:"4px 12px",textAlign:"right"}}>
+                      <input value={s.orc} onChange={e=>setSecField(s.secao,"orc",e.target.value)}
+                        style={{...iSty(T),width:140,textAlign:"right",padding:"4px 8px"}}/>
+                    </td>
+                    <td style={{padding:"4px 12px",textAlign:"right"}}>
+                      <input value={s.gasto} onChange={e=>setSecField(s.secao,"gasto",e.target.value)}
+                        style={{...iSty(T),width:140,textAlign:"right",padding:"4px 8px",color:"#22c55e"}}/>
+                    </td>
+                    <td style={{padding:"6px 12px",textAlign:"right",fontWeight:700,color:sav>=0?"#a3e635":"#ef4444"}}>{sav>=0?"▲ ":"▼ "}{fmtR(Math.abs(sav))}</td>
+                  </tr>
+                );
+              })}
+              {sectionsView.length === 0 && (
+                <tr><td colSpan={4} style={{padding:24,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhuma seção no portal</td></tr>
+              )}
+            </tbody>
+            <tfoot><tr style={{background:T.bg}}>
+              <td style={{padding:"10px 12px",fontSize:11,color:T.textSm,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Total</td>
+              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:T.text}}>{fmtR(orcTotal)}</td>
+              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:T.text}}>{fmtR(gastoTotal)}</td>
+              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:saldoTotal>=0?"#a3e635":"#ef4444"}}>{saldoTotal>=0?"▲ ":"▼ "}{fmtR(Math.abs(saldoTotal))}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>
+
       <div style={{position:"sticky",bottom:0,background:T.card,borderTop:`1px solid ${T.border}`,padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50}}>
-        <p style={{fontSize:11,color:status.cls==="ok"?"#22c55e":status.cls==="err"?"#ef4444":T.textSm,margin:0}}>{status.msg}</p>
-        <button onClick={gerarPPTX} disabled={loading} style={{...btnStyle,background:loading?"#1a3a20":"#3b82f6",padding:"11px 28px",fontSize:12,letterSpacing:1.5,textTransform:"uppercase",opacity:loading?0.7:1}}>
+        <div>
+          <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text}}>Tudo certo?</b> Clique para gerar o PPTX.</p>
+          <p style={{fontSize:11,color:status.cls==="ok"?"#22c55e":status.cls==="err"?"#ef4444":T.textSm}}>{status.msg}</p>
+        </div>
+        <button onClick={gerarPPTX} disabled={loading} style={{...btnStyle,background:loading?"#1e3a5f":"#3b82f6",padding:"11px 28px",fontSize:12,letterSpacing:1.5,textTransform:"uppercase",opacity:loading?0.7:1}}>
           {loading ? "Gerando..." : "⚡ Gerar PPTX"}
         </button>
       </div>
@@ -570,9 +604,9 @@ function FormFixos({T, onBack}) {
 }
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
-export default function TabApresentacoes({T, jogos = []}) {
+export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = []}) {
   const [tipo, setTipo] = useState(null);
   if (!tipo)              return <SeletorTipo T={T} onSelect={setTipo}/>;
   if (tipo==="variaveis") return <FormVariaveis T={T} onBack={()=>setTipo(null)} jogos={jogos}/>;
-  return <FormFixos T={T} onBack={()=>setTipo(null)}/>;
+  return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}/>;
 }

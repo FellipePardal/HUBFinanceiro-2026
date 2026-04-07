@@ -54,56 +54,87 @@ function SeletorTipo({T, onSelect}) {
 }
 
 // ─── FORM VARIÁVEIS ───────────────────────────────────────────────────────────
-function FormVariaveis({T, onBack}) {
-  const [rodadaAtual, setRodadaAtual] = useState(4);
-  const [orcGlobal,   setOrcGlobal]   = useState("11.540.692,00");
-  const [orcAteRod,   setOrcAteRod]   = useState("1.050.317,00");
-  const [macroOrc,    setMacroOrc]    = useState("11.540.692,00");
-  const [macroReal,   setMacroReal]   = useState("712.240,00");
-  const [macroProj,   setMacroProj]   = useState("10.980.000,00");
-  const [nfEsp,       setNfEsp]       = useState("712.240,00");
-  const [nfRec,       setNfRec]       = useState("623.410,00");
+const ORC_GLOBAL_FIXO = 10078880; // Orçado total variáveis do campeonato (travado)
+
+function FormVariaveis({T, onBack, jogos = []}) {
   const [status,      setStatus]      = useState({msg:"Pronto para gerar",cls:""});
   const [loading,     setLoading]     = useState(false);
   const canvasRef = useRef(null);
 
-  const makeRodadas = n => Array.from({length:n}, (_,i) => ({label:`R${i+1}`, orcado:fmtNum(ORC_PADRAO[i]||0), realizado:fmtNum(REAL_PADRAO[i]||0)}));
-  const [rodadas, setRodadas] = useState(makeRodadas(4));
+  // Rodadas disponíveis (jogos já divulgados)
+  const rodadasDisp = useMemo(() =>
+    Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b),
+  [jogos]);
 
-  const setRodadaCount = n => {
-    const num = Math.max(1, Math.min(38, parseInt(n)||1));
-    setRodadaAtual(num);
-    setRodadas(prev => Array.from({length:num}, (_,i) => prev[i]||{label:`R${i+1}`,orcado:"0,00",realizado:"0,00"}));
-  };
-  const setRodadaField = (i,field,val) => setRodadas(prev => prev.map((r,idx) => idx===i ? {...r,[field]:val} : r));
+  const [rodadaAtual, setRodadaAtual] = useState(() => rodadasDisp[rodadasDisp.length-1] || 1);
+  useEffect(() => {
+    if (rodadasDisp.length && !rodadasDisp.includes(rodadaAtual)) {
+      setRodadaAtual(rodadasDisp[rodadasDisp.length-1]);
+    }
+  }, [rodadasDisp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dados computados de jogos (auto)
+  const computed = useMemo(() => {
+    const jogosAteRod = jogos.filter(j => j.rodada <= rodadaAtual);
+    const orcAteRod  = jogosAteRod.reduce((s, j) => s + subTotal(j.orcado || {}), 0);
+    const realAteRod = jogosAteRod.reduce((s, j) => s + subTotal(j.realizado || {}), 0);
+    const provAteRod = jogosAteRod.reduce((s, j) => s + subTotal(j.provisionado || {}), 0);
+    const rodadasAteAtual = rodadasDisp.filter(r => r <= rodadaAtual);
+    const rodadasAuto = rodadasAteAtual.map(r => {
+      const jr = jogos.filter(j => j.rodada === r);
+      return {
+        rodada: r,
+        label: `R${r}`,
+        orcadoAuto:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
+        realizadoAuto: jr.reduce((s, j) => s + subTotal(j.realizado || {}), 0),
+      };
+    });
+    return { orcAteRod, realAteRod, provAteRod, rodadasAuto };
+  }, [jogos, rodadaAtual, rodadasDisp]);
+
+  // Overrides por linha (rodada → {orcado?, realizado?})
+  const [overrides, setOverrides] = useState({});
+  const setRodadaField = (rodada, field, val) =>
+    setOverrides(prev => ({...prev, [rodada]: {...prev[rodada], [field]: val}}));
+  const resetOverrides = () => setOverrides({});
+
+  // View da tabela aplicando overrides
+  const rodadasView = computed.rodadasAuto.map(r => ({
+    ...r,
+    orcado:    overrides[r.rodada]?.orcado    ?? fmtNum(r.orcadoAuto),
+    realizado: overrides[r.rodada]?.realizado ?? fmtNum(r.realizadoAuto),
+  }));
 
   const parsed = useMemo(() => {
-    const rows    = rodadas.map(r => ({label:r.label, orcado:parseBR(r.orcado), realizado:parseBR(r.realizado)}));
+    const rows    = rodadasView.map(r => ({label:r.label, orcado:parseBR(r.orcado), realizado:parseBR(r.realizado)}));
     const totOrc  = rows.reduce((s,r) => s+r.orcado, 0);
     const totReal = rows.reduce((s,r) => s+r.realizado, 0);
-    // ✅ FIX 1: saving = totOrc - totReal (era orcAteRodV - totReal)
     const saving  = totOrc - totReal;
     const savPct  = totOrc > 0 ? saving/totOrc*100 : 0;
-    const nfEspV  = parseBR(nfEsp), nfRecV = parseBR(nfRec);
+    const nfEspV  = computed.provAteRod;
+    const nfRecV  = computed.realAteRod;
     const nfPend  = Math.max(0, nfEspV - nfRecV);
     const pctRec  = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
     return {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfEspV, nfRecV};
-  }, [rodadas, nfEsp, nfRec]);
+  }, [rodadasView, computed]);
 
   useDonut(canvasRef, parsed.nfRecV, parsed.nfPend);
 
   const IS     = {...iSty(T), width:"100%"};
+  const IS_RO  = {...IS, background:T.bg, cursor:"default"};
   const grid3  = {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20};
   const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:T.text,marginBottom:16};
   const secNum = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
   const {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfRecV, nfEspV} = parsed;
+  const orcGlobalFmt = fmtNum(ORC_GLOBAL_FIXO);
+  const orcAteRodFmt = fmtNum(computed.orcAteRod);
 
   async function gerarPPTX() {
     setLoading(true); setStatus({msg:"Gerando...", cls:""});
     try {
-      const orcGlobalV = parseBR(orcGlobal);
-      const orcAteRodV = parseBR(orcAteRod);
-      const macroProjV = parseBR(macroProj);
+      const orcGlobalV = ORC_GLOBAL_FIXO;
+      const orcAteRodV = computed.orcAteRod;
+      const macroProjV = totReal + (orcGlobalV - orcAteRodV);
 
       const pptx = new PptxGenJS();
       pptx.layout = "LAYOUT_WIDE";
@@ -235,41 +266,50 @@ function FormVariaveis({T, onBack}) {
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>01</span><span style={secHdr}>Configuração Base</span></div>
         <div style={grid3}>
-          <div style={{marginBottom:16}}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada Atual *</label><input type="number" min={1} max={38} value={rodadaAtual} onChange={e=>setRodadaCount(e.target.value)} style={{...IS}}/></div>
-          <div style={{marginBottom:16}}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Campeonato *</label><input value={orcGlobal} onChange={e=>setOrcGlobal(e.target.value)} style={{...IS}}/></div>
-          <div style={{marginBottom:16}}><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até a Rodada *</label><input value={orcAteRod} onChange={e=>setOrcAteRod(e.target.value)} style={{...IS}}/></div>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada Atual *</label>
+            <select value={rodadaAtual} onChange={e=>setRodadaAtual(parseInt(e.target.value))} style={{...IS}}>
+              {rodadasDisp.length === 0
+                ? <option value={1}>—</option>
+                : rodadasDisp.map(r => <option key={r} value={r}>Rodada {r}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Campeonato <span style={{background:"#1e3a5f",color:"#93c5fd",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>FIXO</span></label>
+            <input readOnly value={orcGlobalFmt} style={{...IS_RO}}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até a Rodada <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={orcAteRodFmt} style={{...IS_RO,color:"#22c55e"}}/>
+          </div>
         </div>
       </div>
 
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>02</span><span style={secHdr}>Acompanhamento Macro</span></div>
-        <div style={grid3}>
-          {[{label:"Orçado",val:macroOrc,set:setMacroOrc,color:"#9ca3af"},{label:"Realizado",val:macroReal,set:setMacroReal,color:"#22c55e"},{label:"Projetado",val:macroProj,set:setMacroProj,color:"#3b82f6"}].map(({label,val,set:setter,color})=>(
-            <div key={label} style={{background:T.bg,borderRadius:8,padding:"16px",borderTop:`3px solid ${color}`}}>
-              <p style={{fontSize:10,fontWeight:700,color,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>{label}</p>
-              <input value={val} onChange={e=>setter(e.target.value)} style={{...IS,color}}/>
-            </div>
-          ))}
+        <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8,marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:8}}><span style={secNum}>02</span><span style={secHdr}>Dados por Rodada</span></div>
+          <button onClick={resetOverrides} style={{...btnStyle,background:T.border,color:T.text,padding:"5px 12px",fontSize:11}}>🔄 Re-sincronizar com portal</button>
         </div>
-      </div>
-
-      <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>03</span><span style={secHdr}>Dados por Rodada</span></div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-            <thead><tr style={{background:T.bg}}>{["Rodada","Orçado (R$) *","Realizado (R$) *","Saving (R$)"].map((h,i)=>(<th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>))}</tr></thead>
+            <thead><tr style={{background:T.bg}}>{["Rodada","Orçado (R$)","Realizado (R$)","Saving (R$)"].map((h,i)=>(<th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>))}</tr></thead>
             <tbody>
-              {rows.map((r,i) => {
-                const sav = r.orcado - r.realizado;
+              {rodadasView.map((r,i) => {
+                const orcVal  = parseBR(r.orcado);
+                const realVal = parseBR(r.realizado);
+                const sav     = orcVal - realVal;
                 return (
-                  <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                  <tr key={r.rodada} style={{borderBottom:`1px solid ${T.border}`}}>
                     <td style={{padding:"6px 12px",fontWeight:700,color:"#22c55e",fontSize:13}}>{r.label}</td>
-                    <td style={{padding:"4px 12px",textAlign:"right"}}><input value={rodadas[i].orcado} onChange={e=>setRodadaField(i,"orcado",e.target.value)} style={{...iSty(T),width:120,textAlign:"right",padding:"4px 8px"}}/></td>
-                    <td style={{padding:"4px 12px",textAlign:"right"}}><input value={rodadas[i].realizado} onChange={e=>setRodadaField(i,"realizado",e.target.value)} style={{...iSty(T),width:120,textAlign:"right",padding:"4px 8px",color:"#22c55e"}}/></td>
+                    <td style={{padding:"4px 12px",textAlign:"right"}}><input value={r.orcado} onChange={e=>setRodadaField(r.rodada,"orcado",e.target.value)} style={{...iSty(T),width:120,textAlign:"right",padding:"4px 8px"}}/></td>
+                    <td style={{padding:"4px 12px",textAlign:"right"}}><input value={r.realizado} onChange={e=>setRodadaField(r.rodada,"realizado",e.target.value)} style={{...iSty(T),width:120,textAlign:"right",padding:"4px 8px",color:"#22c55e"}}/></td>
                     <td style={{padding:"6px 12px",textAlign:"right",fontWeight:700,color:sav>=0?"#a3e635":"#ef4444"}}>{sav>=0?"▲ ":"▼ "}{fmtR(Math.abs(sav))}</td>
                   </tr>
                 );
               })}
+              {rodadasView.length === 0 && (
+                <tr><td colSpan={4} style={{padding:24,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhuma rodada disponível</td></tr>
+              )}
             </tbody>
             <tfoot><tr style={{background:T.bg}}>
               <td style={{padding:"10px 12px",fontSize:11,color:T.textSm,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Total</td>
@@ -282,11 +322,11 @@ function FormVariaveis({T, onBack}) {
       </div>
 
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>04</span><span style={secHdr}>Notas Fiscais</span></div>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais</span></div>
         <div style={grid3}>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Esperadas *</label><input value={nfEsp} onChange={e=>setNfEsp(e.target.value)} style={{...IS}}/></div>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Recebidas *</label><input value={nfRec} onChange={e=>setNfRec(e.target.value)} style={{...IS,color:"#22c55e"}}/></div>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Pendentes <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfPend)} style={{...IS,color:"#d97706",cursor:"default"}}/></div>
+          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Esperadas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfEspV)} style={{...IS_RO}}/></div>
+          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Recebidas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfRecV)} style={{...IS_RO,color:"#22c55e"}}/></div>
+          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Pendentes <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfPend)} style={{...IS_RO,color:"#d97706"}}/></div>
         </div>
         <div style={{display:"flex",gap:32,alignItems:"flex-start",marginTop:20,flexWrap:"wrap"}}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
@@ -532,9 +572,9 @@ function FormFixos({T, onBack}) {
 }
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
-export default function TabApresentacoes({T}) {
+export default function TabApresentacoes({T, jogos = []}) {
   const [tipo, setTipo] = useState(null);
   if (!tipo)              return <SeletorTipo T={T} onSelect={setTipo}/>;
-  if (tipo==="variaveis") return <FormVariaveis T={T} onBack={()=>setTipo(null)}/>;
+  if (tipo==="variaveis") return <FormVariaveis T={T} onBack={()=>setTipo(null)} jogos={jogos}/>;
   return <FormFixos T={T} onBack={()=>setTipo(null)}/>;
 }

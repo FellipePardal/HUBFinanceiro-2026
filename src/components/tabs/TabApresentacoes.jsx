@@ -112,7 +112,8 @@ function FormVariaveis({T, onBack, jogos = []}) {
     const totReal = rows.reduce((s,r) => s+r.realizado, 0);
     const saving  = totOrc - totReal;
     const savPct  = totOrc > 0 ? saving/totOrc*100 : 0;
-    const nfEspV  = computed.provAteRod;
+    // Notas Esperadas = total da coluna "Realizado" da tabela (com overrides)
+    const nfEspV  = totReal;
     const nfRecV  = computed.realAteRod;
     const nfPend  = Math.max(0, nfEspV - nfRecV);
     const pctRec  = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;

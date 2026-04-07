@@ -91,7 +91,7 @@ function PreviewModal({ nota, onClose, T }) {
   );
 }
 
-const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra","extra"]);
+const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra","extra","seg_extra"]);
 
 function extrairServicos(jogo) {
   const servicos = [];

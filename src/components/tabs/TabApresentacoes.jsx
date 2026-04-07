@@ -86,7 +86,8 @@ function FormVariaveis({T, onBack, jogos = []}) {
         rodada: r,
         label: `R${r}`,
         orcadoAuto:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
-        realizadoAuto: jr.reduce((s, j) => s + subTotal(j.realizado || {}), 0),
+        // Na tabela "Realizado" = provisionado (mesma fonte da aba Savings)
+        realizadoAuto: jr.reduce((s, j) => s + subTotal(j.provisionado || {}), 0),
       };
     });
     return { orcAteRod, realAteRod, provAteRod, rodadasAuto };

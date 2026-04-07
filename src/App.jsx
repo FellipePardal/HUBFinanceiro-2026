@@ -121,7 +121,17 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     tipo: "fixo",
   })), [servicosCalc]);
 
-  const RESUMO_CATS = [...varCalc, ...fixosCalc];
+  // "Outros Mensais": NFs mensais sem servicoId e sem mapeamento variável (ex: categoria "Outro")
+  const outrosMensaisCalc = useMemo(() => {
+    const total = notasMensais
+      .filter(n => !n.servicoId && !VAR_CAT_TO_CATKEY[n.categoria])
+      .reduce((s, n) => s + (n.valor || 0), 0);
+    return total > 0
+      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"variavel" }]
+      : [];
+  }, [notasMensais]);
+
+  const RESUMO_CATS = [...varCalc, ...fixosCalc, ...outrosMensaisCalc];
 
   const [setor,           setSetor]           = useState("orcamento");
   const [tab,             setTab]             = useState("dashboard");

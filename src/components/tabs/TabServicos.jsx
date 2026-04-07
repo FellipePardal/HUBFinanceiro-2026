@@ -85,10 +85,7 @@ export default function TabServicos({servicos, setServicos, T}) {
                             <td key={k} style={{padding:"10px 14px",textAlign:"right"}}>
                               {isEd && !isReadOnly
                                 ? <input value={draft[k]} onChange={e=>setDraft(d=>({...d,[k]:parseFloat(e.target.value)||0}))} style={{...IS,width:110,textAlign:"right",color:col}}/>
-                                : <span style={{color:row[k]===0?T.muted:col,display:"inline-flex",flexDirection:"column",alignItems:"flex-end"}}>
-                                    {fmt(row[k])}
-                                    {isReadOnly && <span style={{fontSize:9,color:T.textSm,fontWeight:400}}>auto · NFs mensais</span>}
-                                  </span>
+                                : <span style={{color:row[k]===0?T.muted:col}}>{fmt(row[k])}</span>
                               }
                             </td>
                           );

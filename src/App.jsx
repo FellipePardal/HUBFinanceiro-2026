@@ -82,27 +82,44 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
     setSupabaseState('fornecedores', next); return next;
   });
 
+  // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard
+  const VAR_CAT_TO_CATKEY = { "Transporte":"logistica", "Uber":"logistica", "Hospedagem":"logistica", "Seg. Espacial":"operacoes" };
+
+  // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
+  const servicosCalc = useMemo(() => servicos.map(sec => ({
+    ...sec,
+    itens: sec.itens.map(it => ({
+      ...it,
+      realizado: notasMensais.filter(n => n.servicoId === it.id).reduce((s, n) => s + (n.valor || 0), 0),
+    })),
+  })), [servicos, notasMensais]);
+
   const varCalc = useMemo(() => {
     const allJ = jogos.filter(j => j.mandante !== "A definir");
-    const result = CATS.map(cat => ({
-      nome: cat.label,
-      orcado:       allJ.reduce((s,j) => s+catTotal(j.orcado, cat), 0),
-      provisionado: allJ.reduce((s,j) => s+catTotal(j.provisionado, cat), 0),
-      realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0),
-      tipo: "variavel",
-    }));
+    const result = CATS.map(cat => {
+      const realizadoMensal = notasMensais
+        .filter(n => !n.servicoId && VAR_CAT_TO_CATKEY[n.categoria] === cat.key)
+        .reduce((s, n) => s + (n.valor || 0), 0);
+      return {
+        nome: cat.label,
+        orcado:       allJ.reduce((s,j) => s+catTotal(j.orcado, cat), 0),
+        provisionado: allJ.reduce((s,j) => s+catTotal(j.provisionado, cat), 0),
+        realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0) + realizadoMensal,
+        tipo: "variavel",
+      };
+    });
     const extraOrc = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
     result.push({ nome:"Extra", orcado:extraOrc, provisionado:0, realizado:0, tipo:"variavel" });
     return result;
-  }, [jogos]);
+  }, [jogos, notasMensais]);
 
-  const fixosCalc = useMemo(() => servicos.map(s => ({
+  const fixosCalc = useMemo(() => servicosCalc.map(s => ({
     nome: s.secao,
     orcado:       s.itens.reduce((t,i) => t+i.orcado, 0),
     provisionado: s.itens.reduce((t,i) => t+i.provisionado, 0),
     realizado:    s.itens.reduce((t,i) => t+i.realizado, 0),
     tipo: "fixo",
-  })), [servicos]);
+  })), [servicosCalc]);
 
   const RESUMO_CATS = [...varCalc, ...fixosCalc];
 
@@ -316,12 +333,12 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="savings"       && <TabSavings       jogosFiltered={jogosFiltered} divulgados={divulgados} totOrcJogos={totOrcJogos} totProvJogos={totProvJogos} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} rodadasList={rodadasList} T={T}/>}
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
-        {tab==="serviços"      && <TabServicos      servicos={servicos} setServicos={setServicos} T={T}/>}
+        {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} T={T}/>}
-        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicos} T={T}/>}
+        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} T={T}/>}
-        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} servicos={servicos} envios={envios} setEnvios={setEnvios} T={T}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 
       </div>
 

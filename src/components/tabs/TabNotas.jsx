@@ -91,7 +91,9 @@ function PreviewModal({ nota, onClose, T }) {
   );
 }
 
-const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra","extra","seg_extra"]);
+const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra","seg_extra"]);
+// Subs que aceitam várias NFs compondo o mesmo provisionado (ex: diária, extras)
+const SUBS_MULTI_NF = new Set(["diaria","extra"]);
 
 function extrairServicos(jogo) {
   const servicos = [];
@@ -135,9 +137,30 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
   const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
+  // Soma de NFs já lançadas por (jogoId, subKey) — usado para subs multi-NF
+  const valoresLancados = {};
+  notasExistentes.forEach(n => {
+    if (n.servicosDetalhe) {
+      Object.entries(n.servicosDetalhe).forEach(([k, v]) => {
+        valoresLancados[k] = (valoresLancados[k] || 0) + (v || 0);
+      });
+    } else if (n.servicosValores && n.jogoId) {
+      Object.entries(n.servicosValores).forEach(([subKey, v]) => {
+        const k = `${n.jogoId}_${subKey}`;
+        valoresLancados[k] = (valoresLancados[k] || 0) + (v || 0);
+      });
+    }
+  });
+
   // Serviços livres por jogo
   const jogosComServicos = jogosRodada.map(jogo => {
-    const servicos = extrairServicos(jogo).filter(s => {
+    const servicos = extrairServicos(jogo).map(s => {
+      const key = `${jogo.id}_${s.subKey}`;
+      const lancado = valoresLancados[key] || 0;
+      const restante = Math.max(0, s.valorRef - lancado);
+      return { ...s, lancado, restante, multi: SUBS_MULTI_NF.has(s.subKey) };
+    }).filter(s => {
+      if (s.multi) return s.restante > 0.01; // mantém visível enquanto sobrar valor
       const key = `${jogo.id}_${s.subKey}`;
       const nota = notasExistentes.find(n => n.servicosKeys?.includes(key));
       return !nota || nota.status !== "Conferida";
@@ -145,11 +168,11 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     return { jogo, servicos };
   }).filter(j => j.servicos.length > 0);
 
-  const toggleServico = (jogoId, subKey, valorRef) => {
+  const toggleServico = (jogoId, subKey, valorSugerido) => {
     const key = `${jogoId}_${subKey}`;
     setSelecionados(prev => {
       if (prev[key] !== undefined) { const n = {...prev}; delete n[key]; return n; }
-      return {...prev, [key]: valorRef};
+      return {...prev, [key]: valorSugerido};
     });
   };
 
@@ -225,18 +248,33 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
               <div style={{background:T.bg,borderRadius:8,padding:8,display:"flex",flexDirection:"column",gap:2}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 8px",fontSize:10,color:T.textSm}}>
                   <span style={{width:20}}/><span style={{flex:1}}>Serviço</span>
-                  <span style={{width:70,textAlign:"right"}}>Ref.</span>
+                  <span style={{width:80,textAlign:"right"}}>Ref. / Rest.</span>
                   <span style={{width:100,textAlign:"right"}}>Valor NF</span>
                 </div>
                 {servicos.map(s => {
                   const key = `${jogo.id}_${s.subKey}`;
                   const checked = selecionados[key] !== undefined;
+                  const valorSugerido = s.multi ? s.restante : s.valorRef;
                   return (
                     <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
                       background:checked?s.catColor+"18":"transparent"}}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleServico(jogo.id, s.subKey, s.valorRef)}/>
-                      <span style={{fontSize:13,color:T.text,flex:1}}>{s.subLabel}</span>
-                      <span style={{fontSize:11,color:T.textSm,width:70,textAlign:"right"}}>{fmt(s.valorRef)}</span>
+                      <input type="checkbox" checked={checked} onChange={() => toggleServico(jogo.id, s.subKey, valorSugerido)}/>
+                      <span style={{fontSize:13,color:T.text,flex:1,display:"flex",alignItems:"center",gap:6}}>
+                        {s.subLabel}
+                        {s.multi && s.lancado > 0 && (
+                          <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600,letterSpacing:0.3}}>
+                            {fmt(s.lancado)} / {fmt(s.valorRef)}
+                          </span>
+                        )}
+                        {s.multi && s.lancado === 0 && (
+                          <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#3b82f622",color:"#3b82f6",fontWeight:600,letterSpacing:0.3}}>
+                            multi-NF
+                          </span>
+                        )}
+                      </span>
+                      <span style={{fontSize:11,color:T.textSm,width:80,textAlign:"right"}}>
+                        {s.multi ? <>Rest. <b style={{color:T.textMd}}>{fmt(s.restante)}</b></> : fmt(s.valorRef)}
+                      </span>
                       {checked
                         ? <input type="number" value={selecionados[key]} onChange={e => setValorUnit(key, e.target.value)}
                             style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#8b5cf6",fontWeight:600}}/>

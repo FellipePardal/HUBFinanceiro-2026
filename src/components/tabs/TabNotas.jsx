@@ -890,37 +890,55 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                   <tbody>
                     {servicos.map(s => {
                       const key = `${jogo.id}_${s.subKey}`;
-                      const nota = nfsDoJogo.find(n => n.servicosKeys?.includes(key));
-                      const valorUnit = nota?.servicosValores?.[s.subKey];
-                      const diff = valorUnit != null ? valorUnit - s.valorRef : null;
+                      const isMulti = SUBS_MULTI_NF.has(s.subKey);
+                      // Todas as NFs vinculadas a esta linha
+                      const notasDestaLinha = nfsDoJogo.filter(n => n.servicosKeys?.includes(key));
+                      // Soma considerando servicosDetalhe (granular por jogo) ou servicosValores (legado)
+                      const valorUnit = notasDestaLinha.reduce((sum, n) => {
+                        if (n.servicosDetalhe && n.servicosDetalhe[key] != null) return sum + n.servicosDetalhe[key];
+                        if (n.servicosValores?.[s.subKey] != null) return sum + n.servicosValores[s.subKey];
+                        return sum;
+                      }, 0);
+                      const hasNotas = notasDestaLinha.length > 0;
+                      const diff = hasNotas ? valorUnit - s.valorRef : null;
+                      const restante = s.valorRef - valorUnit;
+                      const statusLabel = !hasNotas ? "Pendente" : (isMulti && restante > 0.01 ? "Parcial" : "Conferida");
+                      const statusColor = !hasNotas ? "#f59e0b" : (statusLabel === "Parcial" ? "#3b82f6" : "#22c55e");
+                      const nota = notasDestaLinha[0];
                       return (
                         <tr key={s.subKey} style={{borderTop:`1px solid ${T.border}`}}>
                           <td style={{padding:"8px 14px",fontWeight:600,fontSize:13,color:T.text}}>{s.subLabel}</td>
                           <td style={{padding:"8px 14px"}}><Pill label={s.catLabel} color={s.catColor}/></td>
                           <td style={{padding:"8px 14px",color:T.textSm,fontSize:12}}>{fmt(s.valorRef)}</td>
                           <td style={{padding:"8px 14px",fontSize:12}}>
-                            {valorUnit != null ? (
-                              <span style={{display:"flex",alignItems:"center",gap:4}}>
+                            {hasNotas ? (
+                              <span style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                                 <span style={{color:"#8b5cf6",fontWeight:600}}>{fmt(valorUnit)}</span>
-                                {diff !== 0 && <span style={{fontSize:10,color:diff>0?"#ef4444":"#22c55e",fontWeight:600}}>{diff>0?"+":""}{fmt(diff)}</span>}
+                                {diff !== 0 && <span style={{fontSize:10,color:diff>0?"#ef4444":(isMulti?"#3b82f6":"#22c55e"),fontWeight:600}}>{diff>0?"+":""}{fmt(diff)}</span>}
+                                {isMulti && notasDestaLinha.length > 1 && <span style={{fontSize:9,padding:"1px 5px",borderRadius:4,background:"#3b82f622",color:"#3b82f6",fontWeight:600}}>{notasDestaLinha.length} NFs</span>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>
                           <td style={{padding:"8px 14px"}}>
-                            <Pill label={nota ? "Conferida" : "Pendente"} color={nota ? "#22c55e" : "#f59e0b"}/>
+                            <Pill label={statusLabel} color={statusColor}/>
                           </td>
                           <td style={{padding:"8px 14px",fontSize:11}}>
-                            {nota ? (
-                              <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
-                                <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
-                                <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color="#8b5cf6"/>}
-                                {nota.hasFile
-                                  ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
-                                  : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
-                                <button onClick={() => deleteNota(nota.id)} style={{color:"#ef4444",fontSize:10,fontWeight:600,background:"#ef444422",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Apagar</button>
-                              </span>
-                            ) : <span style={{color:T.textSm}}>—</span>}
+                            {!hasNotas ? <span style={{color:T.textSm}}>—</span>
+                              : notasDestaLinha.length > 1 ? (
+                                <span style={{color:T.textSm,fontSize:11}}>
+                                  {notasDestaLinha.map(n => n.fornecedor).filter(Boolean).join(", ")}
+                                </span>
+                              ) : (
+                                <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
+                                  <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
+                                  <span style={{color:T.textSm}}>{nota.fornecedor}</span>
+                                  {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color="#8b5cf6"/>}
+                                  {nota.hasFile
+                                    ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
+                                    : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
+                                  <button onClick={() => deleteNota(nota.id)} style={{color:"#ef4444",fontSize:10,fontWeight:600,background:"#ef444422",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Apagar</button>
+                                </span>
+                              )}
                           </td>
                         </tr>
                       );

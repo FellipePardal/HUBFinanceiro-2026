@@ -5,7 +5,8 @@ import { btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-const CATEGORIAS_MENSAL = ["Transporte","Uber","Hospedagem","Seg. Espacial","Outro"];
+const VAR_CATEGORIAS = ["Transporte","Uber","Hospedagem","Seg. Espacial"];
+const CATEGORIAS_MENSAL = [...VAR_CATEGORIAS, "Outro"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Recebida":"#8b5cf6","Conferida":"#22c55e"};
 
 function FornecedorInput({ value, onChange, fornecedores, T }) {
@@ -88,17 +89,28 @@ function PreviewModal({ nota, onClose, T }) {
   );
 }
 
-function NovaNotaMensalModal({ fornecedores, onSave, onClose, T }) {
+function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, onClose, T }) {
   const IS = iSty(T);
   const mesAtual = new Date().getMonth();
   const [form, setForm] = useState({
-    fornecedor: "", categoria: "Transporte", mes: mesAtual, numeroNF: "",
+    fornecedor: "", categoriaSel: "var::Transporte", mes: mesAtual, numeroNF: "",
     valor: 0, dataEmissao: "", dataEnvio: "", descricao: "", obs: "",
   });
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  // Saldo do serviço selecionado (se for fixo)
+  const isFixo = form.categoriaSel.startsWith("fixo::");
+  const servicoIdSel = isFixo ? parseInt(form.categoriaSel.split("::")[1]) : null;
+  const servicoSel = servicoIdSel ? (servicos||[]).flatMap(s => s.itens).find(i => i.id === servicoIdSel) : null;
+  const gastoServico = servicoSel
+    ? (notasExistentes||[]).filter(n => n.servicoId === servicoSel.id).reduce((s, n) => s + (n.valor||0), 0)
+    : 0;
+  const saldoServico = servicoSel ? (servicoSel.provisionado||0) - gastoServico : 0;
+  const valorAtual = parseFloat(form.valor) || 0;
+  const saldoAposNota = saldoServico - valorAtual;
 
   const handleSave = async () => {
     if (!form.fornecedor) return;
@@ -112,9 +124,19 @@ function NovaNotaMensalModal({ fornecedores, onSave, onClose, T }) {
         hasFile = true;
       } catch(_){}
     }
+    let categoria, servicoId = null;
+    if (isFixo && servicoSel) {
+      categoria = servicoSel.nome;
+      servicoId = servicoSel.id;
+    } else {
+      categoria = form.categoriaSel.replace(/^var::/, "");
+    }
+    const { categoriaSel, ...rest } = form;
     onSave({
       id: notaId,
-      ...form,
+      ...rest,
+      categoria,
+      servicoId,
       valor: parseFloat(form.valor) || 0,
       mes: parseInt(form.mes),
       mesLabel: MESES[parseInt(form.mes)],
@@ -135,9 +157,29 @@ function NovaNotaMensalModal({ fornecedores, onSave, onClose, T }) {
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Categoria</label>
-            <select value={form.categoria} onChange={e => set("categoria", e.target.value)} style={IS}>
-              {CATEGORIAS_MENSAL.map(c => <option key={c}>{c}</option>)}
+            <select value={form.categoriaSel} onChange={e => set("categoriaSel", e.target.value)} style={IS}>
+              <optgroup label="Variáveis Mensais">
+                {VAR_CATEGORIAS.map(c => <option key={c} value={`var::${c}`}>{c}</option>)}
+              </optgroup>
+              {(servicos||[]).map(sec => (
+                <optgroup key={sec.secao} label={`Serviços Fixos · ${sec.secao}`}>
+                  {sec.itens.map(it => <option key={it.id} value={`fixo::${it.id}`}>{it.nome}</option>)}
+                </optgroup>
+              ))}
+              <optgroup label="Outros">
+                <option value="var::Outro">Outro</option>
+              </optgroup>
             </select>
+            {servicoSel && (
+              <div style={{marginTop:6,padding:"6px 10px",background:T.bg,borderRadius:6,fontSize:11,display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                <span style={{color:T.textSm}}>Provisionado: <b style={{color:"#3b82f6"}}>{fmt(servicoSel.provisionado||0)}</b></span>
+                <span style={{color:T.textSm}}>Já gasto: <b style={{color:"#f59e0b"}}>{fmt(gastoServico)}</b></span>
+                <span style={{color:T.textSm}}>Saldo: <b style={{color:saldoServico>=0?"#22c55e":"#ef4444"}}>{fmt(saldoServico)}</b></span>
+                {valorAtual > 0 && (
+                  <span style={{color:T.textSm}}>Após esta NF: <b style={{color:saldoAposNota>=0?"#22c55e":"#ef4444"}}>{fmt(saldoAposNota)}</b></span>
+                )}
+              </div>
+            )}
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Mês de referência</label>
@@ -194,7 +236,7 @@ function NovaNotaMensalModal({ fornecedores, onSave, onClose, T }) {
   );
 }
 
-export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }) {
+export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], T }) {
   const [mesSel, setMesSel] = useState(new Date().getMonth());
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [showNova, setShowNova] = useState(false);
@@ -232,11 +274,26 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }
     setUploadTarget(null);
   };
 
-  // Resumo por categoria no mês
-  const resumoCat = CATEGORIAS_MENSAL.map(cat => {
+  // Resumo por categoria no mês — categorias dinâmicas a partir das notas
+  const todasCategoriasMes = Array.from(new Set(filtered.map(n => n.categoria).filter(Boolean)));
+  const resumoCat = todasCategoriasMes.map(cat => {
     const ns = filtered.filter(n => n.categoria === cat);
     return { cat, qtd: ns.length, valor: ns.reduce((s, n) => s + (n.valor || 0), 0) };
-  }).filter(r => r.qtd > 0);
+  });
+
+  // Saldo provisionado por serviço fixo (considera TODAS as notas, não só do mês)
+  const saldosFixos = servicos.flatMap(sec =>
+    sec.itens.map(it => {
+      const gasto = notas.filter(n => n.servicoId === it.id).reduce((s, n) => s + (n.valor || 0), 0);
+      const prov = it.provisionado || 0;
+      return { secao: sec.secao, id: it.id, nome: it.nome, prov, gasto, saldo: prov - gasto };
+    })
+  );
+  const fixosComMov = saldosFixos.filter(s => s.prov > 0 || s.gasto > 0);
+
+  // Categorias para o filtro: variáveis + qualquer nome de fixo presente nas notas
+  const fixosNomes = Array.from(new Set(notas.filter(n => n.servicoId).map(n => n.categoria)));
+  const filtroCategorias = ["Todas", ...VAR_CATEGORIAS, ...fixosNomes, "Outro"];
 
   return (
     <>
@@ -256,7 +313,7 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }
             {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <div style={{width:1,height:24,background:T.border}}/>
-          {["Todas",...CATEGORIAS_MENSAL].map(c => (
+          {filtroCategorias.map(c => (
             <button key={c} onClick={() => setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,
               background:filtroCat===c?"#f59e0b":T.card,color:filtroCat===c?"#000":T.textMd}}>
               {c}
@@ -276,6 +333,39 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }
               <span style={{color:T.textSm,fontSize:11}}>{r.qtd} NF{r.qtd>1?"s":""}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Saldo Provisionado por Serviço Fixo */}
+      {fixosComMov.length > 0 && (
+        <div style={{background:T.card,borderRadius:12,padding:"14px 18px",marginBottom:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{fontWeight:700,fontSize:13,color:T.text}}>Saldo Provisionado · Serviços Fixos</span>
+            <span style={{fontSize:11,color:T.textSm}}>Atualizado a cada NF lançada</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+            {fixosComMov.map(s => {
+              const pct = s.prov > 0 ? Math.min(100, (s.gasto / s.prov) * 100) : 0;
+              const cor = s.saldo < 0 ? "#ef4444" : pct > 90 ? "#f59e0b" : "#22c55e";
+              return (
+                <div key={s.id} style={{background:T.bg,borderRadius:8,padding:"10px 12px",borderLeft:`3px solid ${cor}`}}>
+                  <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.nome}</div>
+                  <div style={{fontSize:10,color:T.textSm,marginBottom:6}}>{s.secao}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+                    <span style={{color:T.textSm}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(s.prov)}</b></span>
+                    <span style={{color:T.textSm}}>Gasto: <b style={{color:"#f59e0b"}}>{fmt(s.gasto)}</b></span>
+                  </div>
+                  <div style={{background:T.border,borderRadius:4,height:5,marginBottom:4}}>
+                    <div style={{background:cor,width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
+                    <span style={{color:T.textSm}}>{pct.toFixed(0)}% consumido</span>
+                    <span style={{color:T.textSm}}>Saldo: <b style={{color:cor}}>{fmt(s.saldo)}</b></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -327,7 +417,7 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], T }
         </div>
       </div>
 
-      {showNova && <NovaNotaMensalModal fornecedores={fornecedores} onSave={addNota} onClose={() => setShowNova(false)} T={T}/>}
+      {showNova && <NovaNotaMensalModal fornecedores={fornecedores} servicos={servicos} notasExistentes={notas} onSave={addNota} onClose={() => setShowNova(false)} T={T}/>}
       {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
       <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}
         onChange={e => {if (e.target.files[0] && uploadTarget) handleUploadLater(e.target.files[0], uploadTarget); e.target.value="";}}/>

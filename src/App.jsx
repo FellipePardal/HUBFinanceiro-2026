@@ -127,7 +127,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
       .filter(n => !n.servicoId && !VAR_CAT_TO_CATKEY[n.categoria])
       .reduce((s, n) => s + (n.valor || 0), 0);
     return total > 0
-      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"variavel" }]
+      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo" }]
       : [];
   }, [notasMensais]);
 

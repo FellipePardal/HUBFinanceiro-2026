@@ -97,7 +97,11 @@ function FormVariaveis({T, onBack, jogos = []}) {
   const [overrides, setOverrides] = useState({});
   const setRodadaField = (rodada, field, val) =>
     setOverrides(prev => ({...prev, [rodada]: {...prev[rodada], [field]: val}}));
-  const resetOverrides = () => setOverrides({});
+
+  // Overrides do bloco "Notas Fiscais" — vazio = usar valor automático da tabela
+  const [nfEspOverride, setNfEspOverride] = useState("");
+  const [nfRecOverride, setNfRecOverride] = useState("");
+  const resetOverrides = () => { setOverrides({}); setNfEspOverride(""); setNfRecOverride(""); };
 
   // View da tabela aplicando overrides
   const rodadasView = computed.rodadasAuto.map(r => ({
@@ -112,13 +116,15 @@ function FormVariaveis({T, onBack, jogos = []}) {
     const totReal = rows.reduce((s,r) => s+r.realizado, 0);
     const saving  = totOrc - totReal;
     const savPct  = totOrc > 0 ? saving/totOrc*100 : 0;
-    // Notas Esperadas = total da coluna "Realizado" da tabela (com overrides)
-    const nfEspV  = totReal;
-    const nfRecV  = computed.realAteRod;
-    const nfPend  = Math.max(0, nfEspV - nfRecV);
-    const pctRec  = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
-    return {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfEspV, nfRecV};
-  }, [rodadasView, computed]);
+    // Auto: nfEsp segue o total da coluna "Realizado" da tabela; nfRec segue o realizado real das NFs
+    const autoNfEspV = totReal;
+    const autoNfRecV = computed.realAteRod;
+    const nfEspV = nfEspOverride !== "" ? parseBR(nfEspOverride) : autoNfEspV;
+    const nfRecV = nfRecOverride !== "" ? parseBR(nfRecOverride) : autoNfRecV;
+    const nfPend = Math.max(0, nfEspV - nfRecV);
+    const pctRec = nfEspV > 0 ? nfRecV/nfEspV*100 : 0;
+    return {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfEspV, nfRecV, autoNfEspV, autoNfRecV};
+  }, [rodadasView, computed, nfEspOverride, nfRecOverride]);
 
   useDonut(canvasRef, parsed.nfRecV, parsed.nfPend);
 
@@ -127,15 +133,16 @@ function FormVariaveis({T, onBack, jogos = []}) {
   const grid3  = {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20};
   const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:T.text,marginBottom:16};
   const secNum = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
-  const {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfRecV, nfEspV} = parsed;
+  const {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfRecV, nfEspV, autoNfEspV, autoNfRecV} = parsed;
   const orcGlobalFmt = fmtNum(ORC_GLOBAL_FIXO);
-  const orcAteRodFmt = fmtNum(computed.orcAteRod);
+  // Orçado acumulado = total da coluna Orçado da tabela (com overrides)
+  const orcAteRodFmt = fmtNum(totOrc);
 
   async function gerarPPTX() {
     setLoading(true); setStatus({msg:"Gerando...", cls:""});
     try {
       const orcGlobalV = ORC_GLOBAL_FIXO;
-      const orcAteRodV = computed.orcAteRod;
+      const orcAteRodV = totOrc; // total da coluna Orçado da tabela (com overrides)
       const macroProjV = totReal + (orcGlobalV - orcAteRodV);
 
       const pptx = new PptxGenJS();
@@ -326,8 +333,8 @@ function FormVariaveis({T, onBack, jogos = []}) {
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais</span></div>
         <div style={grid3}>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Esperadas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfEspV)} style={{...IS_RO}}/></div>
-          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Recebidas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfRecV)} style={{...IS_RO,color:"#22c55e"}}/></div>
+          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Esperadas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO · editável</span></label><input value={nfEspOverride !== "" ? nfEspOverride : fmtNum(autoNfEspV)} onChange={e=>setNfEspOverride(e.target.value)} style={{...IS}}/></div>
+          <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Notas Recebidas <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO · editável</span></label><input value={nfRecOverride !== "" ? nfRecOverride : fmtNum(autoNfRecV)} onChange={e=>setNfRecOverride(e.target.value)} style={{...IS,color:"#22c55e"}}/></div>
           <div><label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Pendentes <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label><input readOnly value={fmtNum(nfPend)} style={{...IS_RO,color:"#d97706"}}/></div>
         </div>
         <div style={{display:"flex",gap:32,alignItems:"flex-start",marginTop:20,flexWrap:"wrap"}}>

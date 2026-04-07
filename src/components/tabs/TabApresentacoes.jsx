@@ -187,7 +187,7 @@ function FormVariaveis({T, onBack, jogos = []}) {
         x:0.3, y:1.88, w:8.8, h:2.72,
         barDir:"col", barGrouping:"clustered",
         chartColors:["D1D5DB","22C55E"],
-        showValue:true, dataLabelFontSize:7, dataLabelColor:"555555",
+        showValue:false,
         showLegend:true, legendPos:"t", legendFontSize:9,
         title:"Comparativo Orçado × Realizado", showTitle:true, titleFontSize:11, titleBold:true,
         valGridLine:{style:"none"},
@@ -234,24 +234,12 @@ function FormVariaveis({T, onBack, jogos = []}) {
         {text:(savPctTot>=0?"▲ ":"▼ ")+Math.abs(savPctTot).toFixed(1)+"%",     options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
-      // ✅ FIX 3: rowH dinâmico para não sobrepor o footer
-      const rowH = Math.max(0.145, 1.55 / (rows.length + 1));
+      // tabela ocupa todo o espaço entre os gráficos e a borda inferior do slide
+      const rowH = Math.max(0.18, 2.6 / (rows.length + 1));
       sl.addTable([tblHead, ...tblBody, tblTot], {
         x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
         border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
       });
-
-      // footer escuro
-      const fY = 6.55;
-      sl.addShape(pptx.ShapeType.rect, {x:0,y:fY,w:13.33,h:0.95,fill:{color:"111827"},line:{width:0}});
-      sl.addText("RODADA",                    {x:0.3, y:fY+0.08,w:2,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(`${rodadaAtual} / 38`,       {x:0.3, y:fY+0.26,w:2,   h:0.5, fontSize:24,bold:true,color:"FFFFFF",fontFace:"Segoe UI"});
-      sl.addText("ORÇADO TOTAL CAMPEONATO",   {x:2.8, y:fY+0.08,w:4,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(fmtBRL(orcGlobalV),          {x:2.8, y:fY+0.26,w:4,   h:0.5, fontSize:16,color:"FFFFFF",fontFace:"Segoe UI"});
-      sl.addText("VARIÁVEIS REALIZADO",       {x:7.1, y:fY+0.08,w:3,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(fmtBRL(totReal),             {x:7.1, y:fY+0.26,w:3,   h:0.5, fontSize:16,color:"22C55E",fontFace:"Segoe UI"});
-      sl.addText("PROJETADO ATÉ O FINAL",     {x:10.3,y:fY+0.08,w:2.73,h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText(fmtBRL(macroProjV),          {x:10.3,y:fY+0.26,w:2.73,h:0.5, fontSize:14,color:"3B82F6",fontFace:"Segoe UI"});
 
       await pptx.writeFile({fileName:`dashboard_variaveis_R${rodadaAtual}_brasileirao2026.pptx`});
       setStatus({msg:`✅ dashboard_variaveis_R${rodadaAtual}.pptx baixado!`, cls:"ok"});

@@ -426,16 +426,19 @@ function FormFixos({T, onBack}) {
       });
       sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
 
-      // 4 KPIs
+      // Saldo "visual atual" = orçado - gasto (sem considerar provisionado)
+      const catSaldoAtual = c => c.orc - c.gasto;
+      const totSaldoAtual = totals.orc - totals.gasto;
+
+      // 3 KPIs
       const kpis = [
         {label:"ORÇADO TOTAL", val:fmtBRL(orcTotalV),    border:"D1D5DB", valColor:"111827"},
         {label:"GASTO TOTAL",  val:fmtBRL(totals.gasto), border:"D1D5DB", valColor:"111827"},
-        {label:"PROVISIONADO", val:fmtBRL(totals.prov),  border:"D97706", valColor:"D97706"},
-        {label:"SALDO TOTAL",  val:fmtBRL(totals.saldo), border:"22C55E", valColor:totals.saldo>=0?"22C55E":"EF4444"},
+        {label:"SALDO TOTAL",  val:fmtBRL(totSaldoAtual), border:"22C55E", valColor:totSaldoAtual>=0?"22C55E":"EF4444"},
       ];
-      const kW=3.18, kH=0.92, kY=0.82;
+      const kW=4.27, kH=0.92, kY=0.82;
       kpis.forEach(({label,val,border,valColor}, i) => {
-        const x = 0.3 + i*(kW+0.04);
+        const x = 0.3 + i*(kW+0.06);
         sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:kH,fill:{color:"FFFFFF"},line:{color:border,width:1.5}});
         sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:0.05,fill:{color:border},line:{width:0}});
         sl.addText(label, {x:x+0.1,y:kY+0.1,w:kW-0.2,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"});
@@ -445,46 +448,44 @@ function FormFixos({T, onBack}) {
       // gráfico barras por categoria
       const catLabels = totals.cats.map(c => c.label.length>18 ? c.label.substring(0,18)+"…" : c.label);
       sl.addChart(pptx.ChartType.bar, [
-        {name:"Orçado",       labels:catLabels, values:totals.cats.map(c=>c.orc)},
-        {name:"Gasto",        labels:catLabels, values:totals.cats.map(c=>c.gasto)},
-        {name:"Provisionado", labels:catLabels, values:totals.cats.map(c=>c.prov)},
+        {name:"Orçado", labels:catLabels, values:totals.cats.map(c=>c.orc)},
+        {name:"Gasto",  labels:catLabels, values:totals.cats.map(c=>c.gasto)},
       ], {
         x:0.3, y:1.88, w:12.73, h:2.72,
         barDir:"col", barGrouping:"clustered",
-        chartColors:["D1D5DB","22C55E","D97706"],
-        showValue:true, dataLabelFontSize:7, dataLabelColor:"555555",
+        chartColors:["D1D5DB","22C55E"],
+        showValue:false,
         showLegend:true, legendPos:"t", legendFontSize:9,
-        title:"Comparativo Orçado × Gasto × Provisionado", showTitle:true, titleFontSize:11, titleBold:true,
+        title:"Comparativo Orçado × Gasto", showTitle:true, titleFontSize:11, titleBold:true,
         valGridLine:{style:"none"},
       });
 
-      // tabela por categoria
+      // tabela por categoria (sem provisionado)
       const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-      const tblHead = [th("CATEGORIA"), th("ORÇADO","right"), th("GASTO","right"), th("PROVISIONADO","right"), th("SALDO","right")];
+      const tblHead = [th("CATEGORIA"), th("ORÇADO","right"), th("GASTO","right"), th("SALDO","right")];
 
       const tblBody = totals.cats.map((cat, i) => {
+        const saldoAtual = catSaldoAtual(cat);
         const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
-        const sc = cat.saldo>=0?"16A34A":"DC2626";
+        const sc = saldoAtual>=0?"16A34A":"DC2626";
         return [
           {text:cat.label,         options:{fontSize:8.5,bold:true,color:"111827",fill}},
           {text:fmtBRL(cat.orc),   options:{fontSize:8.5,color:"111827",fill,align:"right"}},
           {text:fmtBRL(cat.gasto), options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-          {text:fmtBRL(cat.prov),  options:{fontSize:8.5,color:"D97706",fill,align:"right"}},
-          {text:fmtBRL(cat.saldo), options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
+          {text:fmtBRL(saldoAtual),options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
         ];
       });
 
-      const stc = totals.saldo>=0?"A3E635":"FF6B6B";
+      const stc = totSaldoAtual>=0?"A3E635":"FF6B6B";
       const tblTot = [
-        {text:"TOTAL",              options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
-        {text:fmtBRL(totals.orc),   options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(totals.gasto), options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(totals.prov),  options:{fontSize:8.5,bold:true,color:"F59E0B",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(totals.saldo), options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
+        {text:"TOTAL",                options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
+        {text:fmtBRL(totals.orc),     options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
+        {text:fmtBRL(totals.gasto),   options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
+        {text:fmtBRL(totSaldoAtual),  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
       sl.addTable([tblHead, ...tblBody, tblTot], {
-        x:0.3, y:4.72, w:12.73, colW:[4,2.18,2.18,2.18,2.19],
+        x:0.3, y:4.72, w:12.73, colW:[5.5,2.4,2.4,2.43],
         border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:0.28,
       });
 
@@ -496,9 +497,9 @@ function FormFixos({T, onBack}) {
       sl.addText("ORÇADO TOTAL CAMPEONATO", {x:2.8, y:fY+0.08,w:6,   h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
       sl.addText(fmtBRL(orcTotalV),         {x:2.8, y:fY+0.26,w:6,   h:0.5, fontSize:16,color:"FFFFFF",fontFace:"Segoe UI"});
       sl.addText("SALDO TOTAL",             {x:9.5, y:fY+0.08,w:3.5, h:0.18,fontSize:7,bold:true,color:"9CA3AF",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl.addText((totals.saldo>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(totals.saldo)), {
+      sl.addText((totSaldoAtual>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(totSaldoAtual)), {
         x:9.5,y:fY+0.26,w:3.5,h:0.5,fontSize:16,
-        color:totals.saldo>=0?"22C55E":"EF4444",fontFace:"Segoe UI"
+        color:totSaldoAtual>=0?"22C55E":"EF4444",fontFace:"Segoe UI"
       });
 
       await pptx.writeFile({fileName:`custos_fixos_R${rodadaAtual}_brasileirao2026.pptx`});

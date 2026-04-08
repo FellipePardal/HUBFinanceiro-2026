@@ -1,23 +1,74 @@
 import { fmt } from "../utils";
+import { RADIUS } from "../constants";
 
+// Pill — preserva o contrato { label, color }, agora com visual refinado.
 export const Pill = ({label, color}) => (
-  <span style={{background:color+"22",color,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>
+  <span style={{
+    background: color + "1f",
+    color,
+    border: `1px solid ${color}33`,
+    borderRadius: RADIUS.pill,
+    padding: "3px 10px",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.01em",
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+  }}>{label}</span>
 );
 
-export const KPI = ({label, value, sub, color, T}) => (
-  <div style={{background:T.card,borderRadius:12,padding:"18px 20px",borderLeft:`4px solid ${color}`}}>
-    <p style={{color:T.textMd,fontSize:12,marginBottom:6}}>{label}</p>
-    <p style={{fontSize:20,fontWeight:700,color,marginBottom:2}}>{value}</p>
-    <p style={{color:T.textSm,fontSize:11}}>{sub}</p>
-  </div>
-);
+// KPI — preserva o contrato { label, value, sub, color, T }, agora com visual de stat corporativo.
+export const KPI = ({label, value, sub, color, T}) => {
+  const accent = color || T.brand || "#10b981";
+  return (
+    <div style={{
+      background: T.surface || T.card,
+      border: `1px solid ${T.border}`,
+      borderRadius: RADIUS.lg,
+      padding: "18px 20px",
+      position: "relative",
+      overflow: "hidden",
+      boxShadow: T.shadowSoft || "none",
+    }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:accent, opacity:0.85 }}/>
+      <p style={{
+        color: T.textMd,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        margin: 0,
+      }}>{label}</p>
+      <p className="num" style={{
+        fontSize: 24,
+        fontWeight: 700,
+        color: T.text,
+        margin: "10px 0 4px",
+        letterSpacing: "-0.02em",
+        lineHeight: 1.1,
+      }}>{value}</p>
+      {sub && <p style={{ color: T.textSm, fontSize: 11, margin: 0 }}>{sub}</p>}
+    </div>
+  );
+};
 
 export const CustomTooltip = ({active, payload, label, T}) => {
   if(!active||!payload?.length) return null;
   return (
-    <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px"}}>
-      <p style={{color:T.textMd,marginBottom:6,fontWeight:600}}>{label}</p>
-      {payload.map(p => <p key={p.name} style={{color:p.fill||p.color,margin:"2px 0"}}>{p.name}: {fmt(p.value)}</p>)}
+    <div style={{
+      background: T.surface || T.card,
+      border: `1px solid ${T.borderStrong || T.border}`,
+      borderRadius: RADIUS.md,
+      padding: "10px 14px",
+      boxShadow: T.shadow || "0 8px 24px rgba(0,0,0,0.2)",
+    }}>
+      <p style={{color: T.textMd, marginBottom: 6, fontWeight: 600, fontSize: 12}}>{label}</p>
+      {payload.map(p => (
+        <p key={p.name} className="num" style={{color: p.fill||p.color, margin: "2px 0", fontSize: 12}}>
+          {p.name}: {fmt(p.value)}
+        </p>
+      ))}
     </div>
   );
 };

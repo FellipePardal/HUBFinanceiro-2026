@@ -1,8 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
-import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle } from "./constants";
+import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
 import { KPI, Pill, CustomTooltip } from "./components/shared";
+import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./components/ui";
+import {
+  LayoutDashboard, FileText, Users, ClipboardList,
+  ArrowLeft, Eye, EyeOff, Sun, Moon,
+  Wallet, TrendingUp, Activity, PiggyBank,
+} from "lucide-react";
 import Home             from "./components/Home";
 import TabJogos         from "./components/tabs/TabJogos";
 import TabSavings       from "./components/tabs/TabSavings";
@@ -218,87 +224,226 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   );
 
   const SETORES = [
-    {k:"orcamento", l:"Orçamento",     icon:"📊"},
-    {k:"notas",     l:"Notas Fiscais", icon:"📄"},
-    {k:"fornecedores", l:"Fornecedores", icon:"👥"},
-    {k:"relatorio",    l:"Relatório",    icon:"📋"},
+    {k:"orcamento",    l:"Orçamento",     icon:LayoutDashboard},
+    {k:"notas",        l:"Notas Fiscais", icon:FileText},
+    {k:"fornecedores", l:"Fornecedores",  icon:Users},
+    {k:"relatorio",    l:"Relatório",     icon:ClipboardList},
   ];
+
+  const setorAtual = SETORES.find(s => s.k === setor);
 
   return (
     <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex"}}>
 
-      {/* Sidebar */}
-      <div style={{width:64,minHeight:"100vh",background:"linear-gradient(180deg,#166534,#15803d)",display:"flex",flexDirection:"column",alignItems:"center",paddingTop:12,gap:4,flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,padding:"8px",cursor:"pointer",color:"#fff",fontSize:14,marginBottom:12,width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center"}} title="Voltar ao Portal">←</button>
-        {SETORES.map(s => (
-          <button key={s.k} onClick={() => handleSetorChange(s.k)} title={s.l}
-            style={{width:48,height:48,borderRadius:12,border:"none",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s",
-              background:setor===s.k?"rgba(255,255,255,0.25)":"transparent",
-              boxShadow:setor===s.k?"0 0 12px rgba(134,239,172,0.3)":"none"}}>
-            {s.icon}
-          </button>
-        ))}
-        <div style={{flex:1}}/>
-        <button onClick={()=>setOcultar(o=>!o)} title={ocultar?"Mostrar valores":"Ocultar valores"}
-          style={{width:42,height:42,borderRadius:10,border:"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
-            background:ocultar?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.1)",marginBottom:4}}>
-          {ocultar ? "👁" : "🔒"}
+      {/* ── Sidebar ───────────────────────────────────────────────────── */}
+      <aside style={{
+        width:72,
+        minHeight:"100vh",
+        background: T.gradSidebar || "linear-gradient(180deg,#0a0f1a,#0f172a)",
+        borderRight:"1px solid rgba(255,255,255,0.06)",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"center",
+        paddingTop:16,
+        paddingBottom:16,
+        gap:6,
+        flexShrink:0,
+        position:"sticky",
+        top:0,
+        height:"100vh",
+      }}>
+        {/* logo / back */}
+        <button onClick={onBack} title="Voltar ao portal"
+          style={{
+            width:44, height:44, borderRadius:12, border:"none", cursor:"pointer",
+            background:"linear-gradient(135deg,#059669,#10b981)",
+            color:"#fff",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            marginBottom:14,
+            boxShadow:"0 6px 16px rgba(16,185,129,0.35)",
+          }}>
+          <ArrowLeft size={18} strokeWidth={2.25}/>
         </button>
-        <button onClick={()=>setDarkMode(d=>!d)} title={darkMode?"Modo claro":"Modo escuro"}
-          style={{width:42,height:42,borderRadius:10,border:"none",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
-            background:"rgba(255,255,255,0.1)",marginBottom:12}}>
-          {darkMode ? "☀️" : "🌙"}
-        </button>
-      </div>
 
-      {/* Main */}
-      <div style={{flex:1,minWidth:0,paddingBottom:40}}>
-        {/* Header verde */}
-        <div style={{background:"linear-gradient(135deg,#166534,#15803d,#166534)",padding:"16px 20px 0"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-            <div>
-              <p style={{color:"#86efac",fontSize:11,letterSpacing:2,textTransform:"uppercase",margin:"0 0 2px"}}>FFU — Transmissões · {SETORES.find(s=>s.k===setor)?.l}</p>
-              <h1 style={{fontSize:19,fontWeight:700,margin:0,color:"#fff"}}>Brasileirão Série A 2026</h1>
-              <p style={{color:"#bbf7d0",fontSize:11,margin:"2px 0 0"}}>{divulgados.length} jogos divulgados · {aDivulgar.length} a divulgar · 38 rodadas</p>
+        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.08)", marginBottom:8 }}/>
+
+        {/* setores */}
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {SETORES.map(s => (
+            <IconButton key={s.k} icon={s.icon} title={s.l}
+              active={setor===s.k}
+              onClick={()=>handleSetorChange(s.k)}
+              size={44} T={T}/>
+          ))}
+        </div>
+
+        <div style={{ flex:1 }}/>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          <IconButton
+            icon={ocultar ? EyeOff : Eye}
+            title={ocultar?"Mostrar valores":"Ocultar valores"}
+            onClick={()=>setOcultar(o=>!o)}
+            active={ocultar}
+            size={40} T={T}
+          />
+          <IconButton
+            icon={darkMode ? Sun : Moon}
+            title={darkMode?"Modo claro":"Modo escuro"}
+            onClick={()=>setDarkMode(d=>!d)}
+            size={40} T={T}
+          />
+        </div>
+      </aside>
+
+      {/* ── Main ──────────────────────────────────────────────────────── */}
+      <div style={{flex:1,minWidth:0,paddingBottom:40,background:T.bg}}>
+        {/* Header corporativo */}
+        <div style={{
+          background: T.surface || T.card,
+          borderBottom: `1px solid ${T.border}`,
+          padding: "20px 32px 0",
+        }}>
+          <div style={{
+            display:"flex",
+            justifyContent:"space-between",
+            alignItems:"flex-start",
+            flexWrap:"wrap",
+            gap:16,
+            paddingBottom:18,
+          }}>
+            <div style={{ minWidth:0, display:"flex", alignItems:"center", gap:14 }}>
+              {setorAtual?.icon && (
+                <div style={{
+                  width:42, height:42, borderRadius:12,
+                  background: T.brandSoft || "rgba(16,185,129,0.12)",
+                  border: `1px solid ${T.brandBorder || "rgba(16,185,129,0.28)"}`,
+                  color: T.brand || "#10b981",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  flexShrink:0,
+                }}>
+                  <setorAtual.icon size={20} strokeWidth={2.25}/>
+                </div>
+              )}
+              <div style={{ minWidth:0 }}>
+                <p style={{
+                  color: T.brand || "#10b981",
+                  fontSize: 10,
+                  letterSpacing:"0.16em",
+                  textTransform:"uppercase",
+                  margin:"0 0 3px",
+                  fontWeight:700,
+                }}>Livemode · Transmissões · {setorAtual?.l}</p>
+                <h1 style={{
+                  fontSize:20,
+                  fontWeight:800,
+                  margin:0,
+                  color:T.text,
+                  letterSpacing:"-0.02em",
+                }}>Brasileirão Série A 2026</h1>
+                <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
+                  <span className="num" style={{ color:T.text, fontWeight:600 }}>{divulgados.length}</span> divulgados
+                  <span style={{ color:T.border, margin:"0 8px" }}>·</span>
+                  <span className="num" style={{ color:T.text, fontWeight:600 }}>{aDivulgar.length}</span> a divulgar
+                  <span style={{ color:T.border, margin:"0 8px" }}>·</span>
+                  <span className="num" style={{ color:T.text, fontWeight:600 }}>38</span> rodadas
+                </p>
+              </div>
             </div>
-            <div style={{textAlign:"right"}}>
-              <p style={{color:"#86efac",fontSize:10,margin:"0 0 1px"}}>Execução geral</p>
-              <p style={{fontSize:26,fontWeight:800,color:pctGasto>80?"#fca5a5":"#86efac",margin:0,filter:ocultar?"blur(8px)":"none",transition:"filter 0.2s"}}>{pctGasto}%</p>
+
+            <div style={{
+              display:"flex", alignItems:"center", gap:12,
+              padding:"10px 18px",
+              background: T.surfaceAlt || T.bg,
+              border: `1px solid ${T.border}`,
+              borderRadius: RADIUS.lg,
+            }}>
+              <Activity size={16} color={T.brand || "#10b981"} strokeWidth={2.25}/>
+              <div style={{ textAlign:"right" }}>
+                <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
+                <p className="num" style={{
+                  fontSize:22,
+                  fontWeight:800,
+                  color: pctGasto>80 ? (T.danger||"#ef4444") : (T.brand||"#10b981"),
+                  margin:0,
+                  filter:ocultar?"blur(8px)":"none",
+                  transition:"filter 0.2s",
+                  letterSpacing:"-0.02em",
+                  lineHeight:1,
+                }}>{pctGasto}%</p>
+              </div>
             </div>
           </div>
-          <div style={{display:"flex",gap:2,marginTop:14,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            {TABS.map(t => (
-              <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 14px",borderRadius:"8px 8px 0 0",border:"none",cursor:"pointer",whiteSpace:"nowrap",background:tab===t?T.bg:"rgba(255,255,255,0.12)",color:tab===t?"#22c55e":"#e2e8f0",fontWeight:tab===t?700:400,fontSize:13,textTransform:"capitalize",flexShrink:0}}>
-                {t}
-              </button>
-            ))}
+
+          {/* tabs */}
+          <div style={{
+            display:"flex", gap:4, overflowX:"auto", WebkitOverflowScrolling:"touch",
+            marginBottom:-1,
+          }}>
+            {TABS.map(t => {
+              const isActive = tab===t;
+              return (
+                <button key={t} onClick={()=>setTab(t)} style={{
+                  padding:"10px 16px",
+                  border:"none",
+                  borderBottom: `2px solid ${isActive ? (T.brand||"#10b981") : "transparent"}`,
+                  background:"transparent",
+                  color: isActive ? (T.brand||"#10b981") : T.textMd,
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize:13,
+                  cursor:"pointer",
+                  whiteSpace:"nowrap",
+                  textTransform:"capitalize",
+                  flexShrink:0,
+                  transition:"color .15s, border-color .15s",
+                  letterSpacing:"-0.005em",
+                }}>
+                  {t}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div style={{padding:"24px 20px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
+        <div style={{padding:"28px 32px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard" && (<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:24}}>
-            <KPI label="Total Orçado"       value={fmt(totalOrc)}           sub="Jogos + serviços fixos"                                           color="#22c55e" T={T}/>
-            <KPI label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color="#3b82f6" T={T}/>
-            <KPI label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color="#f59e0b" T={T}/>
-            <KPI label="Saldo Disponível"   value={fmt(totalOrc-totalReal)} sub="Orçado - Realizado"                                               color={(totalOrc-totalReal)>=0?"#a3e635":"#ef4444"} T={T}/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
+            <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}           sub="Jogos + serviços fixos"                                           color={T.brand}   icon={Wallet}     />
+            <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info}    icon={PiggyBank}  />
+            <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color={T.warning} icon={TrendingUp} />
+            <Stat T={T} label="Saldo Disponível"   value={fmt(totalOrc-totalReal)} sub="Orçado − Realizado"                                               color={(totalOrc-totalReal)>=0 ? T.brand : T.danger} icon={Activity}/>
           </div>
-          <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"14px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <h3 style={{margin:0,fontSize:14,color:T.textMd}}>Resumo por Categoria</h3>
-              <div style={{display:"flex",gap:12,fontSize:12,color:T.textMd}}>
-                <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#6366f1",marginRight:4}}/>Fixo</span>
-                <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:"#f43f5e",marginRight:4}}/>Variável</span>
-              </div>
-            </div>
+          <Card T={T}>
+            <SectionHeader
+              T={T}
+              title="Resumo por Categoria"
+              subtitle="Visão consolidada por natureza de despesa"
+              icon={LayoutDashboard}
+              right={
+                <div style={{display:"flex",gap:10,fontSize:11,color:T.textMd}}>
+                  <Badge color="#6366f1" T={T}>Fixo</Badge>
+                  <Badge color="#f43f5e" T={T}>Variável</Badge>
+                </div>
+              }
+            />
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
                 <thead>
-                  <tr style={{background:T.bg}}>
+                  <tr style={{background:T.surfaceAlt||T.bg}}>
                     {["Categoria","Tipo","Orçado","Provisionado","Realizado","Saldo","% Exec.","Progresso"].map(h => (
-                      <th key={h} style={{padding:"10px 16px",textAlign:h==="Categoria"||h==="Tipo"?"left":"right",color:T.textSm,fontSize:12,whiteSpace:"nowrap"}}>{h}</th>
+                      <th key={h} style={{
+                        padding:"11px 16px",
+                        textAlign:h==="Categoria"||h==="Tipo"?"left":"right",
+                        color:T.textSm,
+                        fontSize:10,
+                        fontWeight:700,
+                        letterSpacing:"0.06em",
+                        textTransform:"uppercase",
+                        whiteSpace:"nowrap",
+                        borderBottom:`1px solid ${T.border}`,
+                      }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -308,34 +453,32 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
                     const pct   = c.orcado ? Math.min(100,(c.realizado/c.orcado)*100) : 0;
                     return (
                       <tr key={c.nome} style={{borderTop:`1px solid ${T.border}`}}>
-                        <td style={{padding:"12px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text}}>{c.nome}</td>
-                        <td style={{padding:"12px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
-                        <td style={{padding:"12px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text}}>{fmt(c.orcado)}</td>
-                        <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(c.provisionado||0)}</td>
-                        <td style={{padding:"12px 16px",textAlign:"right",color:"#f59e0b",whiteSpace:"nowrap"}}>{fmt(c.realizado)}</td>
-                        <td style={{padding:"12px 16px",textAlign:"right",fontWeight:600,color:saldo<0?"#ef4444":"#22c55e",whiteSpace:"nowrap"}}>{fmt(saldo)}</td>
-                        <td style={{padding:"12px 16px",textAlign:"right",color:T.text}}>{pct.toFixed(1)}%</td>
-                        <td style={{padding:"12px 20px"}}>
-                          <div style={{background:T.border,borderRadius:4,height:8,minWidth:60}}>
-                            <div style={{background:pct>90?"#ef4444":pct>60?"#f59e0b":"#22c55e",width:`${pct}%`,height:"100%",borderRadius:4}}/>
-                          </div>
+                        <td style={{padding:"13px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text,fontSize:13}}>{c.nome}</td>
+                        <td style={{padding:"13px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",fontWeight:700,color:saldo<0?(T.danger||"#ef4444"):(T.brand||"#10b981"),whiteSpace:"nowrap",fontSize:13}}>{fmt(saldo)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.text,fontSize:13}}>{pct.toFixed(1)}%</td>
+                        <td style={{padding:"13px 20px",minWidth:120}}>
+                          <Progress value={pct} T={T}/>
                         </td>
                       </tr>
                     );
                   })}
-                  <tr style={{borderTop:`2px solid ${T.border}`,background:T.bg,fontWeight:700}}>
-                    <td colSpan={2} style={{padding:"12px 16px",color:T.text}}>TOTAL GERAL</td>
-                    <td style={{padding:"12px 16px",textAlign:"right",color:"#22c55e",whiteSpace:"nowrap"}}>{fmt(totalOrc)}</td>
-                    <td style={{padding:"12px 16px",textAlign:"right",color:"#3b82f6",whiteSpace:"nowrap"}}>{fmt(totalProv)}</td>
-                    <td style={{padding:"12px 16px",textAlign:"right",color:"#f59e0b",whiteSpace:"nowrap"}}>{fmt(totalReal)}</td>
-                    <td style={{padding:"12px 16px",textAlign:"right",color:(totalOrc-totalReal)>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>{fmt(totalOrc-totalReal)}</td>
-                    <td style={{padding:"12px 16px",textAlign:"right",color:T.text}}>{pctGasto}%</td>
+                  <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
+                    <td colSpan={2} style={{padding:"14px 16px",color:T.text,fontSize:12,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total Geral</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.brand||"#10b981",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalProv)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalReal)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:(totalOrc-totalReal)>=0?(T.brand||"#10b981"):(T.danger||"#ef4444"),whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc-totalReal)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.text,fontSize:14,fontWeight:700}}>{pctGasto}%</td>
                     <td/>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </>)}
 
         {/* ── ABAS ── */}

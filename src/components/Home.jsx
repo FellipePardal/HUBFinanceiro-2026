@@ -1,81 +1,256 @@
-import { CAMPEONATOS } from "../constants";
-import { btnStyle } from "../constants";
+import { CAMPEONATOS, RADIUS } from "../constants";
+import { Card, Stat, Button, Badge } from "./ui";
+import {
+  Radio, Trophy, Calendar, Building2, Sun, Moon,
+  ArrowRight, Lock, Activity, BarChart3,
+} from "lucide-react";
 
-export default function Home({onEnter, T, darkMode, setDarkMode}) {
+export default function Home({ onEnter, T, darkMode, setDarkMode }) {
   return (
-    <div style={{minHeight:"100vh",background:T.bg}}>
-      <div style={{background:"linear-gradient(135deg,#0f172a,#1e293b)",padding:"28px 24px 24px",borderBottom:`1px solid ${T.border}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,#22c55e,#16a34a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📡</div>
-            <div>
-              <p style={{color:"#94a3b8",fontSize:11,letterSpacing:3,textTransform:"uppercase",margin:"0 0 2px"}}>Portal Financeiro</p>
-              <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#f1f5f9"}}>Transmissões</h1>
-            </div>
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.text }}>
+      {/* ── Top bar ───────────────────────────────────────────────────────── */}
+      <header style={{
+        background: T.surface || T.card,
+        borderBottom: `1px solid ${T.border}`,
+        padding: "16px 32px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 16,
+        flexWrap: "wrap",
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+        backdropFilter: "saturate(180%) blur(8px)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: T.gradBrand || "linear-gradient(135deg,#059669,#10b981)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(16,185,129,0.25)",
+          }}>
+            <Radio size={20} color="#fff" strokeWidth={2.25} />
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{color:"#64748b",fontSize:12}}>Temporada 2026</span>
-            <button onClick={()=>setDarkMode(d=>!d)} style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:20,padding:"5px 14px",cursor:"pointer",fontSize:12,color:"#94a3b8",fontWeight:600}}>
-              {darkMode ? "☀️ Claro" : "🌙 Escuro"}
-            </button>
+          <div>
+            <p style={{
+              color: T.textSm,
+              fontSize: 10,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              margin: "0 0 2px",
+              fontWeight: 600,
+            }}>Portal Financeiro</p>
+            <h1 style={{
+              fontSize: 17,
+              fontWeight: 700,
+              margin: 0,
+              color: T.text,
+              letterSpacing: "-0.02em",
+            }}>Livemode · Transmissões</h1>
           </div>
         </div>
-      </div>
 
-      <div style={{padding:"32px 24px",maxWidth:900,margin:"0 auto"}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14,marginBottom:36}}>
-          {[
-            {label:"Campeonatos Ativos",value:"1",sub:"de 2 planejados",color:"#22c55e"},
-            {label:"Temporada",value:"2026",sub:"FFU Transmissões",color:"#3b82f6"},
-          ].map(k => (
-            <div key={k.label} style={{background:T.card,borderRadius:14,padding:"20px",borderLeft:`4px solid ${k.color}`}}>
-              <p style={{color:T.textMd,fontSize:12,marginBottom:8}}>{k.label}</p>
-              <p style={{fontSize:22,fontWeight:800,color:k.color,margin:"0 0 4px"}}>{k.value}</p>
-              <p style={{color:T.textSm,fontSize:11,margin:0}}>{k.sub}</p>
-            </div>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Badge color={T.brand} T={T}>
+            <Activity size={11} strokeWidth={2.5} />
+            Temporada 2026
+          </Badge>
+          <Button
+            T={T}
+            variant="secondary"
+            size="sm"
+            icon={darkMode ? Sun : Moon}
+            onClick={() => setDarkMode(d => !d)}
+          >
+            {darkMode ? "Claro" : "Escuro"}
+          </Button>
+        </div>
+      </header>
+
+      {/* ── Conteúdo ──────────────────────────────────────────────────────── */}
+      <main style={{ padding: "40px 32px 64px", maxWidth: 1200, margin: "0 auto" }}>
+        {/* Hero */}
+        <div style={{ marginBottom: 32 }}>
+          <p style={{
+            color: T.brand || "#10b981",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            margin: "0 0 8px",
+          }}>Visão Geral</p>
+          <h2 style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: T.text,
+            margin: "0 0 8px",
+            letterSpacing: "-0.025em",
+          }}>Painel de campeonatos</h2>
+          <p style={{ color: T.textMd, fontSize: 14, margin: 0, maxWidth: 640 }}>
+            Acompanhe orçamento, execução e operação financeira de cada campeonato em um único lugar.
+          </p>
         </div>
 
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h2 style={{margin:0,fontSize:16,color:T.text,fontWeight:700}}>Campeonatos</h2>
-          <span style={{color:T.textSm,fontSize:12}}>{CAMPEONATOS.length} projetos</span>
+        {/* KPIs */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16,
+          marginBottom: 40,
+        }}>
+          <Stat T={T} label="Campeonatos Ativos" value="1" sub="de 2 planejados" color={T.brand} icon={Trophy} />
+          <Stat T={T} label="Temporada"          value="2026" sub="Janeiro – Dezembro" color={T.info} icon={Calendar} />
+          <Stat T={T} label="Unidade"            value="Transmissões" sub="Livemode Sports" color={T.warning} icon={BarChart3} />
+          <Stat T={T} label="Detentores"         value="2" sub="CazeTV · Amazon" color="#a855f7" icon={Building2} />
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:20}}>
+        {/* Section header */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}>
+          <div>
+            <h3 style={{
+              margin: 0,
+              fontSize: 16,
+              color: T.text,
+              fontWeight: 700,
+              letterSpacing: "-0.01em",
+            }}>Campeonatos</h3>
+            <p style={{ color: T.textSm, fontSize: 12, margin: "2px 0 0" }}>
+              {CAMPEONATOS.length} projetos cadastrados
+            </p>
+          </div>
+        </div>
+
+        {/* Cards de campeonatos */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
+          gap: 20,
+        }}>
           {CAMPEONATOS.map(camp => (
-            <div key={camp.id} style={{background:T.card,borderRadius:18,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,0.18)",opacity:camp.emBreve?0.7:1}}>
-              <div style={{background:camp.corGrad,padding:"24px 24px 20px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div>
-                    <span style={{fontSize:36}}>{camp.icon}</span>
-                    <h3 style={{margin:"8px 0 4px",fontSize:18,fontWeight:800,color:"#fff"}}>{camp.nome}</h3>
-                    <p style={{margin:0,fontSize:13,color:"rgba(255,255,255,0.7)"}}>{camp.edicao} · {camp.descricao}</p>
+            <Card
+              key={camp.id}
+              T={T}
+              hoverable={!camp.emBreve}
+              style={{
+                opacity: camp.emBreve ? 0.65 : 1,
+                cursor: camp.emBreve ? "not-allowed" : "pointer",
+              }}
+            >
+              {/* faixa superior */}
+              <div style={{
+                background: camp.corGrad,
+                padding: "22px 24px 20px",
+                position: "relative",
+                overflow: "hidden",
+              }}>
+                {/* glow decorativo */}
+                <div style={{
+                  position: "absolute",
+                  top: -40,
+                  right: -40,
+                  width: 160,
+                  height: 160,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 60%)",
+                  pointerEvents: "none",
+                }}/>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  position: "relative",
+                  gap: 12,
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 32, lineHeight: 1, display: "block", marginBottom: 12 }}>{camp.icon}</span>
+                    <h4 style={{
+                      margin: "0 0 4px",
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: "#fff",
+                      letterSpacing: "-0.015em",
+                    }}>{camp.nome}</h4>
+                    <p style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.72)",
+                    }}>{camp.edicao} · {camp.descricao}</p>
                   </div>
-                  <span style={{background:camp.statusColor+"33",color:camp.statusColor,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,border:`1px solid ${camp.statusColor}55`,whiteSpace:"nowrap"}}>{camp.status}</span>
+                  <span style={{
+                    background: camp.statusColor + "22",
+                    color: camp.statusColor === "#22c55e" ? "#86efac" : camp.statusColor,
+                    border: `1px solid ${camp.statusColor}55`,
+                    borderRadius: RADIUS.pill,
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    whiteSpace: "nowrap",
+                  }}>{camp.status}</span>
                 </div>
               </div>
-              <div style={{padding:"20px 24px"}}>
-                {camp.id==="brasileirao-2026" && (
-                  <div style={{marginBottom:16}}>
-                    <div style={{display:"flex",gap:16,fontSize:12}}>
-                      <span style={{color:T.textMd}}>Rodadas: <b style={{color:T.text}}>{camp.rodadas}</b></span>
-                      <span style={{color:T.textMd}}>Detentores: <b style={{color:T.text}}>CazeTV · Amazon</b></span>
+
+              {/* corpo do card */}
+              <div style={{ padding: "18px 24px 22px" }}>
+                {camp.id === "brasileirao-2026" && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 18,
+                    paddingBottom: 18,
+                    borderBottom: `1px solid ${T.border}`,
+                  }}>
+                    <div>
+                      <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Rodadas</p>
+                      <p className="num" style={{ color: T.text, fontSize: 16, fontWeight: 700, margin: 0 }}>{camp.rodadas}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Detentores</p>
+                      <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>CazeTV · Amazon</p>
                     </div>
                   </div>
                 )}
-                {camp.emBreve && <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px",fontStyle:"italic"}}>Em estruturação — será disponibilizado em breve.</p>}
-                <button
-                  onClick={()=>!camp.emBreve&&onEnter(camp.id)}
-                  style={{...btnStyle,background:camp.emBreve?T.border:camp.cor,width:"100%",padding:"11px",fontSize:14,borderRadius:10,cursor:camp.emBreve?"not-allowed":"pointer",opacity:camp.emBreve?0.5:1}}
+                {camp.emBreve && (
+                  <p style={{ color: T.textSm, fontSize: 12, margin: "0 0 16px", fontStyle: "italic" }}>
+                    Em estruturação — disponível em breve.
+                  </p>
+                )}
+                <Button
+                  T={T}
+                  variant={camp.emBreve ? "secondary" : "primary"}
+                  size="md"
+                  fullWidth
+                  disabled={camp.emBreve}
+                  icon={camp.emBreve ? Lock : ArrowRight}
+                  onClick={() => !camp.emBreve && onEnter(camp.id)}
                 >
-                  {camp.emBreve ? "🔒 Em breve" : "Abrir campeonato →"}
-                </button>
+                  {camp.emBreve ? "Em breve" : "Abrir campeonato"}
+                </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
-        <div style={{marginTop:48,textAlign:"center",color:T.textSm,fontSize:11}}>Portal Financeiro · Temporada 2026 · Todos os campeonatos</div>
-      </div>
+
+        <div style={{
+          marginTop: 56,
+          paddingTop: 24,
+          borderTop: `1px solid ${T.border}`,
+          textAlign: "center",
+          color: T.textSm,
+          fontSize: 11,
+          letterSpacing: "0.04em",
+        }}>
+          Portal Financeiro · Livemode Sports · Temporada 2026
+        </div>
+      </main>
     </div>
   );
 }

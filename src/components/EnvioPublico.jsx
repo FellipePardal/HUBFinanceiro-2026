@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getState, getNFFile } from "../lib/supabase";
+import { getState, setState, getNFFile } from "../lib/supabase";
 
 const T = { bg:"#f8fafc", card:"#fff", border:"#e2e8f0", muted:"#cbd5e1", text:"#1e293b", textMd:"#475569", textSm:"#64748b" };
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
@@ -7,6 +7,9 @@ const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",
 export default function EnvioPublico({ numero }) {
   const [envio, setEnvio] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [payerName, setPayerName] = useState("");
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     getState('envios').then(ev => {
@@ -14,6 +17,27 @@ export default function EnvioPublico({ numero }) {
       setLoading(false);
     });
   }, [numero]);
+
+  const confirmarPagamento = async () => {
+    setPaying(true);
+    try {
+      // Re-busca a lista mais recente pra evitar sobrescrever outras alterações
+      const todosEnvios = (await getState('envios')) || [];
+      const hoje = new Date();
+      const dataHoje = hoje.toLocaleDateString("pt-BR");
+      const atualizado = todosEnvios.map(e => e.numero === numero
+        ? {...e, pago:true, pagoEm:hoje.toISOString(), pagoPor:(payerName||"").trim() || null, dataPagamentoEfetiva:dataHoje}
+        : e
+      );
+      await setState('envios', atualizado);
+      setEnvio(atualizado.find(e => e.numero === numero) || null);
+      setShowConfirm(false);
+      setPayerName("");
+    } catch (e) {
+      alert("Erro ao confirmar pagamento: " + e.message);
+    }
+    setPaying(false);
+  };
 
   const downloadNF = async (id, filename) => {
     const data = await getNFFile(id);
@@ -55,8 +79,18 @@ export default function EnvioPublico({ numero }) {
               <p style={{fontSize:13,margin:"6px 0 0",color:"#bbf7d0"}}>
                 {new Date(envio.criadoEm).toLocaleDateString("pt-BR")} · {envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}
               </p>
-              {envio.dataPagamento && <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>Pagamento: {envio.dataPagamento}</p>}
+              {envio.dataPagamento && <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>Pagamento previsto: {envio.dataPagamento}</p>}
+              {envio.pago && (envio.dataPagamentoEfetiva || envio.pagoPor) && (
+                <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>
+                  Pago{envio.dataPagamentoEfetiva?` em ${envio.dataPagamentoEfetiva}`:""}{envio.pagoPor?` por ${envio.pagoPor}`:""}
+                </p>
+              )}
               {envio.obs && <p style={{fontSize:12,margin:"4px 0 0",color:"#bbf7d0",fontStyle:"italic"}}>{envio.obs}</p>}
+              {!envio.pago && (
+                <button onClick={()=>setShowConfirm(true)} className="no-print" style={{marginTop:12,background:"#fff",color:"#166534",border:"none",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontWeight:700,fontSize:13,boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+                  ✓ Confirmar Pagamento
+                </button>
+              )}
             </div>
             <div style={{textAlign:"right"}}>
               <p style={{fontSize:28,fontWeight:800,color:"#86efac",margin:0}}>{fmt(envio.totalGeral)}</p>
@@ -166,6 +200,39 @@ export default function EnvioPublico({ numero }) {
           FFU — Transmissões · Brasileirão Série A 2026 · Envio {envio.numero} · {new Date(envio.criadoEm).toLocaleDateString("pt-BR")}
         </div>
       </div>
+
+      {showConfirm && (
+        <div className="no-print" style={{position:"fixed",inset:0,background:"#00000099",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:T.card,borderRadius:14,padding:28,maxWidth:440,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <h3 style={{margin:"0 0 8px",fontSize:18,color:T.text}}>Confirmar Pagamento</h3>
+            <p style={{margin:"0 0 6px",color:T.textMd,fontSize:13}}>
+              Você está prestes a marcar o <b>Envio {envio.numero}</b> como pago.
+            </p>
+            <p style={{margin:"0 0 18px",color:T.textMd,fontSize:13}}>
+              Valor total: <b style={{color:"#166534"}}>{fmt(envio.totalGeral)}</b> · {envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}
+            </p>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:11,color:T.textSm,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:600}}>Seu nome (opcional)</label>
+              <input value={payerName} onChange={e=>setPayerName(e.target.value)} placeholder="Ex: Maria Silva"
+                style={{width:"100%",boxSizing:"border-box",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",fontSize:13,color:T.text,background:T.bg}}/>
+              <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Para registro de quem confirmou o pagamento.</p>
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button onClick={()=>{setShowConfirm(false);setPayerName("");}} disabled={paying}
+                style={{background:T.border,color:T.text,border:"none",borderRadius:8,padding:"10px 18px",cursor:"pointer",fontWeight:600,fontSize:13,opacity:paying?0.5:1}}>
+                Cancelar
+              </button>
+              <button onClick={confirmarPagamento} disabled={paying}
+                style={{background:paying?"#1f3d24":"#166534",color:"#fff",border:"none",borderRadius:8,padding:"10px 22px",cursor:paying?"default":"pointer",fontWeight:700,fontSize:13}}>
+                {paying ? "Confirmando..." : "✓ Confirmar Pagamento"}
+              </button>
+            </div>
+            <p style={{margin:"14px 0 0",fontSize:11,color:T.textSm,textAlign:"center"}}>
+              Esta ação só pode ser revertida pela equipe administrativa.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

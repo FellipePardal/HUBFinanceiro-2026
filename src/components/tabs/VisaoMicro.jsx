@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { CATS, btnStyle, iSty } from "../../constants";
+import { CATS, iSty, RADIUS } from "../../constants";
 import { fmt, subTotal, catTotal } from "../../utils";
 import { allSubKeys } from "../../data";
 import { Pill } from "../shared";
+import { Card, PanelTitle, Button, Segmented } from "../ui";
+import { ChevronLeft, ChevronRight, Pencil, Save, X, Copy, Trophy } from "lucide-react";
 
 export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
@@ -41,68 +43,99 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
   const totOrc   = subTotal(safeOrc);
   const totProv  = subTotal(safeProv);
   const totReal  = subTotal(safeReal);
-  const compareTabs   = ["orcado","provisionado","realizado"];
-  const compareColors = {orcado:"#22c55e", provisionado:"#3b82f6", realizado:"#f59e0b"};
+  const compareTabs   = [
+    {value:"orcado", label:"Orçado"},
+    {value:"provisionado", label:"Provisionado"},
+    {value:"realizado", label:"Realizado"},
+  ];
 
   return (
     <div>
       {/* Navegação entre jogos */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>idx>0&&onChangeJogo(divulgados[idx-1].id)} disabled={idx===0} style={{...btnStyle,background:idx===0?T.card:T.border,padding:"6px 14px",opacity:idx===0?0.4:1,color:T.text}}>←</button>
-          <select value={jogoId} onChange={e=>onChangeJogo(parseInt(e.target.value))} style={{...IS,width:"auto",padding:"7px 14px",fontWeight:600,maxWidth:"60vw"}}>
-            {divulgados.map(j=><option key={j.id} value={j.id}>Rd {j.rodada} · {j.mandante} x {j.visitante}</option>)}
+          <Button T={T} variant="secondary" size="md" icon={ChevronLeft}
+            disabled={idx===0}
+            onClick={()=>idx>0&&onChangeJogo(divulgados[idx-1].id)}/>
+          <select value={jogoId} onChange={e=>onChangeJogo(parseInt(e.target.value))}
+            style={{...IS,width:"auto",padding:"9px 14px",fontWeight:600,maxWidth:"60vw",borderRadius:RADIUS.md}}>
+            {divulgados.map(j=><option key={j.id} value={j.id}>Rd {j.rodada} · {j.mandante} × {j.visitante}</option>)}
           </select>
-          <button onClick={()=>idx<divulgados.length-1&&onChangeJogo(divulgados[idx+1].id)} disabled={idx===divulgados.length-1} style={{...btnStyle,background:idx===divulgados.length-1?T.card:T.border,padding:"6px 14px",opacity:idx===divulgados.length-1?0.4:1,color:T.text}}>→</button>
+          <Button T={T} variant="secondary" size="md" icon={ChevronRight}
+            disabled={idx===divulgados.length-1}
+            onClick={()=>idx<divulgados.length-1&&onChangeJogo(divulgados[idx+1].id)}/>
         </div>
         <div style={{display:"flex",gap:8}}>
           {!editing
-            ? <button onClick={startEdit} style={{...btnStyle,background:"#3b82f6"}}>✏ Editar valores</button>
+            ? <Button T={T} variant="primary" size="md" icon={Pencil} onClick={startEdit}>Editar valores</Button>
             : <>
-                {activeTab==="provisionado" && <button onClick={copyOrcadoToProvisionado} style={{...btnStyle,background:"#6366f1",fontSize:12}}>↓ Copiar Orçado</button>}
-                <button onClick={cancelEdit} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-                <button onClick={saveEdit}   style={{...btnStyle,background:"#22c55e"}}>💾 Salvar</button>
+                {activeTab==="provisionado" && <Button T={T} variant="secondary" size="md" icon={Copy} onClick={copyOrcadoToProvisionado}>Copiar Orçado</Button>}
+                <Button T={T} variant="secondary" size="md" icon={X} onClick={cancelEdit}>Cancelar</Button>
+                <Button T={T} variant="primary" size="md" icon={Save} onClick={saveEdit}>Salvar</Button>
               </>
           }
         </div>
       </div>
 
       {/* Card do jogo */}
-      <div style={{background:T.card,borderRadius:12,padding:"18px 24px",marginBottom:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
-          <div>
-            <h2 style={{margin:"0 0 6px",fontSize:20,color:T.text}}>{data.mandante} x {data.visitante}</h2>
-            <p style={{color:T.textMd,fontSize:13,margin:0}}>Rodada {data.rodada} · {data.cidade} · {data.data} {data.hora} · {data.detentor}</p>
-          </div>
-          <Pill label={data.categoria} color={data.categoria==="B1"?"#22c55e":"#f59e0b"}/>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginTop:18}}>
-          {[
-            {label:"Orçado",      value:fmt(totOrc),          color:"#22c55e"},
-            {label:"Provisionado",value:fmt(totProv),         color:"#3b82f6"},
-            {label:"Realizado",   value:fmt(totReal),         color:"#f59e0b"},
-            {label:"Saving", value:fmt(totOrc-totProv), color:(totOrc-totProv)>=0?"#a3e635":"#ef4444"},
-          ].map(k => (
-            <div key={k.label} style={{background:T.bg,borderRadius:8,padding:"12px 16px",borderTop:`3px solid ${k.color}`}}>
-              <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>{k.label}</p>
-              <p style={{color:k.color,fontWeight:700,fontSize:16,margin:0}}>{k.value}</p>
+      <Card T={T} style={{marginBottom:20}}>
+        <div style={{padding:"22px 24px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <div style={{
+                width:46,height:46,borderRadius:12,
+                background:T.brandSoft||"rgba(16,185,129,0.12)",
+                color:T.brand||"#10b981",
+                border:`1px solid ${T.brandBorder||"rgba(16,185,129,0.28)"}`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+              }}>
+                <Trophy size={22} strokeWidth={2.25}/>
+              </div>
+              <div>
+                <h2 style={{margin:"0 0 4px",fontSize:20,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>{data.mandante} × {data.visitante}</h2>
+                <p style={{color:T.textMd,fontSize:12,margin:0}}>
+                  <span className="num" style={{fontWeight:600,color:T.text}}>Rd {data.rodada}</span>
+                  <span style={{margin:"0 8px",color:T.border}}>·</span>
+                  {data.cidade}
+                  <span style={{margin:"0 8px",color:T.border}}>·</span>
+                  <span className="num">{data.data} {data.hora}</span>
+                  <span style={{margin:"0 8px",color:T.border}}>·</span>
+                  {data.detentor}
+                </p>
+              </div>
             </div>
-          ))}
+            <Pill label={data.categoria} color={data.categoria==="B1"?(T.brand||"#10b981"):(T.warning||"#f59e0b")}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginTop:20}}>
+            {[
+              {label:"Orçado",      value:fmt(totOrc),          color:T.brand},
+              {label:"Provisionado",value:fmt(totProv),         color:T.info},
+              {label:"Realizado",   value:fmt(totReal),         color:T.warning},
+              {label:"Saving",      value:fmt(totOrc-totProv),  color:(totOrc-totProv)>=0?T.brand:T.danger},
+            ].map(k => (
+              <div key={k.label} style={{
+                background:T.surfaceAlt||T.bg,
+                borderRadius:RADIUS.md,
+                padding:"14px 18px",
+                border:`1px solid ${T.border}`,
+                position:"relative",
+                overflow:"hidden",
+              }}>
+                <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:k.color,boxShadow:`0 0 12px ${k.color}88`}}/>
+                <p style={{color:T.textSm,fontSize:10,margin:"4px 0 6px",letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>{k.label}</p>
+                <p className="num" style={{color:k.color,fontWeight:800,fontSize:18,margin:0,letterSpacing:"-0.02em"}}>{k.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Tabs de edição */}
       {editing && (
-        <div style={{display:"flex",gap:4,marginBottom:16}}>
-          {compareTabs.map(t => (
-            <button key={t} onClick={()=>setActiveTab(t)} style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:activeTab===t?compareColors[t]:T.card,color:activeTab===t?"#fff":T.textMd,textTransform:"capitalize"}}>
-              {t.charAt(0).toUpperCase()+t.slice(1)}
-            </button>
-          ))}
+        <div style={{marginBottom:16}}>
+          <Segmented T={T} value={activeTab} onChange={setActiveTab} options={compareTabs}/>
         </div>
       )}
 
-      {/* Tabelas por categoria */}
       {CATS.map(cat => {
         const cOrc  = catTotal(safeOrc, cat);
         const cProv = catTotal(safeProv, cat);
@@ -114,22 +147,23 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
         } : null;
 
         return (
-          <div key={cat.key} style={{background:T.card,borderRadius:12,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"12px 20px",background:T.bg,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <span style={{fontWeight:700,fontSize:14,color:cat.color}}>{cat.label}</span>
-              <div style={{display:"flex",gap:16,fontSize:12}}>
-                <span style={{color:T.textMd}}>Orç: <b style={{color:"#22c55e"}}>{fmt(cOrc)}</b></span>
-                <span style={{color:T.textMd}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(cProv)}</b></span>
-                <span style={{color:T.textMd}}>Real: <b style={{color:"#f59e0b"}}>{fmt(cReal)}</b></span>
-                <span style={{color:T.textMd}}>Saving: <b style={{color:(cOrc-cProv)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cProv)}</b></span>
-              </div>
-            </div>
+          <Card key={cat.key} T={T} style={{marginBottom:16}} accent={cat.color}>
+            <PanelTitle T={T} title={cat.label} color={cat.color}
+              right={
+                <div style={{display:"flex",gap:14,fontSize:11}}>
+                  <span style={{color:T.textMd}}>Orç: <b className="num" style={{color:T.brand}}>{fmt(cOrc)}</b></span>
+                  <span style={{color:T.textMd}}>Prov: <b className="num" style={{color:T.info}}>{fmt(cProv)}</b></span>
+                  <span style={{color:T.textMd}}>Real: <b className="num" style={{color:T.warning}}>{fmt(cReal)}</b></span>
+                  <span style={{color:T.textMd}}>Saving: <b className="num" style={{color:(cOrc-cProv)>=0?T.brand:T.danger}}>{fmt(cOrc-cProv)}</b></span>
+                </div>
+              }
+            />
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
                 <thead>
-                  <tr style={{background:T.bg}}>
+                  <tr style={{background:T.surfaceAlt||T.bg}}>
                     {["Item","Orçado","Provisionado","Realizado","Saving"].map(h => (
-                      <th key={h} style={{padding:"8px 20px",textAlign:h==="Item"?"left":"right",color:T.muted,fontSize:11}}>{h}</th>
+                      <th key={h} style={{padding:"11px 20px",textAlign:h==="Item"?"left":"right",color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",borderBottom:`1px solid ${T.border}`}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -137,38 +171,37 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
                   {cat.subs.map(sub => {
                     const o = safeOrc[sub.key]||0, p = safeProv[sub.key]||0, r = safeReal[sub.key]||0;
                     if(!editing && o===0 && p===0 && r===0) return null;
-                    const isActive = !editing || activeTab===sub.key || true;
                     return (
                       <tr key={sub.key} style={{borderTop:`1px solid ${T.border}`}}>
-                        <td style={{padding:"10px 20px",fontSize:13,color:T.text}}>{sub.label}</td>
+                        <td style={{padding:"11px 20px",fontSize:13,color:T.text}}>{sub.label}</td>
                         {["orcado","provisionado","realizado"].map(tipo => {
                           const val = tipo==="orcado"?o:tipo==="provisionado"?p:r;
-                          const col = tipo==="orcado"?"#22c55e":tipo==="provisionado"?"#3b82f6":"#f59e0b";
+                          const col = tipo==="orcado"?T.brand:tipo==="provisionado"?T.info:T.warning;
                           const active = !editing || activeTab===tipo;
                           return (
-                            <td key={tipo} style={{padding:"8px 20px",textAlign:"right",opacity:editing&&!active?0.35:1}}>
+                            <td key={tipo} className="num" style={{padding:"9px 20px",textAlign:"right",opacity:editing&&!active?0.35:1}}>
                               {editing && active && draftTipo
-                                ? <input value={draftTipo[tipo][sub.key]??0} onChange={e=>setVal(tipo,sub.key,e.target.value)} style={{...IS,width:90,textAlign:"right",padding:"4px 8px",color:col}}/>
-                                : <span style={{fontSize:13,color:val===0?T.muted:col}}>{fmt(val)}</span>
+                                ? <input value={draftTipo[tipo][sub.key]??0} onChange={e=>setVal(tipo,sub.key,e.target.value)} style={{...IS,width:100,textAlign:"right",padding:"5px 10px",color:col}}/>
+                                : <span style={{fontSize:13,color:val===0?T.textSm:col}}>{fmt(val)}</span>
                               }
                             </td>
                           );
                         })}
-                        <td style={{padding:"10px 20px",textAlign:"right",fontWeight:600,color:(o-p)>=0?"#a3e635":"#ef4444",fontSize:13}}>{fmt(o-p)}</td>
+                        <td className="num" style={{padding:"11px 20px",textAlign:"right",fontWeight:700,color:(o-p)>=0?T.brand:T.danger,fontSize:13}}>{fmt(o-p)}</td>
                       </tr>
                     );
                   })}
-                  <tr style={{borderTop:`2px solid ${T.border}`,background:T.bg,fontWeight:700}}>
-                    <td style={{padding:"10px 20px",fontSize:13,color:T.text}}>Total {cat.label}</td>
-                    <td style={{padding:"10px 20px",textAlign:"right",color:"#22c55e"}}>{fmt(cOrc)}</td>
-                    <td style={{padding:"10px 20px",textAlign:"right",color:"#3b82f6"}}>{fmt(cProv)}</td>
-                    <td style={{padding:"10px 20px",textAlign:"right",color:"#f59e0b"}}>{fmt(cReal)}</td>
-                    <td style={{padding:"10px 20px",textAlign:"right",color:(cOrc-cProv)>=0?"#a3e635":"#ef4444"}}>{fmt(cOrc-cProv)}</td>
+                  <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
+                    <td style={{padding:"12px 20px",fontSize:11,color:T.text,textTransform:"uppercase",letterSpacing:"0.04em"}}>Total {cat.label}</td>
+                    <td className="num" style={{padding:"12px 20px",textAlign:"right",color:T.brand}}>{fmt(cOrc)}</td>
+                    <td className="num" style={{padding:"12px 20px",textAlign:"right",color:T.info}}>{fmt(cProv)}</td>
+                    <td className="num" style={{padding:"12px 20px",textAlign:"right",color:T.warning}}>{fmt(cReal)}</td>
+                    <td className="num" style={{padding:"12px 20px",textAlign:"right",color:(cOrc-cProv)>=0?T.brand:T.danger}}>{fmt(cOrc-cProv)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>

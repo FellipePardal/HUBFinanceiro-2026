@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt } from "../../utils";
-import { btnStyle, iSty } from "../../constants";
+import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
+import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
+import { Plus, Eye, Trash2, Upload, X, Download, FileText } from "lucide-react";
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const VAR_CATEGORIAS = ["Transporte","Uber","Hospedagem","Seg. Espacial"];
@@ -295,108 +297,118 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
   const fixosNomes = Array.from(new Set(notas.filter(n => n.servicoId).map(n => n.categoria)));
   const filtroCategorias = ["Todas", ...VAR_CATEGORIAS, ...fixosNomes, "Outro"];
 
+  const TS = tableStyles(T);
+  const cyan = "#06b6d4";
+
   return (
     <>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
-        <KPI label={`Total ${MESES[mesSel]}`} value={fmt(totalValor)} sub={`${filtered.length} notas`} color="#06b6d4" T={T}/>
-        <KPI label="Total Geral (todos os meses)" value={fmt(totalGeral)} sub={`${notas.length} notas`} color="#8b5cf6" T={T}/>
-        <KPI label="Categorias no mês" value={String(resumoCat.length)} sub={resumoCat.map(r => r.cat).join(", ") || "—"} color="#22c55e" T={T}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
+        <KPI label={`Total ${MESES[mesSel]}`} value={fmt(totalValor)} sub={`${filtered.length} notas`} color={cyan} T={T}/>
+        <KPI label="Total Geral" value={fmt(totalGeral)} sub={`${notas.length} notas (todos os meses)`} color="#a855f7" T={T}/>
+        <KPI label="Categorias no mês" value={String(resumoCat.length)} sub={resumoCat.map(r => r.cat).join(", ") || "—"} color={T.brand} T={T}/>
       </div>
 
-      {/* Seletor de mês + filtros */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Mês:</span>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Mês</span>
           <select value={mesSel} onChange={e => setMesSel(parseInt(e.target.value))}
-            style={{background:T.bg,border:`1px solid ${T.muted}`,borderRadius:8,color:T.text,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            style={{background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:RADIUS.md,color:T.text,padding:"7px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
             {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <div style={{width:1,height:24,background:T.border}}/>
           {filtroCategorias.map(c => (
-            <button key={c} onClick={() => setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,
-              background:filtroCat===c?"#f59e0b":T.card,color:filtroCat===c?"#000":T.textMd}}>
-              {c}
-            </button>
+            <Chip key={c} active={filtroCat===c} onClick={()=>setFiltroCat(c)} T={T} color={cyan}>{c}</Chip>
           ))}
         </div>
-        <button onClick={() => setShowNova(true)} style={{...btnStyle,background:"#06b6d4",fontSize:12}}>+ Nova NF Mensal</button>
+        <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowNova(true)}>Nova NF Mensal</Button>
       </div>
 
-      {/* Resumo por categoria */}
       {resumoCat.length > 0 && (
-        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
           {resumoCat.map(r => (
-            <div key={r.cat} style={{background:T.card,borderRadius:8,padding:"8px 16px",display:"flex",gap:12,alignItems:"center"}}>
+            <div key={r.cat} style={{
+              background:T.surface||T.card,
+              border:`1px solid ${T.border}`,
+              borderRadius:RADIUS.md,
+              padding:"10px 16px",
+              display:"flex",
+              gap:14,
+              alignItems:"center",
+              boxShadow:T.shadowSoft,
+            }}>
               <span style={{color:T.text,fontSize:12,fontWeight:600}}>{r.cat}</span>
-              <span style={{color:"#06b6d4",fontSize:12,fontWeight:700}}>{fmt(r.valor)}</span>
+              <span className="num" style={{color:cyan,fontSize:13,fontWeight:700}}>{fmt(r.valor)}</span>
               <span style={{color:T.textSm,fontSize:11}}>{r.qtd} NF{r.qtd>1?"s":""}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Saldo Provisionado por Serviço Fixo */}
       {fixosComMov.length > 0 && (
-        <div style={{background:T.card,borderRadius:12,padding:"14px 18px",marginBottom:20}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <span style={{fontWeight:700,fontSize:13,color:T.text}}>Saldo Provisionado · Serviços Fixos</span>
-            <span style={{fontSize:11,color:T.textSm}}>Atualizado a cada NF lançada</span>
+        <Card T={T} style={{marginBottom:20}}>
+          <PanelTitle T={T} title="Saldo Provisionado · Serviços Fixos" subtitle="Atualizado a cada NF lançada"/>
+          <div style={{padding:"18px 20px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+              {fixosComMov.map(s => {
+                const pct = s.prov > 0 ? Math.min(100, (s.gasto / s.prov) * 100) : 0;
+                const cor = s.saldo < 0 ? T.danger : pct > 90 ? T.warning : T.brand;
+                return (
+                  <div key={s.id} style={{
+                    background:T.surfaceAlt||T.bg,
+                    borderRadius:RADIUS.md,
+                    padding:"12px 14px",
+                    border:`1px solid ${T.border}`,
+                    position:"relative",
+                    overflow:"hidden",
+                  }}>
+                    <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:cor,boxShadow:`0 0 12px ${cor}88`}}/>
+                    <div style={{fontSize:12,fontWeight:700,color:T.text,marginBottom:2,marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.nome}</div>
+                    <div style={{fontSize:10,color:T.textSm,marginBottom:8,letterSpacing:"0.04em",textTransform:"uppercase",fontWeight:600}}>{s.secao}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:6}}>
+                      <span style={{color:T.textSm}}>Prov: <b className="num" style={{color:T.info}}>{fmt(s.prov)}</b></span>
+                      <span style={{color:T.textSm}}>Gasto: <b className="num" style={{color:T.warning}}>{fmt(s.gasto)}</b></span>
+                    </div>
+                    <Progress value={pct} T={T} color={cor} height={5}/>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginTop:6}}>
+                      <span className="num" style={{color:T.textSm}}>{pct.toFixed(0)}% consumido</span>
+                      <span style={{color:T.textSm}}>Saldo: <b className="num" style={{color:cor}}>{fmt(s.saldo)}</b></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
-            {fixosComMov.map(s => {
-              const pct = s.prov > 0 ? Math.min(100, (s.gasto / s.prov) * 100) : 0;
-              const cor = s.saldo < 0 ? "#ef4444" : pct > 90 ? "#f59e0b" : "#22c55e";
-              return (
-                <div key={s.id} style={{background:T.bg,borderRadius:8,padding:"10px 12px",borderLeft:`3px solid ${cor}`}}>
-                  <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.nome}</div>
-                  <div style={{fontSize:10,color:T.textSm,marginBottom:6}}>{s.secao}</div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
-                    <span style={{color:T.textSm}}>Prov: <b style={{color:"#3b82f6"}}>{fmt(s.prov)}</b></span>
-                    <span style={{color:T.textSm}}>Gasto: <b style={{color:"#f59e0b"}}>{fmt(s.gasto)}</b></span>
-                  </div>
-                  <div style={{background:T.border,borderRadius:4,height:5,marginBottom:4}}>
-                    <div style={{background:cor,width:`${pct}%`,height:"100%",borderRadius:4}}/>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                    <span style={{color:T.textSm}}>{pct.toFixed(0)}% consumido</span>
-                    <span style={{color:T.textSm}}>Saldo: <b style={{color:cor}}>{fmt(s.saldo)}</b></span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        </Card>
       )}
 
-      {/* Tabela */}
-      <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
-        <div style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",color:T.textSm,fontSize:12}}>
-          <span>{filtered.length} notas em {MESES[mesSel]}</span>
-          <span>Total: <b style={{color:"#06b6d4"}}>{fmt(totalValor)}</b></span>
-        </div>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
-            <thead><tr style={{background:T.bg}}>
-              {["Fornecedor","Categoria","Nº NF","Valor","Emissão","Envio","Descrição",""].map(h =>
-                <th key={h} style={{padding:"10px 12px",textAlign:"left",color:T.textSm,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
-            </tr></thead>
+      <Card T={T}>
+        <PanelTitle T={T} title={`Notas Fiscais — ${MESES[mesSel]}`} subtitle={`${filtered.length} notas`}
+          right={<span style={{fontSize:12,color:T.textMd}}>Total: <b className="num" style={{color:cyan}}>{fmt(totalValor)}</b></span>}
+        />
+        <div style={TS.wrap}>
+          <table style={{...TS.table, minWidth:780}}>
+            <thead>
+              <tr style={TS.thead}>
+                {["Fornecedor","Categoria","Nº NF","Valor","Emissão","Envio","Descrição",""].map(h =>
+                  <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
+              </tr>
+            </thead>
             <tbody>
               {filtered.map(n => (
-                <tr key={n.id} style={{borderTop:`1px solid ${T.border}`}}>
-                  <td style={{padding:"10px 12px",fontWeight:600,fontSize:13,color:T.text,whiteSpace:"nowrap"}}>{n.fornecedor}</td>
-                  <td style={{padding:"10px 12px"}}><Pill label={n.categoria} color="#06b6d4"/></td>
-                  <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.numeroNF || "—"}</td>
-                  <td style={{padding:"10px 12px",color:"#06b6d4",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(n.valor)}</td>
-                  <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEmissao || "—"}</td>
-                  <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEnvio || "—"}</td>
-                  <td style={{padding:"10px 12px",color:T.textSm,fontSize:12,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.descricao || n.obs || "—"}</td>
-                  <td style={{padding:"10px 12px"}}>
+                <tr key={n.id} style={TS.tr}>
+                  <td style={{...TS.td, fontWeight:600, whiteSpace:"nowrap"}}>{n.fornecedor}</td>
+                  <td style={TS.td}><Pill label={n.categoria} color={cyan}/></td>
+                  <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.numeroNF || "—"}</td>
+                  <td className="num" style={{...TS.tdNum, color:cyan, fontWeight:700}}>{fmt(n.valor)}</td>
+                  <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.dataEmissao || "—"}</td>
+                  <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.dataEnvio || "—"}</td>
+                  <td style={{...TS.td, color:T.textSm, fontSize:12, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{n.descricao || n.obs || "—"}</td>
+                  <td style={TS.td}>
                     <div style={{display:"flex",gap:4}}>
                       {n.hasFile
-                        ? <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>
-                        : <button onClick={() => {setUploadTarget(n); uploadRef.current?.click();}} style={{...btnStyle,background:"#f59e0b",padding:"4px 8px",fontSize:10}}>Enviar</button>}
-                      <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>Apagar</button>
+                        ? <Button T={T} variant="secondary" size="sm" icon={Eye}    onClick={()=>setPreview(n)}/>
+                        : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                      <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
                     </div>
                   </td>
                 </tr>
@@ -405,17 +417,17 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
                 <tr><td colSpan={8} style={{padding:40,textAlign:"center",color:T.textSm}}>Nenhuma nota mensal em {MESES[mesSel]}</td></tr>
               )}
               {filtered.length > 0 && (
-                <tr style={{borderTop:`2px solid ${T.border}`,background:T.bg,fontWeight:700}}>
-                  <td style={{padding:"12px 12px",color:T.text}}>TOTAL</td>
+                <tr style={TS.totalRow}>
+                  <td style={{...TS.td, textTransform:"uppercase", letterSpacing:"0.04em", fontSize:11}}>Total</td>
                   <td colSpan={2}/>
-                  <td style={{padding:"12px 12px",color:"#06b6d4",whiteSpace:"nowrap"}}>{fmt(totalValor)}</td>
+                  <td className="num" style={{...TS.tdNum, color:cyan}}>{fmt(totalValor)}</td>
                   <td colSpan={4}/>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       {showNova && <NovaNotaMensalModal fornecedores={fornecedores} servicos={servicos} notasExistentes={notas} onSave={addNota} onClose={() => setShowNova(false)} T={T}/>}
       {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}

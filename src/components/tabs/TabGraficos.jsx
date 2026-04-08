@@ -1,57 +1,66 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, CartesianGrid } from "recharts";
 import { CustomTooltip } from "../shared";
 import { fmt, fmtK, subTotal } from "../../utils";
 import { PIE_COLORS } from "../../constants";
+import { Card, PanelTitle } from "../ui";
+import { TrendingUp, PieChart as PieIcon, BarChart3 } from "lucide-react";
 
 export default function TabGraficos({ divulgados, savingRodada, RESUMO_CATS, T }) {
   return (
     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:20}}>
 
-      {/* Saving por Rodada */}
-      <div style={{background:T.card,borderRadius:12,padding:20}}>
-        <h3 style={{margin:"0 0 16px",fontSize:14,color:T.textMd}}>Saving por Rodada</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={savingRodada}>
-            <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:11}}/>
-            <YAxis tickFormatter={fmtK} tick={{fill:T.textMd,fontSize:11}}/>
-            <Tooltip content={<CustomTooltip T={T}/>}/>
-            <Bar dataKey="Saving" fill="#22c55e" radius={[4,4,0,0]}/>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <Card T={T}>
+        <PanelTitle T={T} title="Saving por Rodada" subtitle="Diferença Orçado − Provisionado por rodada"/>
+        <div style={{padding:20}}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={savingRodada}>
+              <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+              <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:11}} axisLine={{stroke:T.border}} tickLine={{stroke:T.border}}/>
+              <YAxis tickFormatter={fmtK} tick={{fill:T.textMd,fontSize:11}} axisLine={{stroke:T.border}} tickLine={{stroke:T.border}}/>
+              <Tooltip content={<CustomTooltip T={T}/>} cursor={{fill: T.brandSoft || "rgba(16,185,129,0.08)"}}/>
+              <Bar dataKey="Saving" fill={T.brand || "#10b981"} radius={[6,6,0,0]}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
-      {/* Distribuição do Budget */}
-      <div style={{background:T.card,borderRadius:12,padding:20}}>
-        <h3 style={{margin:"0 0 16px",fontSize:14,color:T.textMd}}>Distribuição do Budget</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <PieChart>
-            <Pie
-              data={RESUMO_CATS.map(c=>({name:c.nome,value:c.orcado}))}
-              cx="50%" cy="50%" outerRadius={90} dataKey="value"
-              label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`}
-              labelLine={false}
-            >
-              {RESUMO_CATS.map((_,i) => <Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
-            </Pie>
-            <Tooltip formatter={v=>fmt(v)}/>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      <Card T={T}>
+        <PanelTitle T={T} title="Distribuição do Budget" subtitle="Participação de cada categoria no orçado total"/>
+        <div style={{padding:20}}>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={RESUMO_CATS.map(c=>({name:c.nome,value:c.orcado}))}
+                cx="50%" cy="50%" outerRadius={100} innerRadius={50} dataKey="value"
+                label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`}
+                labelLine={false}
+                stroke={T.surface || T.card}
+                strokeWidth={2}
+              >
+                {RESUMO_CATS.map((_,i) => <Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+              </Pie>
+              <Tooltip formatter={v=>fmt(v)} contentStyle={{background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:8}}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
-      {/* Orçado por Jogo B1 vs B2 */}
-      <div style={{background:T.card,borderRadius:12,padding:20}}>
-        <h3 style={{margin:"0 0 16px",fontSize:14,color:T.textMd}}>Orçado por Jogo — B1 vs B2</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={divulgados.map(j=>({name:`R${j.rodada} ${j.mandante.split(" ")[0]}`,valor:subTotal(j.orcado),cat:j.categoria}))}>
-            <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:9}}/>
-            <YAxis tickFormatter={fmtK} tick={{fill:T.textMd,fontSize:11}}/>
-            <Tooltip content={<CustomTooltip T={T}/>}/>
-            <Bar dataKey="valor" radius={[4,4,0,0]}>
-              {divulgados.map(j => <Cell key={j.id} fill={j.categoria==="B1"?"#22c55e":"#f59e0b"}/>)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <Card T={T}>
+        <PanelTitle T={T} title="Orçado por Jogo — B1 vs B2" subtitle="Comparativo de orçamento entre categorias"/>
+        <div style={{padding:20}}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={divulgados.map(j=>({name:`R${j.rodada} ${j.mandante.split(" ")[0]}`,valor:subTotal(j.orcado),cat:j.categoria}))}>
+              <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+              <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:9}} axisLine={{stroke:T.border}} tickLine={{stroke:T.border}}/>
+              <YAxis tickFormatter={fmtK} tick={{fill:T.textMd,fontSize:11}} axisLine={{stroke:T.border}} tickLine={{stroke:T.border}}/>
+              <Tooltip content={<CustomTooltip T={T}/>} cursor={{fill: T.brandSoft || "rgba(16,185,129,0.08)"}}/>
+              <Bar dataKey="valor" radius={[6,6,0,0]}>
+                {divulgados.map(j => <Cell key={j.id} fill={j.categoria==="B1"?(T.brand||"#10b981"):(T.warning||"#f59e0b")}/>)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
     </div>
   );

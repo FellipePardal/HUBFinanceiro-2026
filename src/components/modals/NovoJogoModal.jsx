@@ -1,7 +1,28 @@
 import { useState } from "react";
-import { TIMES, CIDADES, DETENTORES, CENARIO_INFO, btnStyle, iSty } from "../../constants";
+import { TIMES, CIDADES, DETENTORES, CENARIO_INFO, btnStyle, iSty, RADIUS } from "../../constants";
 import { getDefaults, allSubKeys } from "../../data";
 import { fmt } from "../../utils";
+import { Button } from "../ui";
+
+const overlayStyle = {
+  position:"fixed", inset:0,
+  background:"rgba(0,0,0,0.65)",
+  backdropFilter:"blur(4px)",
+  zIndex:100,
+  display:"flex", alignItems:"center", justifyContent:"center",
+  padding:16,
+};
+const dialogStyle = (T, max=460) => ({
+  background:T.surface||T.card,
+  borderRadius:RADIUS.xl,
+  padding:28,
+  width:"100%",
+  maxWidth:max,
+  maxHeight:"90vh",
+  overflowY:"auto",
+  border:`1px solid ${T.border}`,
+  boxShadow:T.shadow||"0 20px 40px rgba(0,0,0,0.4)",
+});
 
 // ─── MODAL NOVO JOGO RÁPIDO (por cenário) ─────────────────────────────────────
 export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
@@ -28,13 +49,13 @@ export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
-      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:440,maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-          <div style={{width:4,height:28,background:info.color,borderRadius:2}}/>
+    <div style={overlayStyle}>
+      <div style={dialogStyle(T, 460)}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:22}}>
+          <div style={{width:4,height:36,background:info.color,borderRadius:4,boxShadow:`0 0 12px ${info.color}88`}}/>
           <div>
-            <h3 style={{margin:0,fontSize:16,color:T.text}}>Novo Jogo — {info.label}</h3>
-            <p style={{margin:"4px 0 0",fontSize:12,color:T.textSm}}>Orçado automático: <b style={{color:info.color}}>{fmt(info.total)}</b></p>
+            <h3 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Novo Jogo · {info.label}</h3>
+            <p style={{margin:"4px 0 0",fontSize:12,color:T.textSm}}>Orçado automático: <b className="num" style={{color:info.color,fontWeight:700}}>{fmt(info.total)}</b></p>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
@@ -46,9 +67,9 @@ export function NovoRapidoModal({cenario, jogos, onSave, onClose, T}) {
           {field("Cidade","cidade",CIDADES)}
           {field("Detentor","detentor",DETENTORES)}
         </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
-          <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-          <button onClick={handleSave} style={{...btnStyle,background:info.color,color:cenario==="b2sul"?"#000":"#fff"}}>Adicionar Jogo</button>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
+          <Button T={T} variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
+          <Button T={T} variant="primary" size="md" onClick={handleSave}>Adicionar Jogo</Button>
         </div>
       </div>
     </div>
@@ -97,9 +118,9 @@ export function NovoJogoModal({jogo, onSave, onClose, T}) {
   };
 
   return (
-    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
-      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:460,maxHeight:"90vh",overflowY:"auto"}}>
-        <h3 style={{margin:"0 0 20px",fontSize:16,color:T.text}}>{isEdit ? "Editar Jogo" : "Novo Jogo"}</h3>
+    <div style={overlayStyle}>
+      <div style={dialogStyle(T, 480)}>
+        <h3 style={{margin:"0 0 20px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>{isEdit ? "Editar Jogo" : "Novo Jogo"}</h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           {field("Mandante","mandante",TIMES)}
           {field("Visitante","visitante",TIMES)}
@@ -111,9 +132,9 @@ export function NovoJogoModal({jogo, onSave, onClose, T}) {
           {field("Região","regiao",["Sudeste","Sul"])}
           {field("Detentor","detentor",DETENTORES)}
         </div>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
-          <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
-          <button onClick={handleSave} style={{...btnStyle,background:"#22c55e"}}>{isEdit ? "Salvar" : "Adicionar"}</button>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
+          <Button T={T} variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
+          <Button T={T} variant="primary" size="md" onClick={handleSave}>{isEdit ? "Salvar" : "Adicionar"}</Button>
         </div>
       </div>
     </div>

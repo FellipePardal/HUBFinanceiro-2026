@@ -1,8 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
-import { CATS, btnStyle, iSty } from "../../constants";
+import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
+import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
+import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -821,42 +823,40 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     alert("Planilha copiada!");
   };
 
-  const TABS_NF = ["rodada", "planilha", "resumo", "recebidas"];
+  const TABS_NF = [
+    {value:"rodada", label:"Por Rodada"},
+    {value:"planilha", label:"Planilha"},
+    {value:"resumo", label:"Resumo"},
+    {value:"recebidas", label:"Recebidas"},
+  ];
+  const TS = tableStyles(T);
+  const purple = "#a855f7";
+  const cyan = "#06b6d4";
 
   return (
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",gap:4}}>
-          {TABS_NF.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{padding:"6px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
-              background:tab===t?"#8b5cf6":"transparent",color:tab===t?"#fff":T.textMd,textTransform:"capitalize"}}>
-              {t === "rodada" ? "Por Rodada" : t === "planilha" ? "Planilha" : t === "resumo" ? "Resumo" : "Recebidas"}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setShowAvulsa(true)} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ NF Avulsa</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <Segmented T={T} value={tab} onChange={setTab} options={TABS_NF}/>
+        <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowAvulsa(true)}>NF Avulsa</Button>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
-        <KPI label="Serviços Pendentes" value={String(totalPendente)} sub="Sem NF" color="#f59e0b" T={T}/>
-        <KPI label="Serviços Conferidos" value={String(totalConferida)} sub="Com NF" color="#22c55e" T={T}/>
-        <KPI label="Notas Registradas" value={`${totalNotas} (${notasAvulsas} avulsa${notasAvulsas!==1?"s":""})`} sub="" color="#8b5cf6" T={T}/>
-        <KPI label="Valor Total NFs" value={fmt(totalValor)} sub={`${totalNotas} notas`} color="#06b6d4" T={T}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
+        <KPI label="Serviços Pendentes" value={String(totalPendente)} sub="Sem NF" color={T.warning} T={T}/>
+        <KPI label="Serviços Conferidos" value={String(totalConferida)} sub="Com NF" color={T.brand} T={T}/>
+        <KPI label="Notas Registradas" value={`${totalNotas}`} sub={`${notasAvulsas} avulsa${notasAvulsas!==1?"s":""}`} color={purple} T={T}/>
+        <KPI label="Valor Total NFs" value={fmt(totalValor)} sub={`${totalNotas} notas`} color={cyan} T={T}/>
       </div>
 
       {/* ── POR RODADA ── */}
       {tab === "rodada" && (<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>Rodada:</span>
+            <span style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada</span>
             {rodadas.map(r => (
-              <button key={r} onClick={() => setRodadaSel(r)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-                background:rodadaEfetiva===r?"#8b5cf6":T.card,color:rodadaEfetiva===r?"#fff":T.textMd}}>
-                {r}
-              </button>
+              <Chip key={r} active={rodadaEfetiva===r} onClick={()=>setRodadaSel(r)} T={T} color={purple}>{r}</Chip>
             ))}
           </div>
-          <button onClick={() => setShowRegistrar(true)} style={{...btnStyle,background:"#8b5cf6",fontSize:12,padding:"8px 20px"}}>+ Registrar NF (Rodada {rodadaEfetiva})</button>
+          <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowRegistrar(true)}>Registrar NF (Rd {rodadaEfetiva})</Button>
         </div>
 
         {jogosRodada.map(jogo => {
@@ -865,35 +865,37 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           const servicosComNF = new Set(nfsDoJogo.flatMap(n => n.servicosKeys || []));
           const pendentes = servicos.filter(s => !servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
           const conferidas = servicos.filter(s => servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
+          const accentJogo = jogo.categoria==="B1"?T.brand:T.warning;
 
           return (
-            <div key={jogo.id} style={{background:T.card,borderRadius:12,overflow:"hidden",marginBottom:16}}>
-              <div style={{padding:"14px 20px",background:T.bg,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <Pill label={jogo.categoria} color={jogo.categoria==="B1"?"#22c55e":"#f59e0b"}/>
-                  <span style={{fontWeight:700,fontSize:15,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
-                  <span style={{color:T.textSm,fontSize:12}}>{jogo.data} · {jogo.cidade}</span>
+            <Card key={jogo.id} T={T} style={{marginBottom:16}} accent={accentJogo}>
+              <div style={{padding:"14px 20px",background:T.surfaceAlt||T.bg,borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                  <Pill label={jogo.categoria} color={accentJogo}/>
+                  <span style={{fontWeight:700,fontSize:14,color:T.text,letterSpacing:"-0.005em"}}>{jogo.mandante} × {jogo.visitante}</span>
+                  <span style={{color:T.textSm,fontSize:11}}>
+                    <span className="num">{jogo.data}</span>
+                    <span style={{margin:"0 6px",color:T.border}}>·</span>
+                    {jogo.cidade}
+                  </span>
                 </div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <span style={{color:"#f59e0b",fontSize:12}}>{pendentes} pendente{pendentes!==1?"s":""}</span>
-                  <span style={{color:"#22c55e",fontSize:12}}>{conferidas}/{servicos.length}</span>
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <span style={{color:T.warning,fontSize:11,fontWeight:700,background:T.warning+"1f",padding:"3px 10px",borderRadius:RADIUS.pill,border:`1px solid ${T.warning}33`}}>{pendentes} pendente{pendentes!==1?"s":""}</span>
+                  <span className="num" style={{color:T.brand,fontSize:11,fontWeight:700,background:T.brand+"1f",padding:"3px 10px",borderRadius:RADIUS.pill,border:`1px solid ${T.brand}33`}}>{conferidas}/{servicos.length}</span>
                 </div>
               </div>
 
-              {/* Serviços do jogo */}
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-                  <thead><tr style={{background:T.bg}}>
+              <div style={TS.wrap}>
+                <table style={{...TS.table, minWidth:600}}>
+                  <thead><tr style={TS.thead}>
                     {["Serviço","Categoria","Valor Ref.","Valor NF","Status","NF Vinculada"].map(h =>
-                      <th key={h} style={{padding:"8px 14px",textAlign:"left",color:T.textSm,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
+                      <th key={h} style={{...TS.th, ...TS.thLeft}}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {servicos.map(s => {
                       const key = `${jogo.id}_${s.subKey}`;
                       const isMulti = SUBS_MULTI_NF.has(s.subKey);
-                      // Todas as NFs vinculadas a esta linha
                       const notasDestaLinha = nfsDoJogo.filter(n => n.servicosKeys?.includes(key));
-                      // Soma considerando servicosDetalhe (granular por jogo) ou servicosValores (legado)
                       const valorUnit = notasDestaLinha.reduce((sum, n) => {
                         if (n.servicosDetalhe && n.servicosDetalhe[key] != null) return sum + n.servicosDetalhe[key];
                         if (n.servicosValores?.[s.subKey] != null) return sum + n.servicosValores[s.subKey];
@@ -903,40 +905,40 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                       const diff = hasNotas ? valorUnit - s.valorRef : null;
                       const restante = s.valorRef - valorUnit;
                       const statusLabel = !hasNotas ? "Pendente" : (isMulti && restante > 0.01 ? "Parcial" : "Conferida");
-                      const statusColor = !hasNotas ? "#f59e0b" : (statusLabel === "Parcial" ? "#3b82f6" : "#22c55e");
+                      const statusColor = !hasNotas ? T.warning : (statusLabel === "Parcial" ? T.info : T.brand);
                       const nota = notasDestaLinha[0];
                       return (
-                        <tr key={s.subKey} style={{borderTop:`1px solid ${T.border}`}}>
-                          <td style={{padding:"8px 14px",fontWeight:600,fontSize:13,color:T.text}}>{s.subLabel}</td>
-                          <td style={{padding:"8px 14px"}}><Pill label={s.catLabel} color={s.catColor}/></td>
-                          <td style={{padding:"8px 14px",color:T.textSm,fontSize:12}}>{fmt(s.valorRef)}</td>
-                          <td style={{padding:"8px 14px",fontSize:12}}>
+                        <tr key={s.subKey} style={TS.tr}>
+                          <td style={{...TS.td, fontWeight:600}}>{s.subLabel}</td>
+                          <td style={TS.td}><Pill label={s.catLabel} color={s.catColor}/></td>
+                          <td className="num" style={{...TS.td, color:T.textSm, fontSize:12}}>{fmt(s.valorRef)}</td>
+                          <td style={{...TS.td, fontSize:12}}>
                             {hasNotas ? (
-                              <span style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                                <span style={{color:"#8b5cf6",fontWeight:600}}>{fmt(valorUnit)}</span>
-                                {diff !== 0 && <span style={{fontSize:10,color:diff>0?"#ef4444":(isMulti?"#3b82f6":"#22c55e"),fontWeight:600}}>{diff>0?"+":""}{fmt(diff)}</span>}
-                                {isMulti && notasDestaLinha.length > 1 && <span style={{fontSize:9,padding:"1px 5px",borderRadius:4,background:"#3b82f622",color:"#3b82f6",fontWeight:600}}>{notasDestaLinha.length} NFs</span>}
+                              <span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                <span className="num" style={{color:purple,fontWeight:700}}>{fmt(valorUnit)}</span>
+                                {diff !== 0 && <span className="num" style={{fontSize:10,color:diff>0?T.danger:(isMulti?T.info:T.brand),fontWeight:600}}>{diff>0?"+":""}{fmt(diff)}</span>}
+                                {isMulti && notasDestaLinha.length > 1 && <span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:T.info+"22",color:T.info,fontWeight:700}}>{notasDestaLinha.length} NFs</span>}
                               </span>
                             ) : <span style={{color:T.textSm}}>—</span>}
                           </td>
-                          <td style={{padding:"8px 14px"}}>
+                          <td style={TS.td}>
                             <Pill label={statusLabel} color={statusColor}/>
                           </td>
-                          <td style={{padding:"8px 14px",fontSize:11}}>
+                          <td style={{...TS.td, fontSize:11}}>
                             {!hasNotas ? <span style={{color:T.textSm}}>—</span>
                               : notasDestaLinha.length > 1 ? (
                                 <span style={{color:T.textSm,fontSize:11}}>
                                   {notasDestaLinha.map(n => n.fornecedor).filter(Boolean).join(", ")}
                                 </span>
                               ) : (
-                                <span style={{color:T.text,display:"flex",alignItems:"center",gap:6}}>
-                                  <code style={{color:"#22c55e",fontSize:11}}>{nota.codigo}</code>
-                                  <span style={{color:T.textSm}}>{nota.fornecedor}</span>
-                                  {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color="#8b5cf6"/>}
+                                <span style={{color:T.text,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                                  <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{nota.codigo}</code>
+                                  <span style={{color:T.textMd}}>{nota.fornecedor}</span>
+                                  {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color={purple}/>}
                                   {nota.hasFile
-                                    ? <button onClick={() => setPreview(nota)} style={{color:"#3b82f6",fontSize:10,fontWeight:600,background:"#3b82f622",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Ver</button>
-                                    : <button onClick={() => {setUploadTarget(nota); uploadRef.current?.click();}} style={{color:"#f59e0b",fontSize:10,fontWeight:600,background:"#f59e0b22",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Enviar</button>}
-                                  <button onClick={() => deleteNota(nota.id)} style={{color:"#ef4444",fontSize:10,fontWeight:600,background:"#ef444422",padding:"2px 6px",borderRadius:4,border:"none",cursor:"pointer"}}>Apagar</button>
+                                    ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(nota)}/>
+                                    : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
+                                  <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(nota.id)}/>
                                 </span>
                               )}
                           </td>
@@ -947,77 +949,76 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                 </table>
               </div>
 
-              {/* NFs avulsas deste jogo */}
               {nfsDoJogo.filter(n => n.tipo === "avulsa").length > 0 && (
-                <div style={{padding:"8px 14px",borderTop:`1px solid ${T.border}`,background:T.bg}}>
-                  <p style={{color:"#f59e0b",fontSize:11,fontWeight:600,margin:"0 0 4px"}}>NFs Avulsas neste jogo:</p>
+                <div style={{padding:"10px 16px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
+                  <p style={{color:T.warning,fontSize:10,fontWeight:700,margin:"0 0 6px",letterSpacing:"0.06em",textTransform:"uppercase"}}>NFs Avulsas neste jogo</p>
                   {nfsDoJogo.filter(n => n.tipo === "avulsa").map(n => (
-                    <div key={n.id} style={{display:"flex",gap:12,alignItems:"center",fontSize:12,padding:"2px 0"}}>
-                      <code style={{color:"#22c55e",fontSize:11}}>{n.codigo}</code>
+                    <div key={n.id} style={{display:"flex",gap:12,alignItems:"center",fontSize:12,padding:"3px 0"}}>
+                      <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
                       <span style={{color:T.text}}>{n.fornecedor}</span>
-                      <span style={{color:"#8b5cf6",fontWeight:600}}>{fmt(n.valorNF)}</span>
+                      <span className="num" style={{color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
                       <span style={{color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>
-                      <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"2px 8px",fontSize:10}}>🗑</button>
+                      <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           );
         })}
       </>)}
 
       {/* ── PLANILHA ── */}
       {tab === "planilha" && (<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{color:T.textMd,fontSize:12,fontWeight:600}}>Rodada:</span>
+            <span style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada</span>
             {planilhaRodadas.map(r => (
-              <button key={r} onClick={() => setFiltroPlanilha(r)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,
-                background:filtroPlanilha===r?"#8b5cf6":T.card,color:filtroPlanilha===r?"#fff":T.textMd}}>
+              <Chip key={r} active={filtroPlanilha===r} onClick={()=>setFiltroPlanilha(r)} T={T} color={purple}>
                 {r === "Todas" ? "Todas" : `Rd ${r}`}
-              </button>
+              </Chip>
             ))}
           </div>
-          <button onClick={copyPlanilha} style={{...btnStyle,background:"#22c55e",fontSize:12}}>Copiar Planilha</button>
+          <Button T={T} variant="primary" size="md" icon={CopyIcon} onClick={copyPlanilha}>Copiar Planilha</Button>
         </div>
 
-        <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",color:T.textSm,fontSize:12}}>
-            <span>{planilhaItens.length} notas</span>
-            <span>Total: <b style={{color:"#8b5cf6"}}>{fmt(planilhaItens.reduce((s, n) => s + (n.valorNF || 0), 0))}</b></span>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:900}}>
-              <thead><tr style={{background:T.bg}}>
-                {["Código","Nº NF","Fornecedor","Valor","Emissão","Envio","Pagamento","Jogo","Rd","Serviços","Tipo",""].map(h =>
-                  <th key={h} style={{padding:"10px 12px",textAlign:"left",color:T.textSm,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>)}
-              </tr></thead>
+        <Card T={T}>
+          <PanelTitle T={T} title="Planilha de Notas" subtitle={`${planilhaItens.length} notas`}
+            right={<span style={{fontSize:12,color:T.textMd}}>Total: <b className="num" style={{color:purple}}>{fmt(planilhaItens.reduce((s, n) => s + (n.valorNF || 0), 0))}</b></span>}
+          />
+          <div style={TS.wrap}>
+            <table style={{...TS.table, minWidth:1050}}>
+              <thead>
+                <tr style={TS.thead}>
+                  {["Código","Nº NF","Fornecedor","Valor","Emissão","Envio","Pagamento","Jogo","Rd","Serviços","Tipo",""].map(h =>
+                    <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
+                </tr>
+              </thead>
               <tbody>
                 {planilhaItens.map(n => (
-                  <tr key={n.id} style={{borderTop:`1px solid ${T.border}`}}>
-                    <td style={{padding:"10px 12px"}}><code style={{color:"#22c55e",fontSize:11,fontWeight:600}}>{n.codigo}</code></td>
-                    <td style={{padding:"10px 12px",color:T.text,fontSize:13,fontWeight:600}}>{n.numeroNF}</td>
-                    <td style={{padding:"10px 12px",color:T.text,fontSize:13}}>{n.fornecedor}</td>
-                    <td style={{padding:"10px 12px",color:"#8b5cf6",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(n.valorNF || 0)}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEmissao}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.dataEnvio}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{envioMap[n.id]?.dataPagamento || "—"}</td>
-                    <td style={{padding:"10px 12px",color:T.text,fontSize:12,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{n.rodada}</td>
-                    <td style={{padding:"10px 12px",color:T.textSm,fontSize:11,maxWidth:200}}>{(n.servicosLabels||[]).join(", ")}</td>
-                    <td style={{padding:"10px 12px"}}>
-                      <div style={{display:"flex",gap:4}}>
-                        <Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?"#f59e0b":"#22c55e"}/>
-                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id].numero}`} color="#8b5cf6"/>}
+                  <tr key={n.id} style={TS.tr}>
+                    <td style={TS.td}><code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"3px 7px",borderRadius:4,fontWeight:600}}>{n.codigo}</code></td>
+                    <td className="num" style={{...TS.td, fontWeight:600}}>{n.numeroNF}</td>
+                    <td style={TS.td}>{n.fornecedor}</td>
+                    <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(n.valorNF || 0)}</td>
+                    <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.dataEmissao}</td>
+                    <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.dataEnvio}</td>
+                    <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{envioMap[n.id]?.dataPagamento || "—"}</td>
+                    <td style={{...TS.td, fontSize:12, whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
+                    <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{n.rodada}</td>
+                    <td style={{...TS.td, color:T.textSm, fontSize:11, maxWidth:200}}>{(n.servicosLabels||[]).join(", ")}</td>
+                    <td style={TS.td}>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        <Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?T.warning:T.brand}/>
+                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id].numero}`} color={purple}/>}
                       </div>
                     </td>
-                    <td style={{padding:"10px 12px"}}>
+                    <td style={TS.td}>
                       <div style={{display:"flex",gap:4}}>
                         {n.hasFile
-                          ? <button onClick={() => setPreview(n)} style={{...btnStyle,background:"#3b82f6",padding:"4px 8px",fontSize:10}}>Ver</button>
-                          : <button onClick={() => {setUploadTarget(n); uploadRef.current?.click();}} style={{...btnStyle,background:"#f59e0b",padding:"4px 8px",fontSize:10}}>Enviar</button>}
-                        <button onClick={() => deleteNota(n.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 8px",fontSize:10}}>🗑</button>
+                          ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
+                          : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                        <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
                       </div>
                     </td>
                   </tr>
@@ -1028,21 +1029,21 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       </>)}
 
       {/* ── RESUMO ── */}
       {tab === "resumo" && (
-        <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"14px 20px",borderBottom:`1px solid ${T.border}`}}>
-            <h3 style={{margin:0,fontSize:14,color:T.textMd}}>Status por Rodada</h3>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:T.bg}}>
-                {["Rodada","Serviços","Pendente","Conferida","NFs","Valor NFs","% Concluído"].map(h =>
-                  <th key={h} style={{padding:"10px 14px",textAlign:h==="Rodada"?"left":"right",color:T.textSm,fontSize:11}}>{h}</th>)}
-              </tr></thead>
+        <Card T={T}>
+          <PanelTitle T={T} title="Status por Rodada" subtitle="Progresso de notas conferidas vs pendentes"/>
+          <div style={TS.wrap}>
+            <table style={{...TS.table, minWidth:680}}>
+              <thead>
+                <tr style={TS.thead}>
+                  {["Rodada","Serviços","Pendente","Conferida","NFs","Valor NFs","% Concluído"].map(h =>
+                    <th key={h} style={{...TS.th, ...(h==="Rodada"?TS.thLeft:TS.thRight)}}>{h}</th>)}
+                </tr>
+              </thead>
               <tbody>
                 {rodadas.map(rod => {
                   const rodServicos = allServicos.filter(i => i.rodada === rod);
@@ -1051,21 +1052,19 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                   const conf = rodServicos.filter(i => i.status === "Conferida").length;
                   const rodNotas = notas.filter(n => n.rodada === rod);
                   const rodValor = rodNotas.reduce((s, n) => s + (n.valorNF || 0), 0);
-                  const pct = tot ? (conf / tot * 100).toFixed(0) : 0;
+                  const pct = tot ? (conf / tot * 100) : 0;
                   return (
-                    <tr key={rod} style={{borderTop:`1px solid ${T.border}`}}>
-                      <td style={{padding:"10px 14px",fontWeight:600,color:T.text}}>Rodada {rod}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",color:T.text}}>{tot}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",color:pend>0?"#f59e0b":T.textSm}}>{pend}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",color:conf>0?"#22c55e":T.textSm}}>{conf}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",color:T.text}}>{rodNotas.length}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right",color:"#8b5cf6",fontWeight:600}}>{fmt(rodValor)}</td>
-                      <td style={{padding:"10px 14px",textAlign:"right"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"flex-end"}}>
-                          <span style={{color:T.textMd,fontSize:12}}>{pct}%</span>
-                          <div style={{width:60,background:T.border,borderRadius:4,height:6}}>
-                            <div style={{width:`${pct}%`,height:"100%",borderRadius:4,background:"#22c55e"}}/>
-                          </div>
+                    <tr key={rod} style={TS.tr}>
+                      <td style={{...TS.td, fontWeight:600}}>Rodada {rod}</td>
+                      <td className="num" style={TS.tdNum}>{tot}</td>
+                      <td className="num" style={{...TS.tdNum, color:pend>0?T.warning:T.textSm}}>{pend}</td>
+                      <td className="num" style={{...TS.tdNum, color:conf>0?T.brand:T.textSm}}>{conf}</td>
+                      <td className="num" style={TS.tdNum}>{rodNotas.length}</td>
+                      <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(rodValor)}</td>
+                      <td style={{padding:"13px 16px", textAlign:"right"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"flex-end"}}>
+                          <span className="num" style={{color:T.textMd,fontSize:12,minWidth:32}}>{pct.toFixed(0)}%</span>
+                          <div style={{width:80}}><Progress value={pct} T={T}/></div>
                         </div>
                       </td>
                     </tr>
@@ -1074,7 +1073,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── RECEBIDAS (do formulário externo) ── */}

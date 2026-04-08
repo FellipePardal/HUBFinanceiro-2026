@@ -1,50 +1,50 @@
 import { Pill } from "../shared";
 import { fmtK, subTotal } from "../../utils";
-import { btnStyle } from "../../constants";
+import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
+import { Search, Pencil, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 
 export default function TabJogos({
   jogos, filtrados, filtroRod, setFiltroRod, filtroCat, setFiltroCat,
   showPlaceholder, setShowPlaceholder, rodadasList,
   setMicroJogoId, setTab, setNovo, setNovoRapido, onDelete, onEdit, T
 }) {
+  const TS = tableStyles(T);
+
   return (
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {rodadasList.map(r => (
-            <button key={r} onClick={()=>setFiltroRod(r)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,background:filtroRod===r?"#22c55e":T.card,color:filtroRod===r?"#fff":T.textMd}}>
+            <Chip key={r} active={filtroRod===r} onClick={()=>setFiltroRod(r)} T={T}>
               {r==="Todas" ? "Todas" : `Rd ${r}`}
-            </button>
+            </Chip>
           ))}
-          <div style={{width:1,background:T.border,margin:"0 4px"}}/>
+          <div style={{width:1,height:24,background:T.border,margin:"0 6px"}}/>
           {["Todas","B1","B2"].map(c => (
-            <button key={c} onClick={()=>setFiltroCat(c)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,background:filtroCat===c?"#f59e0b":T.card,color:filtroCat===c?"#000":T.textMd}}>
+            <Chip key={c} active={filtroCat===c} onClick={()=>setFiltroCat(c)} T={T} color={T.warning}>
               {c==="Todas" ? "B1+B2" : c}
-            </button>
+            </Chip>
           ))}
-          <button onClick={()=>setShowPlaceholder(p=>!p)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,background:showPlaceholder?"#8b5cf6":T.card,color:showPlaceholder?"#fff":T.textMd}}>
+          <Chip active={showPlaceholder} onClick={()=>setShowPlaceholder(p=>!p)} T={T} color="#a855f7">
             {showPlaceholder ? "Ocultar a divulgar" : "Ver a divulgar"}
-          </button>
+          </Chip>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          <button onClick={()=>setNovoRapido("b1")}    style={{...btnStyle,background:"#22c55e",fontSize:12}}>+ B1 Sudeste</button>
-          <button onClick={()=>setNovoRapido("b2s")}   style={{...btnStyle,background:"#3b82f6",fontSize:12}}>+ B2 Sudeste</button>
-          <button onClick={()=>setNovoRapido("b2sul")} style={{...btnStyle,background:"#f59e0b",color:"#000",fontSize:12}}>+ B2 Sul</button>
-          <button onClick={()=>setNovo(true)}          style={{...btnStyle,background:"#475569",fontSize:12}}>+ Personalizado</button>
-
+          <Button T={T} variant="primary"   size="sm" icon={Plus} onClick={()=>setNovoRapido("b1")}>B1 Sudeste</Button>
+          <Button T={T} variant="secondary" size="sm" icon={Plus} onClick={()=>setNovoRapido("b2s")}>B2 Sudeste</Button>
+          <Button T={T} variant="secondary" size="sm" icon={Plus} onClick={()=>setNovoRapido("b2sul")}>B2 Sul</Button>
+          <Button T={T} variant="secondary" size="sm" icon={Plus} onClick={()=>setNovo(true)}>Personalizado</Button>
         </div>
       </div>
 
-      <div style={{background:T.card,borderRadius:12,overflow:"hidden"}}>
-        <div style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`,color:T.textSm,fontSize:12}}>
-          {filtrados.length} jogos
-        </div>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+      <Card T={T}>
+        <PanelTitle T={T} title="Jogos" subtitle={`${filtrados.length} resultado${filtrados.length!==1?"s":""}`}/>
+        <div style={TS.wrap}>
+          <table style={{...TS.table, minWidth:880}}>
             <thead>
-              <tr style={{background:T.bg}}>
+              <tr style={TS.thead}>
                 {["Jogo","Rd","Cidade","Data","Cat.","Detentor","Orçado","Provisionado","Realizado","Saving",""].map(h => (
-                  <th key={h} style={{padding:"10px 12px",textAlign:"left",color:T.textSm,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                  <th key={h} style={{...TS.th, ...((h==="Orçado"||h==="Provisionado"||h==="Realizado"||h==="Saving")?TS.thRight:TS.thLeft)}}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -53,24 +53,24 @@ export default function TabJogos({
                 const o=subTotal(j.orcado), p=subTotal(j.provisionado), r=subTotal(j.realizado);
                 const isDef = j.mandante==="A definir";
                 return (
-                  <tr key={j.id} style={{borderTop:`1px solid ${T.border}`,opacity:isDef?0.45:1}}>
-                    <td style={{padding:"10px 12px",fontWeight:600,fontSize:13,whiteSpace:"nowrap",color:T.text}}>
-                      {isDef ? <span style={{color:T.textSm,fontStyle:"italic"}}>A divulgar</span> : `${j.mandante} x ${j.visitante}`}
+                  <tr key={j.id} style={{...TS.tr, opacity:isDef?0.5:1}}>
+                    <td style={{...TS.td, fontWeight:600, whiteSpace:"nowrap"}}>
+                      {isDef ? <span style={{color:T.textSm,fontStyle:"italic"}}>A divulgar</span> : `${j.mandante} × ${j.visitante}`}
                     </td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12}}>{j.rodada}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12,whiteSpace:"nowrap"}}>{j.cidade}</td>
-                    <td style={{padding:"10px 12px",color:T.textMd,fontSize:12,whiteSpace:"nowrap"}}>{j.data}</td>
-                    <td style={{padding:"10px 12px"}}><Pill label={j.categoria} color={j.categoria==="B1"?"#22c55e":"#f59e0b"}/></td>
-                    <td style={{padding:"10px 12px",fontSize:11,color:T.textMd,whiteSpace:"nowrap"}}>{j.detentor}</td>
-                    <td style={{padding:"10px 12px",fontSize:13,whiteSpace:"nowrap",color:T.text}}>{fmtK(o)}</td>
-                    <td style={{padding:"10px 12px",fontSize:13,color:"#3b82f6",whiteSpace:"nowrap"}}>{fmtK(p)}</td>
-                    <td style={{padding:"10px 12px",fontSize:13,color:"#f59e0b",whiteSpace:"nowrap"}}>{fmtK(r)}</td>
-                    <td style={{padding:"10px 12px",fontWeight:600,color:(o-p)>=0?"#22c55e":"#ef4444",whiteSpace:"nowrap"}}>{fmtK(o-p)}</td>
-                    <td style={{padding:"10px 12px"}}>
+                    <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{j.rodada}</td>
+                    <td style={{...TS.td, color:T.textMd, fontSize:12, whiteSpace:"nowrap"}}>{j.cidade}</td>
+                    <td style={{...TS.td, color:T.textMd, fontSize:12, whiteSpace:"nowrap"}}>{j.data}</td>
+                    <td style={TS.td}><Pill label={j.categoria} color={j.categoria==="B1"?T.brand:T.warning}/></td>
+                    <td style={{...TS.td, color:T.textMd, fontSize:11, whiteSpace:"nowrap"}}>{j.detentor}</td>
+                    <td className="num" style={TS.tdNum}>{fmtK(o)}</td>
+                    <td className="num" style={{...TS.tdNum, color:T.info}}>{fmtK(p)}</td>
+                    <td className="num" style={{...TS.tdNum, color:T.warning}}>{fmtK(r)}</td>
+                    <td className="num" style={{...TS.tdNum, fontWeight:700, color:(o-p)>=0?T.brand:T.danger}}>{fmtK(o-p)}</td>
+                    <td style={TS.td}>
                       <div style={{display:"flex",gap:4}}>
-                        <button onClick={()=>{setMicroJogoId(j.id);setTab("micro");}} style={{...btnStyle,background:"#1d4ed8",padding:"4px 10px",fontSize:11}}>🔍</button>
-                        {!isDef && <button onClick={()=>onEdit(j)} style={{...btnStyle,background:"#475569",padding:"4px 10px",fontSize:11}}>✏️</button>}
-                        {!isDef && <button onClick={()=>onDelete(j.id)} style={{...btnStyle,background:"#7f1d1d",padding:"4px 10px",fontSize:11}}>🗑</button>}
+                        <Button T={T} variant="secondary" size="sm" icon={Search} onClick={()=>{setMicroJogoId(j.id);setTab("micro");}}/>
+                        {!isDef && <Button T={T} variant="secondary" size="sm" icon={Pencil} onClick={()=>onEdit(j)}/>}
+                        {!isDef && <Button T={T} variant="danger"    size="sm" icon={Trash2} onClick={()=>onDelete(j.id)}/>}
                       </div>
                     </td>
                   </tr>
@@ -79,7 +79,7 @@ export default function TabJogos({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </>
   );
 }

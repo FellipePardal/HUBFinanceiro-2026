@@ -5,13 +5,14 @@
 import { RADIUS, FONT } from "../../constants";
 
 // ── Surface / Card ────────────────────────────────────────────────────────────
-export const Card = ({ T, children, padding = 0, style = {}, hoverable = false, accent }) => (
+export const Card = ({ T, children, padding = 0, style = {}, hoverable = false, accent, raised = true }) => (
   <div
     style={{
       background: T.surface || T.card,
+      backgroundImage: T.gradCard || "none",
       border: `1px solid ${T.border}`,
       borderRadius: RADIUS.lg,
-      boxShadow: T.shadowSoft || "none",
+      boxShadow: raised ? (T.shadow || T.shadowSoft || "none") : (T.shadowSoft || "none"),
       padding,
       position: "relative",
       overflow: "hidden",
@@ -21,7 +22,7 @@ export const Card = ({ T, children, padding = 0, style = {}, hoverable = false, 
     }}
   >
     {accent && (
-      <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background: accent }} />
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background: accent, boxShadow:`0 0 18px ${accent}66` }} />
     )}
     {children}
   </div>
@@ -73,57 +74,60 @@ export const Stat = ({ T, label, value, sub, color, icon: Icon, trend }) => {
   return (
     <div style={{
       background: T.surface || T.card,
+      backgroundImage: `${T.gradCard || ""}, radial-gradient(circle at 0% 0%, ${accent}14 0%, transparent 55%)`,
       border: `1px solid ${T.border}`,
       borderRadius: RADIUS.lg,
-      padding: "18px 20px",
+      padding: "20px 22px 22px",
       position: "relative",
       overflow: "hidden",
-      boxShadow: T.shadowSoft || "none",
-      transition: "border-color .2s, transform .2s",
+      boxShadow: T.shadow || "none",
+      transition: "border-color .2s, transform .2s, box-shadow .2s",
     }}>
-      <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:accent, opacity:0.85 }}/>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12 }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:accent, boxShadow:`0 0 24px ${accent}88` }}/>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginTop:4 }}>
         <p style={{
           color:T.textMd,
           fontSize:11,
-          fontWeight:600,
-          letterSpacing:"0.06em",
+          fontWeight:700,
+          letterSpacing:"0.08em",
           textTransform:"uppercase",
           margin:0,
         }}>{label}</p>
         {Icon && (
           <div style={{
-            width:28, height:28, borderRadius:8,
-            background:`${accent}1a`,
+            width:34, height:34, borderRadius:10,
+            background:`${accent}1f`,
             color:accent,
+            border:`1px solid ${accent}3a`,
             display:"flex", alignItems:"center", justifyContent:"center",
             flexShrink:0,
+            boxShadow:`0 4px 12px ${accent}22`,
           }}>
-            <Icon size={14} strokeWidth={2.25} />
+            <Icon size={16} strokeWidth={2.25} />
           </div>
         )}
       </div>
       <p className="num" style={{
-        fontSize:24,
-        fontWeight:700,
+        fontSize:30,
+        fontWeight:800,
         color:T.text,
-        margin:"10px 0 4px",
-        letterSpacing:"-0.02em",
-        lineHeight:1.1,
+        margin:"14px 0 6px",
+        letterSpacing:"-0.025em",
+        lineHeight:1,
       }}>{value}</p>
       {(sub || trend) && (
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:2 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:4 }}>
           {trend && (
             <span style={{
               fontSize:11,
-              fontWeight:600,
+              fontWeight:700,
               color: trend.positive ? (T.success||"#22c55e") : (T.danger||"#ef4444"),
-              background: (trend.positive ? (T.success||"#22c55e") : (T.danger||"#ef4444")) + "1a",
-              padding:"2px 6px",
+              background: (trend.positive ? (T.success||"#22c55e") : (T.danger||"#ef4444")) + "1f",
+              padding:"3px 8px",
               borderRadius:6,
             }}>{trend.label}</span>
           )}
-          {sub && <p style={{ color:T.textSm, fontSize:11, margin:0 }}>{sub}</p>}
+          {sub && <p style={{ color:T.textSm, fontSize:11, margin:0, fontWeight:500 }}>{sub}</p>}
         </div>
       )}
     </div>
@@ -240,6 +244,107 @@ export const Progress = ({ value, T, color, height = 6 }) => {
     </div>
   );
 };
+
+// ── Table primitives ──────────────────────────────────────────────────────────
+export const tableStyles = (T) => ({
+  wrap: { overflowX: "auto" },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: 500 },
+  thead: { background: T.surfaceAlt || T.bg },
+  th: {
+    padding: "12px 16px",
+    color: T.textSm,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
+    borderBottom: `1px solid ${T.border}`,
+  },
+  thLeft: { textAlign: "left" },
+  thRight: { textAlign: "right" },
+  tr: { borderTop: `1px solid ${T.border}`, transition: "background .15s" },
+  td: { padding: "13px 16px", fontSize: 13, color: T.text },
+  tdNum: { padding: "13px 16px", fontSize: 13, color: T.text, textAlign: "right", whiteSpace: "nowrap" },
+  totalRow: { borderTop: `2px solid ${T.borderStrong || T.border}`, background: T.surfaceAlt || T.bg, fontWeight: 700 },
+});
+
+// Heading section padronizada (faixa superior em painel)
+export const PanelTitle = ({ T, title, subtitle, color, right }) => {
+  const c = color || T.brand || "#10b981";
+  return (
+    <div style={{
+      padding: "14px 20px",
+      background: T.surfaceAlt || T.bg,
+      borderBottom: `1px solid ${T.border}`,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 12,
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0 }}>
+        <span style={{ width: 4, height: 22, background: c, borderRadius: 2, boxShadow: `0 0 12px ${c}88` }}/>
+        <div>
+          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: "-0.005em" }}>{title}</h4>
+          {subtitle && <p style={{ margin: "2px 0 0", fontSize: 11, color: T.textSm }}>{subtitle}</p>}
+        </div>
+      </div>
+      {right && <div style={{ display:"flex", alignItems:"center", gap:10 }}>{right}</div>}
+    </div>
+  );
+};
+
+// Chip (filtro de pílula segmentado)
+export const Chip = ({ children, active, onClick, T, color }) => {
+  const c = color || T.brand || "#10b981";
+  return (
+    <button onClick={onClick} style={{
+      padding: "6px 14px",
+      borderRadius: RADIUS.pill,
+      border: active ? `1px solid ${c}` : `1px solid ${T.border}`,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 600,
+      background: active ? c + "1f" : (T.surface || T.card),
+      color: active ? c : T.textMd,
+      transition: "all .15s",
+      whiteSpace: "nowrap",
+      letterSpacing: "-0.005em",
+      boxShadow: active ? `0 0 0 3px ${c}1a` : "none",
+    }}>{children}</button>
+  );
+};
+
+// Segmented (toggle de modos)
+export const Segmented = ({ options, value, onChange, T }) => (
+  <div style={{
+    display: "inline-flex",
+    background: T.surfaceAlt || T.bg,
+    border: `1px solid ${T.border}`,
+    borderRadius: RADIUS.md,
+    padding: 3,
+    gap: 2,
+  }}>
+    {options.map(o => {
+      const active = value === o.value;
+      return (
+        <button key={o.value} onClick={() => onChange(o.value)} style={{
+          padding: "6px 14px",
+          borderRadius: RADIUS.sm,
+          border: "none",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          background: active ? (T.brand || "#10b981") : "transparent",
+          color: active ? "#fff" : T.textMd,
+          transition: "all .15s",
+          letterSpacing: "-0.005em",
+          boxShadow: active ? `0 2px 8px ${(T.brand || "#10b981")}55` : "none",
+        }}>{o.label}</button>
+      );
+    })}
+  </div>
+);
 
 // ── IconButton (sidebar / toolbar) ────────────────────────────────────────────
 export const IconButton = ({ icon: Icon, onClick, title, active = false, size = 40, T, variant = "sidebar" }) => {

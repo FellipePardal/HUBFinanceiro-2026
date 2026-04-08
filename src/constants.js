@@ -4,33 +4,36 @@
 // preservadas para que o restante do app continue funcionando sem alterações.
 // Tokens novos foram adicionados para o design system.
 export const DARK = {
-  // legacy keys (compat)
-  bg:"#0a0f1a", card:"#111827", border:"#1f2937", muted:"#334155",
+  // legacy keys (compat) — bg mais profundo, contraste forte entre superfícies
+  bg:"#060912", card:"#0f1623", border:"#1e293b", muted:"#334155",
   text:"#f8fafc", textMd:"#cbd5e1", textSm:"#94a3b8",
   // novos tokens
-  surface:"#111827",
-  surfaceAlt:"#0f172a",
+  surface:"#0f1623",
+  surfaceAlt:"#0a0f1a",
   surfaceRaised:"#1a2435",
   borderStrong:"#334155",
   brand:"#10b981",        // emerald-500 — verde corporativo refinado
   brandStrong:"#059669",
-  brandSoft:"rgba(16,185,129,0.12)",
-  brandBorder:"rgba(16,185,129,0.28)",
+  brandSoft:"rgba(16,185,129,0.14)",
+  brandBorder:"rgba(16,185,129,0.32)",
+  brandGlow:"radial-gradient(circle at 50% 0%, rgba(16,185,129,0.12) 0%, transparent 60%)",
   accent:"#10b981",
   success:"#22c55e",
   warning:"#f59e0b",
   danger:"#ef4444",
   info:"#3b82f6",
-  shadow:"0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -8px rgba(0,0,0,0.5)",
-  shadowSoft:"0 1px 0 rgba(255,255,255,0.04) inset, 0 1px 2px rgba(0,0,0,0.4)",
-  gradHeader:"linear-gradient(135deg,#0a0f1a 0%,#0f172a 60%,#10261e 100%)",
-  gradSidebar:"linear-gradient(180deg,#0a0f1a 0%,#0f172a 100%)",
-  gradBrand:"linear-gradient(135deg,#059669 0%,#10b981 100%)",
+  shadow:"0 4px 6px -2px rgba(0,0,0,0.4), 0 20px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+  shadowSoft:"0 1px 0 rgba(255,255,255,0.05) inset, 0 2px 8px -2px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
+  shadowBrand:"0 0 0 1px rgba(16,185,129,0.25), 0 8px 24px -8px rgba(16,185,129,0.4)",
+  gradHeader:"linear-gradient(135deg,#060912 0%,#0f1623 60%,#0a1f17 100%)",
+  gradSidebar:"linear-gradient(180deg,#060912 0%,#0a0f1a 100%)",
+  gradBrand:"linear-gradient(135deg,#047857 0%,#10b981 100%)",
+  gradCard:"linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)",
 };
 
 export const LIGHT = {
-  // legacy keys (compat)
-  bg:"#f6f7f9", card:"#ffffff", border:"#e5e7eb", muted:"#cbd5e1",
+  // legacy keys (compat) — bg cinza claro, cards brancos puros pra contraste forte
+  bg:"#eef0f4", card:"#ffffff", border:"#e2e8f0", muted:"#cbd5e1",
   text:"#0b1220", textMd:"#475569", textSm:"#64748b",
   // novos tokens
   surface:"#ffffff",
@@ -40,17 +43,20 @@ export const LIGHT = {
   brand:"#059669",
   brandStrong:"#047857",
   brandSoft:"rgba(5,150,105,0.10)",
-  brandBorder:"rgba(5,150,105,0.30)",
+  brandBorder:"rgba(5,150,105,0.32)",
+  brandGlow:"radial-gradient(circle at 50% 0%, rgba(5,150,105,0.08) 0%, transparent 60%)",
   accent:"#059669",
   success:"#16a34a",
   warning:"#d97706",
   danger:"#dc2626",
   info:"#2563eb",
-  shadow:"0 1px 2px rgba(15,23,42,0.06), 0 8px 24px -12px rgba(15,23,42,0.12)",
-  shadowSoft:"0 1px 2px rgba(15,23,42,0.05)",
+  shadow:"0 4px 6px -2px rgba(15,23,42,0.06), 0 20px 40px -12px rgba(15,23,42,0.18), 0 0 0 1px rgba(15,23,42,0.04)",
+  shadowSoft:"0 1px 3px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.03)",
+  shadowBrand:"0 0 0 1px rgba(5,150,105,0.25), 0 8px 24px -8px rgba(5,150,105,0.35)",
   gradHeader:"linear-gradient(135deg,#ffffff 0%,#f1f5f9 60%,#ecfdf5 100%)",
-  gradSidebar:"linear-gradient(180deg,#0a0f1a 0%,#0f172a 100%)",
+  gradSidebar:"linear-gradient(180deg,#060912 0%,#0a0f1a 100%)",
   gradBrand:"linear-gradient(135deg,#047857 0%,#059669 100%)",
+  gradCard:"linear-gradient(180deg, rgba(15,23,42,0.015) 0%, transparent 100%)",
 };
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────

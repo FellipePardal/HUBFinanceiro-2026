@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import PptxGenJS from "pptxgenjs";
-import { btnStyle, iSty, ORC_PADRAO, REAL_PADRAO } from "../../constants";
+import { btnStyle, iSty, ORC_PADRAO, REAL_PADRAO, RADIUS } from "../../constants";
 import { parseBR, fmtNum, fmtR, fmtRs, subTotal } from "../../utils";
+import { Card, Button } from "../ui";
+import { BarChart3, Lock, ArrowRight, ArrowLeft, FileDown } from "lucide-react";
 
 const fmtBRL = v => "R$ " + Number(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
 
@@ -24,29 +26,36 @@ function useDonut(canvasRef, rec, pend) {
 
 // ─── SELETOR DE TIPO ──────────────────────────────────────────────────────────
 function SeletorTipo({T, onSelect}) {
+  const opts = [
+    {key:"variaveis", icon:BarChart3, label:"Custos Variáveis", desc:"Acompanhamento por rodada — orçado × realizado, saving acumulado e notas fiscais.", color:T.brand, grad:"linear-gradient(135deg,#047857 0%,#10b981 100%)"},
+    {key:"fixos",     icon:Lock,      label:"Custos Fixos",     desc:"Serviços fixos do campeonato — orçado × gasto × provisionado por categoria.",        color:T.info,  grad:"linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)"},
+  ];
   return (
     <div>
-      <h2 style={{margin:"0 0 8px",fontSize:16,color:T.text,fontWeight:700}}>Gerar Apresentação PPTX</h2>
-      <p style={{color:T.textMd,fontSize:13,marginBottom:28}}>Selecione o tipo de custo que deseja apresentar:</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:20}}>
-        {[
-          {key:"variaveis",icon:"📊",label:"Custos Variáveis",desc:"Acompanhamento por rodada — orçado × realizado, saving acumulado e notas fiscais.",color:"#22c55e",grad:"linear-gradient(135deg,#14532d,#166534)"},
-          {key:"fixos",    icon:"🔒",label:"Custos Fixos",    desc:"Serviços fixos do campeonato — orçado × gasto × provisionado por categoria.",color:"#3b82f6",grad:"linear-gradient(135deg,#1e3a5f,#1e40af)"},
-        ].map(opt => (
-          <div key={opt.key} onClick={()=>onSelect(opt.key)}
-            style={{background:T.card,borderRadius:18,overflow:"hidden",boxShadow:"0 4px 24px rgba(0,0,0,0.18)",cursor:"pointer",border:`1px solid ${T.border}`}}
-            onMouseEnter={e=>e.currentTarget.style.transform="translateY(-3px)"}
-            onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-            <div style={{background:opt.grad,padding:"28px 24px 22px"}}>
-              <span style={{fontSize:40}}>{opt.icon}</span>
-              <h3 style={{margin:"10px 0 6px",fontSize:18,fontWeight:800,color:"#fff"}}>{opt.label}</h3>
-            </div>
-            <div style={{padding:"18px 24px"}}>
-              <p style={{color:T.textMd,fontSize:13,margin:"0 0 18px",lineHeight:1.5}}>{opt.desc}</p>
-              <button style={{...btnStyle,background:opt.color,width:"100%",padding:"11px",fontSize:14,borderRadius:10}}>Preencher formulário →</button>
-            </div>
-          </div>
-        ))}
+      <p style={{color:T.brand,fontSize:11,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",margin:"0 0 8px"}}>Apresentações</p>
+      <h2 style={{margin:"0 0 6px",fontSize:24,color:T.text,fontWeight:800,letterSpacing:"-0.025em"}}>Gerar Apresentação PPTX</h2>
+      <p style={{color:T.textMd,fontSize:14,marginBottom:32}}>Selecione o tipo de custo que deseja apresentar.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:20}}>
+        {opts.map(opt => {
+          const Icon = opt.icon;
+          return (
+            <Card key={opt.key} T={T} hoverable onClick={()=>onSelect(opt.key)} style={{cursor:"pointer"}}>
+              <div onClick={()=>onSelect(opt.key)}>
+                <div style={{background:opt.grad,padding:"28px 26px 24px",position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%)",pointerEvents:"none"}}/>
+                  <div style={{width:50,height:50,borderRadius:14,background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                    <Icon size={24} color="#fff" strokeWidth={2.25}/>
+                  </div>
+                  <h3 style={{margin:"14px 0 4px",fontSize:18,fontWeight:800,color:"#fff",letterSpacing:"-0.02em",position:"relative"}}>{opt.label}</h3>
+                </div>
+                <div style={{padding:"18px 24px 22px"}}>
+                  <p style={{color:T.textMd,fontSize:13,margin:"0 0 18px",lineHeight:1.55}}>{opt.desc}</p>
+                  <Button T={T} variant="primary" size="md" fullWidth icon={ArrowRight}>Preencher formulário</Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
@@ -251,11 +260,16 @@ function FormVariaveis({T, onBack, jogos = []}) {
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <button onClick={onBack} style={{...btnStyle,background:T.border,color:T.text,padding:"6px 14px",fontSize:12}}>← Voltar</button>
-        <div>
-          <h2 style={{margin:0,fontSize:15,color:T.text,fontWeight:700}}>📊 Custos Variáveis</h2>
-          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento por rodada</p>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+        <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:12,background:T.brandSoft||"rgba(16,185,129,0.12)",border:`1px solid ${T.brandBorder||"rgba(16,185,129,0.28)"}`,color:T.brand||"#10b981",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <BarChart3 size={18} strokeWidth={2.25}/>
+          </div>
+          <div>
+            <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Variáveis</h2>
+            <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento por rodada</p>
+          </div>
         </div>
       </div>
 
@@ -351,14 +365,14 @@ function FormVariaveis({T, onBack, jogos = []}) {
         </div>
       </div>
 
-      <div style={{position:"sticky",bottom:0,background:T.card,borderTop:`1px solid ${T.border}`,padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50}}>
+      <div style={{position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`1px solid ${T.border}`,padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50,boxShadow:"0 -8px 24px -8px rgba(0,0,0,0.3)"}}>
         <div>
-          <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text}}>Tudo preenchido?</b> Clique para gerar e baixar o PPTX.</p>
-          <p style={{fontSize:11,color:status.cls==="ok"?"#22c55e":status.cls==="err"?"#ef4444":T.textSm}}>{status.msg}</p>
+          <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text,fontWeight:700}}>Tudo preenchido?</b> Clique para gerar e baixar o PPTX.</p>
+          <p style={{fontSize:11,color:status.cls==="ok"?T.brand:status.cls==="err"?T.danger:T.textSm,fontWeight:600}}>{status.msg}</p>
         </div>
-        <button onClick={gerarPPTX} disabled={loading} style={{...btnStyle,background:loading?"#1a3a20":"#22c55e",color:loading?"#4ade80":"#000",padding:"11px 28px",fontSize:12,letterSpacing:1.5,textTransform:"uppercase",opacity:loading?0.7:1}}>
-          {loading ? "Gerando..." : "⚡ Gerar PPTX"}
-        </button>
+        <Button T={T} variant="primary" size="lg" icon={FileDown} onClick={gerarPPTX} disabled={loading}>
+          {loading ? "Gerando..." : "Gerar PPTX"}
+        </Button>
       </div>
     </div>
   );
@@ -516,11 +530,16 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <button onClick={onBack} style={{...btnStyle,background:T.border,color:T.text,padding:"6px 14px",fontSize:12}}>← Voltar</button>
-        <div>
-          <h2 style={{margin:0,fontSize:15,color:T.text,fontWeight:700}}>🔒 Custos Fixos</h2>
-          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento mensal · vinculado às NFs Mensais</p>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+        <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:12,background:T.info+"1f",border:`1px solid ${T.info}3a`,color:T.info,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <Lock size={18} strokeWidth={2.25}/>
+          </div>
+          <div>
+            <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Fixos</h2>
+            <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento mensal · vinculado às NFs Mensais</p>
+          </div>
         </div>
       </div>
 
@@ -590,14 +609,14 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         </div>
       </div>
 
-      <div style={{position:"sticky",bottom:0,background:T.card,borderTop:`1px solid ${T.border}`,padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50}}>
+      <div style={{position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`1px solid ${T.border}`,padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50,boxShadow:"0 -8px 24px -8px rgba(0,0,0,0.3)"}}>
         <div>
-          <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text}}>Tudo certo?</b> Clique para gerar o PPTX.</p>
-          <p style={{fontSize:11,color:status.cls==="ok"?"#22c55e":status.cls==="err"?"#ef4444":T.textSm}}>{status.msg}</p>
+          <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text,fontWeight:700}}>Tudo certo?</b> Clique para gerar o PPTX.</p>
+          <p style={{fontSize:11,color:status.cls==="ok"?T.brand:status.cls==="err"?T.danger:T.textSm,fontWeight:600}}>{status.msg}</p>
         </div>
-        <button onClick={gerarPPTX} disabled={loading} style={{...btnStyle,background:loading?"#1e3a5f":"#3b82f6",padding:"11px 28px",fontSize:12,letterSpacing:1.5,textTransform:"uppercase",opacity:loading?0.7:1}}>
-          {loading ? "Gerando..." : "⚡ Gerar PPTX"}
-        </button>
+        <Button T={T} variant="primary" size="lg" icon={FileDown} onClick={gerarPPTX} disabled={loading}>
+          {loading ? "Gerando..." : "Gerar PPTX"}
+        </Button>
       </div>
     </div>
   );

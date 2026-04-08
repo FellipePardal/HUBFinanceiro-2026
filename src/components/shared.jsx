@@ -24,31 +24,32 @@ export const KPI = ({label, value, sub, color, T}) => {
   return (
     <div style={{
       background: T.surface || T.card,
+      backgroundImage: `${T.gradCard || ""}, radial-gradient(circle at 0% 0%, ${accent}14 0%, transparent 55%)`,
       border: `1px solid ${T.border}`,
       borderRadius: RADIUS.lg,
-      padding: "18px 20px",
+      padding: "20px 22px 22px",
       position: "relative",
       overflow: "hidden",
-      boxShadow: T.shadowSoft || "none",
+      boxShadow: T.shadow || "none",
     }}>
-      <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:accent, opacity:0.85 }}/>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:accent, boxShadow:`0 0 24px ${accent}88` }}/>
       <p style={{
         color: T.textMd,
         fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
+        fontWeight: 700,
+        letterSpacing: "0.08em",
         textTransform: "uppercase",
-        margin: 0,
+        margin: "4px 0 0",
       }}>{label}</p>
       <p className="num" style={{
-        fontSize: 24,
-        fontWeight: 700,
+        fontSize: 30,
+        fontWeight: 800,
         color: T.text,
-        margin: "10px 0 4px",
-        letterSpacing: "-0.02em",
-        lineHeight: 1.1,
+        margin: "14px 0 6px",
+        letterSpacing: "-0.025em",
+        lineHeight: 1,
       }}>{value}</p>
-      {sub && <p style={{ color: T.textSm, fontSize: 11, margin: 0 }}>{sub}</p>}
+      {sub && <p style={{ color: T.textSm, fontSize: 11, margin: 0, fontWeight:500 }}>{sub}</p>}
     </div>
   );
 };

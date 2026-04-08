@@ -101,7 +101,6 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
         }}>
           <Stat T={T} label="Campeonatos Ativos" value="1" sub="de 2 planejados" color={T.brand} icon={Trophy} />
           <Stat T={T} label="Temporada"          value="2026" sub="Janeiro – Dezembro" color={T.info} icon={Calendar} />
-          <Stat T={T} label="Unidade"            value="Transmissões" sub="Livemode Sports" color={T.warning} icon={BarChart3} />
           <Stat T={T} label="Detentores"         value="2" sub="CazeTV · Amazon" color="#a855f7" icon={Building2} />
         </div>
 

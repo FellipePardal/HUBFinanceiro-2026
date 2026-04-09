@@ -18,7 +18,6 @@ import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
 import TabFornecedores  from "./components/tabs/TabFornecedores";
-import TabTabelaPrecos  from "./components/tabs/TabTabelaPrecos";
 import TabNotasMensal  from "./components/tabs/TabNotasMensal";
 import TabEnvio        from "./components/tabs/TabEnvio";
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
@@ -34,19 +33,17 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const [notasMensais, setNotasMensaisRaw] = useState([]);
   const [envios, setEnviosRaw]             = useState([]);
   const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
-  const [tabelaPrecos, setTabelaPrecosRaw] = useState([]);
   const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, tp] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('tabela_precos')]);
+      const [j, s, n, f, nm, ev] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
       if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
       if (nm) setNotasMensaisRaw(nm); else setSupabaseState('notas_mensais', []);
       if (ev) setEnviosRaw(ev); else setSupabaseState('envios', []);
-      if (tp) setTabelaPrecosRaw(tp); else setSupabaseState('tabela_precos', []);
       setLoading(false);
     }
     load();
@@ -60,7 +57,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         if (payload.new.key === 'fornecedores')   setFornecedoresRaw(payload.new.value);
         if (payload.new.key === 'notas_mensais') setNotasMensaisRaw(payload.new.value);
         if (payload.new.key === 'envios')        setEnviosRaw(payload.new.value);
-        if (payload.new.key === 'tabela_precos') setTabelaPrecosRaw(payload.new.value);
       })
       .subscribe();
 
@@ -90,10 +86,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const setFornecedores = fn => setFornecedoresRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('fornecedores', next); return next;
-  });
-  const setTabelaPrecos = fn => setTabelaPrecosRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('tabela_precos', next); return next;
   });
 
   // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard
@@ -213,7 +205,7 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
   const TABS_NF   = ["notas fiscais","mensal"];
-  const TABS_FORN = ["cadastro","tabela de precos"];
+  const TABS_FORN = ["cadastro"];
   const TABS_REL  = ["apresentações","envio"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "fornecedores" ? TABS_FORN : TABS_REL;
 
@@ -498,7 +490,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
-        {tab==="tabela de precos" && <TabTabelaPrecos tabelaPrecos={tabelaPrecos} setTabelaPrecos={setTabelaPrecos} fornecedores={fornecedores} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 

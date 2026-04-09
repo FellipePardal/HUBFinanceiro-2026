@@ -115,4 +115,7 @@ export const FORNECEDORES_INIT = [
   {id:90,apelido:"Camarão Produções",razaoSocial:"CAMARAO FILMS LTDA",cnpj:"21.657.753/0001-44",funcao:"Drone",area:"Operações",tipo:"Fornecedor",nome:"",telefone:"",email:"",cpf:"",rg:""},
   {id:91,apelido:"Fernanda Saito",razaoSocial:"63.409.820 FERNANDA SAITO",cnpj:"63.409.820/0001-51",funcao:"",area:"Operações",tipo:"Prestador",nome:"",telefone:"",email:"",cpf:"",rg:""},
   {id:92,apelido:"Gabriel Sayão",razaoSocial:"GABRIEL SAYAO FERNANDES ROXO 14879796735",cnpj:"46.563.473/0001-06",funcao:"Edição de Melhores Momentos",area:"Operações",tipo:"Prestador",nome:"",telefone:"",email:"",cpf:"",rg:""},
+  {id:9901,apelido:"EPTV",razaoSocial:"EPTV",cnpj:"",funcao:"SNG, UM",area:"Operações",tipo:"Fornecedor",nome:"",telefone:"",email:"",cpf:"",rg:"",tipoTabela:"produtora",precos:[]},
+  {id:9902,apelido:"Telesports",razaoSocial:"TELESPORTS",cnpj:"",funcao:"UM, SNG",area:"Operações",tipo:"Fornecedor",nome:"",telefone:"",email:"",cpf:"",rg:"",tipoTabela:"produtora",precos:[]},
+  {id:9903,apelido:"R.A Produções",razaoSocial:"R.A PRODUÇÕES",cnpj:"",funcao:"SNG",area:"Operações",tipo:"Fornecedor",nome:"",telefone:"",email:"",cpf:"",rg:"",tipoTabela:"produtora",precos:[]},
 ];

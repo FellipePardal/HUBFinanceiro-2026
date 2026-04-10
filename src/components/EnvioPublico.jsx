@@ -36,7 +36,15 @@ export default function EnvioPublico({ numero }) {
       const hoje = new Date();
       const dataHoje = hoje.toLocaleDateString("pt-BR");
       const atualizado = todosEnvios.map(e => e.numero === numero
-        ? {...e, pago:true, pagoEm:hoje.toISOString(), pagoPor:(payerName||"").trim() || null, dataPagamentoEfetiva:dataHoje}
+        ? {
+            ...e,
+            pago:true,
+            pagoEm:hoje.toISOString(),
+            pagoPor:(payerName||"").trim() || null,
+            dataPagamentoEfetiva:dataHoje,
+            notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+            mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          }
         : e
       );
       await setState('envios', atualizado);

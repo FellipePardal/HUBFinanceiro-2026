@@ -74,7 +74,18 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   };
 
   const togglePago = (envioId) => {
-    setEnvios(ev => ev.map(e => e.id === envioId ? {...e, pago: !e.pago} : e));
+    setEnvios(ev => ev.map(e => {
+      if (e.id !== envioId) return e;
+      const novoPago = !e.pago;
+      if (novoPago) {
+        return {
+          ...e, pago: true,
+          notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+        };
+      }
+      return {...e, pago: false};
+    }));
   };
 
   const STATUS_NOTA = ["Pendente","Pago","Alteração"];

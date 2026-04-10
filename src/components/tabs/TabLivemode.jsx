@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { RADIUS, iSty, btnStyle } from "../../constants";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
@@ -200,9 +200,11 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
   const teal = "#14b8a6";
 
   const dados = livemode && livemode.length > 0 ? livemode : gerarDadosIniciais();
-  if (!livemode || livemode.length === 0) {
-    setLivemode(() => gerarDadosIniciais());
-  }
+  useEffect(() => {
+    if (!livemode || livemode.length === 0) {
+      setLivemode(() => gerarDadosIniciais());
+    }
+  }, []);
 
   const totalRodada = r => (r.grafismo||0) + (r.starlink||0) + (r.downlink||0) + (r.distribuicao||0);
 

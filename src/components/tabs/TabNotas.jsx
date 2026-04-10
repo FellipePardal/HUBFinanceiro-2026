@@ -711,6 +711,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const [showRegistrar, setShowRegistrar] = useState(null);
   const [showAvulsa, setShowAvulsa] = useState(false);
   const [filtroPlanilha, setFiltroPlanilha] = useState("Todas");
+  const [filtroFornecedor, setFiltroFornecedor] = useState("Todos");
   const [preview, setPreview] = useState(null);
   const uploadRef = useRef(null);
   const [uploadTarget, setUploadTarget] = useState(null);
@@ -810,9 +811,27 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
   // Planilha
   const planilhaRodadas = ["Todas", ...Array.from(new Set(notas.map(n => String(n.rodada)).filter(Boolean))).sort((a, b) => a - b)];
+  const planilhaFornecedores = ["Todos", ...Array.from(new Set(notas.map(n => n.fornecedor).filter(Boolean))).sort()];
   const planilhaItens = notas
     .filter(n => filtroPlanilha === "Todas" || String(n.rodada) === filtroPlanilha)
+    .filter(n => filtroFornecedor === "Todos" || n.fornecedor === filtroFornecedor)
     .sort((a, b) => (a.rodada || 0) - (b.rodada || 0));
+
+  // Resumo por fornecedor (para painel na planilha)
+  const resumoFornecedor = useMemo(() => {
+    if (filtroFornecedor === "Todos") return null;
+    const nfsForn = notas.filter(n => n.fornecedor === filtroFornecedor);
+    const totalGasto = nfsForn.reduce((s, n) => s + (n.valorNF || 0), 0);
+    const jogosSet = new Set(nfsForn.flatMap(n => n.jogoIds || (n.jogoId ? [n.jogoId] : [])));
+    const jogosComNF = jogos.filter(j => jogosSet.has(j.id) && j.mandante !== "A definir");
+    const statusMap = {};
+    nfsForn.forEach(n => {
+      const env = envioMap[n.id];
+      const st = env ? "Enviada" : "Pendente";
+      statusMap[st] = (statusMap[st] || 0) + 1;
+    });
+    return { total: nfsForn.length, totalGasto, jogos: jogosComNF, status: statusMap };
+  }, [filtroFornecedor, notas, jogos, envioMap]);
 
   const copyPlanilha = () => {
     const header = "Código\tNº NF\tFornecedor\tValor\tEmissão\tEnvio\tPagamento\tJogo\tRodada\tServiços\tTipo\tObs";
@@ -970,7 +989,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
       {/* ── PLANILHA ── */}
       {tab === "planilha" && (<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
             <span style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada</span>
             {planilhaRodadas.map(r => (
@@ -981,6 +1000,52 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           </div>
           <Button T={T} variant="primary" size="md" icon={CopyIcon} onClick={copyPlanilha}>Copiar Planilha</Button>
         </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:18}}>
+          <span style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Fornecedor</span>
+          <select value={filtroFornecedor} onChange={e => setFiltroFornecedor(e.target.value)}
+            style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:T.text,padding:"5px 10px",fontSize:12,cursor:"pointer",maxWidth:220}}>
+            {planilhaFornecedores.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+          {filtroFornecedor !== "Todos" && (
+            <Chip active={false} onClick={()=>setFiltroFornecedor("Todos")} T={T} color={T.danger}>✕ Limpar</Chip>
+          )}
+        </div>
+
+        {resumoFornecedor && (
+          <Card T={T} style={{marginBottom:16}} accent={purple}>
+            <div style={{padding:"16px 22px"}}>
+              <p style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",margin:"0 0 10px"}}>Resumo — {filtroFornecedor}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:12}}>
+                <div>
+                  <p style={{color:T.textSm,fontSize:10,margin:"0 0 2px",textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Total gasto</p>
+                  <p className="num" style={{color:purple,fontSize:18,fontWeight:800,margin:0}}>{fmt(resumoFornecedor.totalGasto)}</p>
+                </div>
+                <div>
+                  <p style={{color:T.textSm,fontSize:10,margin:"0 0 2px",textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Notas</p>
+                  <p className="num" style={{color:T.text,fontSize:18,fontWeight:800,margin:0}}>{resumoFornecedor.total}</p>
+                </div>
+                <div>
+                  <p style={{color:T.textSm,fontSize:10,margin:"0 0 2px",textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Status</p>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:2}}>
+                    {Object.entries(resumoFornecedor.status).map(([st, qt]) => (
+                      <Pill key={st} label={`${st}: ${qt}`} color={st==="Enviada"?T.brand:T.warning}/>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {resumoFornecedor.jogos.length > 0 && (
+                <div>
+                  <p style={{color:T.textSm,fontSize:10,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>Jogos com notas deste fornecedor</p>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {resumoFornecedor.jogos.map(j => (
+                      <Pill key={j.id} label={`Rd${j.rodada} ${abreviar(j.mandante)}x${abreviar(j.visitante)}`} color={T.info}/>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card T={T}>
           <PanelTitle T={T} title="Planilha de Notas" subtitle={`${planilhaItens.length} notas`}

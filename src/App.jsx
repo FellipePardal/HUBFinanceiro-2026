@@ -154,16 +154,26 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   const saveJogo       = j => setJogos(js => js.map(x => x.id===j.id ? j : x));
   const addJogo        = j => {
     setJogos(js => {
-      // Substituir um placeholder da mesma rodada e categoria, se existir
+      // 1) Tentar substituir placeholder da mesma rodada e categoria
       let replaced = false;
-      const next = js.map(x => {
+      let next = js.map(x => {
         if (!replaced && x.mandante === "A definir" && x.rodada === j.rodada && x.categoria === j.categoria) {
           replaced = true;
           return { ...j, id: x.id };
         }
         return x;
       });
-      return replaced ? next : [...js, j];
+      // 2) Se não achou match exato, substituir qualquer placeholder disponível
+      if (!replaced) {
+        next = js.map(x => {
+          if (!replaced && x.mandante === "A definir") {
+            replaced = true;
+            return { ...j, id: x.id };
+          }
+          return x;
+        });
+      }
+      return replaced ? next : js; // nunca ultrapassar o total de 76
     });
     setNovo(false); setNovoRapido(null);
   };

@@ -40,7 +40,7 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
               textTransform: "uppercase",
               margin: "0 0 2px",
               fontWeight: 600,
-            }}>Portal Financeiro</p>
+            }}>HUB Financeiro</p>
             <h1 style={{
               fontSize: 17,
               fontWeight: 700,
@@ -247,7 +247,7 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
           fontSize: 11,
           letterSpacing: "0.04em",
         }}>
-          Portal Financeiro · Livemode Sports · Temporada 2026
+          HUB Financeiro · Livemode Sports · Temporada 2026
         </div>
       </main>
     </div>

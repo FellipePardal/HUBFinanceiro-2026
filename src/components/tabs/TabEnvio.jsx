@@ -77,6 +77,17 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     setEnvios(ev => ev.map(e => e.id === envioId ? {...e, pago: !e.pago} : e));
   };
 
+  const STATUS_NOTA = ["Pendente","Pago","Alteração"];
+  const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Pago":"#22c55e","Alteração":"#ef4444"};
+
+  const updateNotaStatus = (envioId, notaId, tipo, novoStatus) => {
+    setEnvios(ev => ev.map(e => {
+      if (e.id !== envioId) return e;
+      const campo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n)};
+    }));
+  };
+
   const totalEnvios = envios.length;
   const totalNFsEnviadas = envios.reduce((s, e) => s + e.qtdNotas, 0);
   const totalValorEnviado = envios.reduce((s, e) => s + e.totalGeral, 0);
@@ -275,7 +286,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <table style={{...TS.table, minWidth:780}}>
                 <thead>
                   <tr style={TS.thead}>
-                    {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços",""].map(h =>
+                    {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços","Status",""].map(h =>
                       <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
                   </tr>
                 </thead>
@@ -291,6 +302,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                       <td style={{...TS.td, fontSize:11, whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
                       <td className="num" style={{...TS.td, fontSize:12}}>{n.rodada}</td>
                       <td style={{...TS.td, fontSize:10, color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>
+                      <td style={TS.td}>
+                        <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(envioDetalhe.id, n.id, "jogo", e.target.value)}
+                          style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
                       <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, n.codigo)}/>}</td>
                     </tr>
                   ))}
@@ -307,7 +324,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <table style={{...TS.table, minWidth:680}}>
                 <thead>
                   <tr style={TS.thead}>
-                    {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto",""].map(h =>
+                    {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto","Status",""].map(h =>
                       <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
                   </tr>
                 </thead>
@@ -321,6 +338,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                       <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(n.valor)}</td>
                       <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
                       <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataPagamento||"—"}</td>
+                      <td style={TS.td}>
+                        <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(envioDetalhe.id, n.id, "mensal", e.target.value)}
+                          style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
                       <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, `NF_${n.fornecedor}`)}/>}</td>
                     </tr>
                   ))}

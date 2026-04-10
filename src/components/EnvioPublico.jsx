@@ -12,6 +12,8 @@ const T = {
 const purple = "#a855f7";
 const cyan = "#06b6d4";
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const STATUS_NOTA = ["Pendente","Pago","Alteração"];
+const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Pago":"#22c55e","Alteração":"#ef4444"};
 
 export default function EnvioPublico({ numero }) {
   const [envio, setEnvio] = useState(null);
@@ -51,6 +53,21 @@ export default function EnvioPublico({ numero }) {
     const data = await getNFFile(id);
     if (!data) { alert("Arquivo não encontrado"); return; }
     const a = document.createElement("a"); a.href = data; a.download = filename; a.click();
+  };
+
+  const updateNotaStatus = async (notaId, tipo, novoStatus) => {
+    try {
+      const todosEnvios = (await getState('envios')) || [];
+      const campo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      const atualizado = todosEnvios.map(e => e.numero !== numero ? e : {
+        ...e,
+        [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n),
+      });
+      await setState('envios', atualizado);
+      setEnvio(atualizado.find(e => e.numero === numero) || null);
+    } catch (err) {
+      alert("Erro ao atualizar status: " + err.message);
+    }
   };
 
   if (loading) return (
@@ -156,34 +173,27 @@ export default function EnvioPublico({ numero }) {
             Notas Fiscais — Jogos
           </h2>
           <div style={{background:T.card,borderRadius:14,overflow:"hidden",marginBottom:32,border:`1px solid ${T.border}`,boxShadow:"0 4px 16px -8px rgba(15,23,42,0.12)"}}>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:T.surfaceAlt}}>
-                {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços",""].map(h => <th key={h} style={thS}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {(envio.notasResumo||[]).map(n => (
-                  <tr key={n.id}>
-                    <td style={tdS}><code className="num" style={{color:T.brand,fontSize:11,background:T.brandSoft,padding:"3px 7px",borderRadius:4,fontWeight:700}}>{n.codigo}</code></td>
-                    <td className="num" style={{...tdS,fontWeight:600}}>{n.numeroNF||"—"}</td>
-                    <td style={tdS}>{n.fornecedor}</td>
-                    <td className="num" style={{...tdS,fontWeight:700,color:purple,whiteSpace:"nowrap"}}>{fmt(n.valorNF)}</td>
-                    <td className="num" style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
-                    <td className="num" style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
-                    <td style={{...tdS,whiteSpace:"nowrap"}}>{n.jogoLabel}</td>
-                    <td className="num" style={tdS}>{n.rodada}</td>
-                    <td style={{...tdS,fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>
-                    <td style={tdS} className="no-print">
-                      {n.hasFile && <button onClick={() => downloadNF(n.id, n.codigo)} style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4}}><Download size={11} strokeWidth={2.5}/>Baixar</button>}
-                    </td>
-                  </tr>
-                ))}
-                <tr style={{background:T.surfaceAlt,fontWeight:700}}>
-                  <td colSpan={3} style={{...tdS,textTransform:"uppercase",letterSpacing:"0.04em",fontSize:11}}>Total</td>
-                  <td className="num" style={{...tdS,color:purple,fontWeight:700}}>{fmt(envio.totalJogos)}</td>
-                  <td colSpan={6}/>
-                </tr>
-              </tbody>
-            </table>
+            {(envio.notasResumo||[]).map(n => (
+              <div key={n.id} style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                <code className="num" style={{color:T.brand,fontSize:11,background:T.brandSoft,padding:"3px 7px",borderRadius:4,fontWeight:700}}>{n.codigo}</code>
+                <span style={{fontSize:12,fontWeight:600,color:T.text,flex:"1 1 120px",minWidth:80}}>{n.fornecedor}</span>
+                <span className="num" style={{fontSize:13,fontWeight:700,color:purple,minWidth:80}}>{fmt(n.valorNF)}</span>
+                <span style={{fontSize:11,color:T.textSm,minWidth:60}}>NF {n.numeroNF||"—"}</span>
+                <span style={{fontSize:11,color:T.textSm}}>{n.jogoLabel}</span>
+                <span style={{fontSize:10,color:T.textSm,background:T.surfaceAlt,padding:"2px 8px",borderRadius:4}}>Rd {n.rodada}</span>
+                {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"jogo",e.target.value)} className="no-print"
+                  style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                  {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                {(n.servicosLabels||[]).length > 0 && <span style={{fontSize:10,color:T.textSm,flex:"1 1 100%"}}>{(n.servicosLabels||[]).join(", ")}</span>}
+                {n.hasFile && <button onClick={() => downloadNF(n.id, n.codigo)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
+              </div>
+            ))}
+            <div style={{padding:"14px 18px",background:T.surfaceAlt,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.text}}>Total</span>
+              <span className="num" style={{fontSize:14,fontWeight:700,color:purple}}>{fmt(envio.totalJogos)}</span>
+            </div>
           </div>
         </>)}
 
@@ -193,32 +203,25 @@ export default function EnvioPublico({ numero }) {
             Notas Fiscais — Mensais
           </h2>
           <div style={{background:T.card,borderRadius:14,overflow:"hidden",marginBottom:32,border:`1px solid ${T.border}`,boxShadow:"0 4px 16px -8px rgba(15,23,42,0.12)"}}>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:T.surfaceAlt}}>
-                {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto",""].map(h => <th key={h} style={thS}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {(envio.mensaisResumo||[]).map(n => (
-                  <tr key={n.id}>
-                    <td style={{...tdS,fontWeight:600}}>{n.fornecedor}</td>
-                    <td style={tdS}><span style={{background:cyan+"22",color:cyan,border:`1px solid ${cyan}55`,padding:"3px 10px",borderRadius:999,fontSize:11,fontWeight:700}}>{n.categoria}</span></td>
-                    <td style={tdS}>{n.mesLabel}</td>
-                    <td className="num" style={tdS}>{n.numeroNF||"—"}</td>
-                    <td className="num" style={{...tdS,fontWeight:700,color:purple}}>{fmt(n.valor)}</td>
-                    <td className="num" style={{...tdS,color:T.textSm}}>{n.dataEmissao||"—"}</td>
-                    <td className="num" style={{...tdS,color:T.textSm}}>{n.dataPagamento||"—"}</td>
-                    <td style={tdS} className="no-print">
-                      {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_${n.fornecedor}`)} style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:10,fontWeight:600,display:"inline-flex",alignItems:"center",gap:4}}><Download size={11} strokeWidth={2.5}/>Baixar</button>}
-                    </td>
-                  </tr>
-                ))}
-                <tr style={{background:T.surfaceAlt,fontWeight:700}}>
-                  <td colSpan={4} style={{...tdS,textTransform:"uppercase",letterSpacing:"0.04em",fontSize:11}}>Total</td>
-                  <td className="num" style={{...tdS,color:purple,fontWeight:700}}>{fmt(envio.totalMensais)}</td>
-                  <td colSpan={3}/>
-                </tr>
-              </tbody>
-            </table>
+            {(envio.mensaisResumo||[]).map(n => (
+              <div key={n.id} style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:12,fontWeight:600,color:T.text,flex:"1 1 120px",minWidth:80}}>{n.fornecedor}</span>
+                <span style={{background:cyan+"22",color:cyan,border:`1px solid ${cyan}55`,padding:"3px 10px",borderRadius:999,fontSize:11,fontWeight:700}}>{n.categoria}</span>
+                <span style={{fontSize:11,color:T.textSm}}>{n.mesLabel}</span>
+                <span className="num" style={{fontSize:13,fontWeight:700,color:purple,minWidth:80}}>{fmt(n.valor)}</span>
+                <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
+                {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"mensal",e.target.value)} className="no-print"
+                  style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                  {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_${n.fornecedor}`)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
+              </div>
+            ))}
+            <div style={{padding:"14px 18px",background:T.surfaceAlt,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.text}}>Total</span>
+              <span className="num" style={{fontSize:14,fontWeight:700,color:purple}}>{fmt(envio.totalMensais)}</span>
+            </div>
           </div>
         </>)}
 

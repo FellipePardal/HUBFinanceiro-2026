@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { KPI, Pill } from "../shared";
-import { RADIUS, iSty } from "../../constants";
+import { RADIUS, iSty, btnStyle } from "../../constants";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
-import { CheckCircle2, Clock, Edit2 } from "lucide-react";
+import { CheckCircle2, Clock, Edit2, Plus, Trash2, Eye, Upload } from "lucide-react";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
 
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 
-const SERVICOS_LM = [
+export const SERVICOS_LM = [
   { key:"grafismo",     label:"Máquinas de Grafismo", valorPadrao:3948 },
   { key:"starlink",     label:"Starlink",             valorPadrao:658  },
   { key:"downlink",     label:"Downlink",             valorPadrao:3000 },
@@ -23,11 +24,140 @@ function gerarDadosIniciais() {
     starlink: 658,
     downlink: 3000,
     distribuicao: 2000,
-    emitido: false,
   }));
 }
 
-export default function TabLivemode({ livemode, setLivemode, jogos, setJogos, T }) {
+// ── Modal para registrar NF Livemode ──
+function NFLivemodeModal({ onSave, onClose, fornecedores, T }) {
+  const IS = iSty(T);
+  const [form, setForm] = useState({
+    rodada:"1", servicos:{}, numeroNF:"", fornecedor:"", dataEmissao:"", obs:"",
+  });
+  const [arquivo, setArquivo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+  const set = (k,v) => setForm(f => ({...f,[k]:v}));
+
+  const toggleServico = (key) => {
+    setForm(f => {
+      const s = {...f.servicos};
+      if (s[key] !== undefined) { delete s[key]; } else { s[key] = SERVICOS_LM.find(x=>x.key===key)?.valorPadrao || 0; }
+      return {...f, servicos: s};
+    });
+  };
+  const setServicoValor = (key, val) => setForm(f => ({...f, servicos:{...f.servicos, [key]: parseFloat(val)||0}}));
+
+  const totalNF = Object.values(form.servicos).reduce((s,v) => s+(v||0), 0);
+  const selCount = Object.keys(form.servicos).length;
+  const servicosLabels = Object.keys(form.servicos).map(k => SERVICOS_LM.find(x=>x.key===k)?.label||k);
+
+  const handleSave = async () => {
+    if (selCount === 0 || (!form.numeroNF && !form.fornecedor)) return;
+    setUploading(true);
+    const notaId = Date.now();
+    let hasFile = false;
+    if (arquivo) {
+      try { const dataUrl = await fileToDataUrl(arquivo); await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_){}
+    }
+    onSave({
+      id: notaId,
+      rodada: parseInt(form.rodada)||1,
+      servicos: {...form.servicos},
+      servicosLabels,
+      numeroNF: form.numeroNF,
+      fornecedor: form.fornecedor,
+      valor: totalNF,
+      dataEmissao: form.dataEmissao,
+      obs: form.obs,
+      hasFile,
+    });
+    setUploading(false);
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}}>
+        <h3 style={{margin:"0 0 4px",fontSize:16,color:T.text}}>Registrar NF Livemode</h3>
+        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada e os serviços cobertos por esta nota</p>
+
+        <div style={{marginBottom:12}}>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Rodada</label>
+          <select value={form.rodada} onChange={e=>set("rodada",e.target.value)} style={IS}>
+            {Array.from({length:TOTAL_RODADAS},(_,i)=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
+          </select>
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:6}}>Serviços</label>
+          <div style={{background:T.bg,borderRadius:8,padding:8}}>
+            {SERVICOS_LM.map(s => {
+              const checked = form.servicos[s.key] !== undefined;
+              return (
+                <div key={s.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,background:checked?"#22c55e18":"transparent"}}>
+                  <input type="checkbox" checked={checked} onChange={()=>toggleServico(s.key)} style={{accentColor:"#22c55e"}}/>
+                  <span style={{flex:1,fontSize:13,color:T.text}}>{s.label}</span>
+                  {checked
+                    ? <input type="number" value={form.servicos[s.key]} onChange={e=>setServicoValor(s.key, e.target.value)}
+                        style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#a855f7",fontWeight:600}}/>
+                    : <span className="num" style={{fontSize:11,color:T.textSm,width:100,textAlign:"right"}}>{fmt(s.valorPadrao)}</span>
+                  }
+                </div>
+              );
+            })}
+            {selCount > 0 && (
+              <div style={{borderTop:`1px solid ${T.border}`,marginTop:6,paddingTop:6,textAlign:"right"}}>
+                <span style={{fontSize:14,fontWeight:700,color:"#a855f7"}}>Total NF: {fmt(totalNF)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor</label>
+            <input value={form.fornecedor} onChange={e=>set("fornecedor",e.target.value)} placeholder="Livemode" style={IS}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota</label>
+            <input value={form.numeroNF} onChange={e=>set("numeroNF",e.target.value)} style={IS}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
+            <input value={form.dataEmissao} onChange={e=>set("dataEmissao",e.target.value)} placeholder="dd/mm" style={IS}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações</label>
+            <input value={form.obs} onChange={e=>set("obs",e.target.value)} style={IS}/>
+          </div>
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF (PDF/imagem)</label>
+          <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e=>setArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
+          <div onClick={()=>fileRef.current?.click()}
+            onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();setArquivo(e.dataTransfer.files[0]||null);}}
+            style={{border:`2px dashed ${arquivo?"#22c55e":T.muted}`,borderRadius:8,padding:"14px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
+            {arquivo
+              ? <p style={{margin:0,color:"#22c55e",fontSize:13,fontWeight:600}}>{arquivo.name} ({(arquivo.size/1024).toFixed(0)} KB)</p>
+              : <p style={{margin:0,color:T.textSm,fontSize:12}}>Clique ou arraste o arquivo aqui</p>}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{...btnStyle,background:"#475569"}}>Cancelar</button>
+          <button onClick={handleSave} disabled={selCount===0||uploading} style={{...btnStyle,background:selCount>0?"#22c55e":"#475569",opacity:selCount>0&&!uploading?1:0.5}}>
+            {uploading ? "Enviando..." : "Salvar NF"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente Principal ──
+export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, jogos, setJogos, fornecedores, T }) {
+  const [tab, setTab] = useState("notas");
+  const [showModal, setShowModal] = useState(false);
   const [editRodada, setEditRodada] = useState(null);
   const [editForm, setEditForm] = useState({});
 
@@ -35,168 +165,252 @@ export default function TabLivemode({ livemode, setLivemode, jogos, setJogos, T 
   const TS = tableStyles(T);
   const purple = "#a855f7";
   const green = "#22c55e";
+  const teal = "#14b8a6";
 
   const dados = livemode && livemode.length > 0 ? livemode : gerarDadosIniciais();
-
-  // Inicializar dados no Supabase se vazio
   if (!livemode || livemode.length === 0) {
     setLivemode(() => gerarDadosIniciais());
   }
 
   const totalRodada = r => (r.grafismo||0) + (r.starlink||0) + (r.downlink||0) + (r.distribuicao||0);
 
-  const totalGeral = dados.reduce((s,r) => s + totalRodada(r), 0);
-  const totalEmitido = dados.filter(r => r.emitido).reduce((s,r) => s + totalRodada(r), 0);
-  const totalPendente = totalGeral - totalEmitido;
-  const rodadasEmitidas = dados.filter(r => r.emitido).length;
+  // ── NFs ──
+  const nfs = notasLivemode || [];
+  const totalNFs = nfs.length;
+  const totalValorNFs = nfs.reduce((s,n) => s + (n.valor||0), 0);
 
-  // Totais por serviço
+  const addNota = (nota) => {
+    setNotasLivemode(ns => [...ns, nota]);
+    setShowModal(false);
+  };
+
+  const deleteNota = (id) => {
+    if (!window.confirm("Excluir esta NF?")) return;
+    deleteNFFile(id);
+    setNotasLivemode(ns => ns.filter(n => n.id !== id));
+  };
+
+  // ── Realizado por rodada (soma das NFs) ──
+  const realizadoPorRodada = useMemo(() => {
+    const map = {};
+    nfs.forEach(n => {
+      if (!map[n.rodada]) map[n.rodada] = 0;
+      map[n.rodada] += n.valor || 0;
+    });
+    return map;
+  }, [nfs]);
+
+  // ── Controle por rodada ──
+  const totalGeral = dados.reduce((s,r) => s + totalRodada(r), 0);
+  const rodadasComNF = new Set(nfs.map(n => n.rodada));
+
   const totaisPorServico = SERVICOS_LM.map(s => ({
     ...s,
     total: dados.reduce((sum,r) => sum + (r[s.key]||0), 0),
-    emitido: dados.filter(r => r.emitido).reduce((sum,r) => sum + (r[s.key]||0), 0),
+    realizado: nfs.reduce((sum,n) => sum + (n.servicos?.[s.key]||0), 0),
   }));
-
-  const toggleEmitido = (rodada) => {
-    setLivemode(prev => (prev||dados).map(r => r.rodada === rodada ? {...r, emitido: !r.emitido} : r));
-  };
 
   const startEdit = (r) => {
     setEditRodada(r.rodada);
-    setEditForm({ grafismo: r.grafismo, starlink: r.starlink, downlink: r.downlink, distribuicao: r.distribuicao, jogos: r.jogos });
+    setEditForm({ grafismo:r.grafismo, starlink:r.starlink, downlink:r.downlink, distribuicao:r.distribuicao, jogos:r.jogos });
   };
-
   const saveEdit = () => {
     setLivemode(prev => (prev||dados).map(r => r.rodada === editRodada ? {
-      ...r,
-      grafismo: parseFloat(editForm.grafismo)||0,
-      starlink: parseFloat(editForm.starlink)||0,
-      downlink: parseFloat(editForm.downlink)||0,
-      distribuicao: parseFloat(editForm.distribuicao)||0,
-      jogos: parseInt(editForm.jogos)||2,
+      ...r, grafismo:parseFloat(editForm.grafismo)||0, starlink:parseFloat(editForm.starlink)||0,
+      downlink:parseFloat(editForm.downlink)||0, distribuicao:parseFloat(editForm.distribuicao)||0,
+      jogos:parseInt(editForm.jogos)||2,
     } : r));
     setEditRodada(null);
   };
 
-  // ── Sync com realizado.infra dos jogos ──
-  // Calcula o total livemode emitido por rodada e distribui entre os jogos
+  // ── Sync infra nos jogos ──
   const syncInfra = () => {
     const divulgados = jogos.filter(j => j.mandante !== "A definir");
-    const rodadaMap = {};
-    dados.filter(r => r.emitido).forEach(r => {
-      rodadaMap[r.rodada] = totalRodada(r);
-    });
-
     setJogos(js => js.map(j => {
       if (j.mandante === "A definir") return j;
-      const totalLmRodada = rodadaMap[j.rodada] || 0;
+      const totalLm = realizadoPorRodada[j.rodada] || 0;
       const jogosNaRodada = divulgados.filter(x => x.rodada === j.rodada).length || 1;
-      const infraPorJogo = Math.round(totalLmRodada / jogosNaRodada);
+      const infraPorJogo = Math.round(totalLm / jogosNaRodada);
       return {...j, realizado: {...(j.realizado||{}), infra: infraPorJogo}};
     }));
-    alert("Infra + Distr. atualizado nos jogos com base nas rodadas emitidas!");
+    alert("Infra + Distr. atualizado nos jogos com base nas NFs registradas!");
   };
+
+  // NFs agrupadas por rodada
+  const nfsPorRodada = useMemo(() => {
+    const map = {};
+    nfs.forEach(n => {
+      if (!map[n.rodada]) map[n.rodada] = [];
+      map[n.rodada].push(n);
+    });
+    return map;
+  }, [nfs]);
+
+  const TABS_LM = [
+    {value:"notas", label:"Notas Fiscais"},
+    {value:"controle", label:"Controle por Rodada"},
+  ];
 
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:16}}>
-        <KPI label="Total Geral" value={fmt(totalGeral)} sub={`${TOTAL_RODADAS} rodadas`} color={purple} T={T}/>
-        <KPI label="Emitido" value={fmt(totalEmitido)} sub={`${rodadasEmitidas} rodada${rodadasEmitidas!==1?"s":""}`} color={green} T={T}/>
-        <KPI label="Pendente" value={fmt(totalPendente)} sub={`${TOTAL_RODADAS - rodadasEmitidas} rodada${TOTAL_RODADAS-rodadasEmitidas!==1?"s":""}`} color={T.warning} T={T}/>
+        <KPI label="Orçado Total" value={fmt(totalGeral)} sub={`${TOTAL_RODADAS} rodadas`} color={purple} T={T}/>
+        <KPI label="NFs Registradas" value={String(totalNFs)} sub={fmt(totalValorNFs)} color={green} T={T}/>
+        <KPI label="Saldo" value={fmt(totalGeral - totalValorNFs)} sub={`${((totalValorNFs/totalGeral)*100||0).toFixed(1)}% executado`} color={totalGeral-totalValorNFs>=0?teal:T.danger} T={T}/>
       </div>
 
       {/* Resumo por serviço */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:24}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:20}}>
         {totaisPorServico.map(s => (
           <Card key={s.key} T={T}>
             <div style={{padding:"14px 18px"}}>
               <p style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",margin:"0 0 6px"}}>{s.label}</p>
               <p className="num" style={{color:T.text,fontSize:18,fontWeight:800,margin:"0 0 4px"}}>{fmt(s.total)}</p>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                <span style={{color:green}}>Emitido: {fmt(s.emitido)}</span>
-                <span style={{color:T.textSm}}>{s.total ? ((s.emitido/s.total)*100).toFixed(0) : 0}%</span>
+                <span style={{color:green}}>NFs: {fmt(s.realizado)}</span>
+                <span style={{color:T.textSm}}>{s.total ? ((s.realizado/s.total)*100).toFixed(0) : 0}%</span>
               </div>
-              <div style={{marginTop:6}}><Progress value={s.total ? (s.emitido/s.total)*100 : 0} T={T}/></div>
+              <div style={{marginTop:6}}><Progress value={s.total ? (s.realizado/s.total)*100 : 0} T={T}/></div>
             </div>
           </Card>
         ))}
       </div>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:12}}>
-        <PanelTitle T={T} title="Controle por Rodada" subtitle="Serviços Livemode — Infra + Distribuição"/>
-        <Button T={T} variant="primary" size="md" icon={CheckCircle2} onClick={syncInfra}>
-          Sincronizar com Jogos
-        </Button>
+        <div style={{display:"flex",gap:4}}>
+          {TABS_LM.map(t => (
+            <button key={t.value} onClick={()=>setTab(t.value)} style={{
+              padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+              background:tab===t.value?teal:"transparent",color:tab===t.value?"#fff":T.textMd,
+            }}>{t.label}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowModal(true)}>Nova NF</Button>
+          <Button T={T} variant="secondary" size="md" icon={CheckCircle2} onClick={syncInfra}>Sincronizar Jogos</Button>
+        </div>
       </div>
 
-      <Card T={T}>
-        <div style={TS.wrap}>
-          <table style={{...TS.table, minWidth:700}}>
-            <thead>
-              <tr style={TS.thead}>
-                {["Rodada","Jogos","Grafismo","Starlink","Downlink","Distribuição","Total","Status",""].map(h =>
-                  <th key={h} style={{...TS.th, ...(["Jogos","Grafismo","Starlink","Downlink","Distribuição","Total"].includes(h)?TS.thRight:TS.thLeft)}}>{h}</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {dados.map(r => {
-                const isEdit = editRodada === r.rodada;
-                const total = totalRodada(r);
-                return (
-                  <tr key={r.rodada} style={{...TS.tr, background: r.emitido ? (green+"08") : "transparent"}}>
-                    <td style={{...TS.td, fontWeight:700, fontSize:13}}>Rodada {r.rodada}</td>
-                    <td className="num" style={TS.tdNum}>
-                      {isEdit ? <input type="number" value={editForm.jogos} onChange={e=>setEditForm(f=>({...f,jogos:e.target.value}))} style={{...IS,width:50,textAlign:"right",padding:"2px 6px",fontSize:12}}/> : r.jogos}
-                    </td>
-                    {SERVICOS_LM.map(s => (
-                      <td key={s.key} className="num" style={TS.tdNum}>
-                        {isEdit
-                          ? <input type="number" value={editForm[s.key]} onChange={e=>setEditForm(f=>({...f,[s.key]:e.target.value}))} style={{...IS,width:80,textAlign:"right",padding:"2px 6px",fontSize:12}}/>
-                          : fmt(r[s.key]||0)
-                        }
-                      </td>
-                    ))}
-                    <td className="num" style={{...TS.tdNum, fontWeight:700, color:purple}}>{fmt(total)}</td>
-                    <td style={TS.td}>
-                      <button onClick={()=>toggleEmitido(r.rodada)}
-                        style={{
-                          background: r.emitido ? green+"22" : T.warning+"22",
-                          color: r.emitido ? green : T.warning,
-                          border: `1px solid ${r.emitido ? green : T.warning}55`,
-                          borderRadius:6, padding:"4px 10px", fontSize:10, fontWeight:700,
-                          cursor:"pointer", display:"inline-flex", alignItems:"center", gap:4,
-                        }}>
-                        {r.emitido ? <CheckCircle2 size={11} strokeWidth={2.5}/> : <Clock size={11} strokeWidth={2.5}/>}
-                        {r.emitido ? "Emitido" : "Pendente"}
-                      </button>
-                    </td>
-                    <td style={TS.td}>
-                      {isEdit ? (
-                        <div style={{display:"flex",gap:4}}>
-                          <Button T={T} variant="primary" size="sm" onClick={saveEdit}>Salvar</Button>
-                          <Button T={T} variant="secondary" size="sm" onClick={()=>setEditRodada(null)}>X</Button>
-                        </div>
-                      ) : (
-                        <Button T={T} variant="secondary" size="sm" icon={Edit2} onClick={()=>startEdit(r)}/>
+      {/* ── ABA NOTAS ── */}
+      {tab === "notas" && (
+        <div>
+          {nfs.length === 0 ? (
+            <Card T={T}>
+              <div style={{padding:50,textAlign:"center"}}>
+                <p style={{color:T.text,fontSize:14,margin:"0 0 4px",fontWeight:600}}>Nenhuma NF Livemode registrada</p>
+                <p style={{color:T.textSm,fontSize:12,margin:0}}>Clique em "Nova NF" para registrar</p>
+              </div>
+            </Card>
+          ) : (
+            <Card T={T}>
+              <div style={TS.wrap}>
+                <table style={{...TS.table, minWidth:700}}>
+                  <thead>
+                    <tr style={TS.thead}>
+                      {["Rd","Nº NF","Fornecedor","Serviços","Valor","Emissão","Obs",""].map(h =>
+                        <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
-                <td style={{...TS.td,fontSize:11,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total</td>
-                <td className="num" style={TS.tdNum}>{dados.reduce((s,r) => s + (r.jogos||0), 0)}</td>
-                {SERVICOS_LM.map(s => (
-                  <td key={s.key} className="num" style={{...TS.tdNum, fontWeight:700}}>{fmt(dados.reduce((sum,r) => sum + (r[s.key]||0), 0))}</td>
-                ))}
-                <td className="num" style={{...TS.tdNum, fontWeight:700, color:purple, fontSize:14}}>{fmt(totalGeral)}</td>
-                <td colSpan={2}/>
-              </tr>
-            </tbody>
-          </table>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...nfs].sort((a,b) => a.rodada - b.rodada).map(n => (
+                      <tr key={n.id} style={TS.tr}>
+                        <td className="num" style={{...TS.td, fontWeight:700}}>Rd {n.rodada}</td>
+                        <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
+                        <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
+                        <td style={{...TS.td, fontSize:11}}>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                            {(n.servicosLabels||[]).map(s => <Pill key={s} label={s} color={teal}/>)}
+                          </div>
+                        </td>
+                        <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(n.valor)}</td>
+                        <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
+                        <td style={{...TS.td, color:T.textSm, fontSize:11}}>{n.obs||""}</td>
+                        <td style={TS.td}>
+                          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
+                      <td colSpan={4} style={{...TS.td,fontSize:11,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total ({nfs.length} notas)</td>
+                      <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700, fontSize:14}}>{fmt(totalValorNFs)}</td>
+                      <td colSpan={3}/>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
         </div>
-      </Card>
+      )}
+
+      {/* ── ABA CONTROLE ── */}
+      {tab === "controle" && (
+        <Card T={T}>
+          <div style={TS.wrap}>
+            <table style={{...TS.table, minWidth:750}}>
+              <thead>
+                <tr style={TS.thead}>
+                  {["Rodada","Jogos","Grafismo","Starlink","Downlink","Distribuição","Orçado","NFs","Saldo",""].map(h =>
+                    <th key={h} style={{...TS.th, ...(["Jogos","Grafismo","Starlink","Downlink","Distribuição","Orçado","NFs","Saldo"].includes(h)?TS.thRight:TS.thLeft)}}>{h}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {dados.map(r => {
+                  const isEdit = editRodada === r.rodada;
+                  const orcado = totalRodada(r);
+                  const realizado = realizadoPorRodada[r.rodada] || 0;
+                  const saldo = orcado - realizado;
+                  const temNF = rodadasComNF.has(r.rodada);
+                  return (
+                    <tr key={r.rodada} style={{...TS.tr, background:temNF ? green+"08" : "transparent"}}>
+                      <td style={{...TS.td, fontWeight:700, fontSize:13}}>Rodada {r.rodada}</td>
+                      <td className="num" style={TS.tdNum}>
+                        {isEdit ? <input type="number" value={editForm.jogos} onChange={e=>setEditForm(f=>({...f,jogos:e.target.value}))} style={{...IS,width:50,textAlign:"right",padding:"2px 6px",fontSize:12}}/> : r.jogos}
+                      </td>
+                      {SERVICOS_LM.map(s => (
+                        <td key={s.key} className="num" style={TS.tdNum}>
+                          {isEdit
+                            ? <input type="number" value={editForm[s.key]} onChange={e=>setEditForm(f=>({...f,[s.key]:e.target.value}))} style={{...IS,width:80,textAlign:"right",padding:"2px 6px",fontSize:12}}/>
+                            : fmt(r[s.key]||0)
+                          }
+                        </td>
+                      ))}
+                      <td className="num" style={{...TS.tdNum, fontWeight:700, color:purple}}>{fmt(orcado)}</td>
+                      <td className="num" style={{...TS.tdNum, color:realizado>0?green:T.textSm}}>{fmt(realizado)}</td>
+                      <td className="num" style={{...TS.tdNum, fontWeight:700, color:saldo<0?T.danger:teal}}>{fmt(saldo)}</td>
+                      <td style={TS.td}>
+                        {isEdit ? (
+                          <div style={{display:"flex",gap:4}}>
+                            <Button T={T} variant="primary" size="sm" onClick={saveEdit}>Salvar</Button>
+                            <Button T={T} variant="secondary" size="sm" onClick={()=>setEditRodada(null)}>X</Button>
+                          </div>
+                        ) : (
+                          <Button T={T} variant="secondary" size="sm" icon={Edit2} onClick={()=>startEdit(r)}/>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
+                  <td style={{...TS.td,fontSize:11,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total</td>
+                  <td className="num" style={TS.tdNum}>{dados.reduce((s,r)=>s+(r.jogos||0),0)}</td>
+                  {SERVICOS_LM.map(s => (
+                    <td key={s.key} className="num" style={{...TS.tdNum, fontWeight:700}}>{fmt(dados.reduce((sum,r)=>sum+(r[s.key]||0),0))}</td>
+                  ))}
+                  <td className="num" style={{...TS.tdNum, fontWeight:700, color:purple, fontSize:14}}>{fmt(totalGeral)}</td>
+                  <td className="num" style={{...TS.tdNum, fontWeight:700, color:green}}>{fmt(totalValorNFs)}</td>
+                  <td className="num" style={{...TS.tdNum, fontWeight:700, color:teal}}>{fmt(totalGeral - totalValorNFs)}</td>
+                  <td/>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {showModal && <NFLivemodeModal onSave={addNota} onClose={()=>setShowModal(false)} fornecedores={fornecedores} T={T}/>}
     </div>
   );
 }

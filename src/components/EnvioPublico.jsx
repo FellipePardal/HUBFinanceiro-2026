@@ -44,6 +44,7 @@ export default function EnvioPublico({ numero }) {
             dataPagamentoEfetiva:dataHoje,
             notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
             mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+            livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
           }
         : e
       );
@@ -66,7 +67,7 @@ export default function EnvioPublico({ numero }) {
   const updateNotaStatus = async (notaId, tipo, novoStatus) => {
     try {
       const todosEnvios = (await getState('envios')) || [];
-      const campo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
       const atualizado = todosEnvios.map(e => e.numero !== numero ? e : {
         ...e,
         [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n),
@@ -167,6 +168,14 @@ export default function EnvioPublico({ numero }) {
               <p style={{fontSize:11,color:T.textSm,margin:"4px 0 0"}}>{(envio.mensaisResumo||[]).length} notas</p>
             </div>
           )}
+          {(envio.totalLivemode||0) > 0 && (
+            <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"18px 20px",position:"relative",overflow:"hidden",boxShadow:"0 4px 16px -8px rgba(15,23,42,0.15)"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:"#14b8a6",boxShadow:"0 0 18px #14b8a688"}}/>
+              <p style={{fontSize:10,color:T.textSm,margin:"4px 0 8px",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>NFs Livemode</p>
+              <p className="num" style={{fontSize:24,fontWeight:800,color:T.text,margin:0,letterSpacing:"-0.025em"}}>{fmt(envio.totalLivemode)}</p>
+              <p style={{fontSize:11,color:T.textSm,margin:"4px 0 0"}}>{(envio.livemodeResumo||[]).length} notas</p>
+            </div>
+          )}
           <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"18px 20px",position:"relative",overflow:"hidden",boxShadow:"0 4px 16px -8px rgba(15,23,42,0.15)"}}>
             <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:purple,boxShadow:`0 0 18px ${purple}88`}}/>
             <p style={{fontSize:10,color:T.textSm,margin:"4px 0 8px",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Total do Envio</p>
@@ -229,6 +238,34 @@ export default function EnvioPublico({ numero }) {
             <div style={{padding:"14px 18px",background:T.surfaceAlt,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.text}}>Total</span>
               <span className="num" style={{fontSize:14,fontWeight:700,color:purple}}>{fmt(envio.totalMensais)}</span>
+            </div>
+          </div>
+        </>)}
+
+        {(envio.livemodeResumo||[]).length > 0 && (<>
+          <h2 style={{fontSize:14,fontWeight:700,margin:"0 0 14px",color:T.text,letterSpacing:"-0.01em",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{width:4,height:18,background:"#14b8a6",borderRadius:2,boxShadow:"0 0 12px #14b8a688"}}/>
+            Notas Fiscais — Livemode
+          </h2>
+          <div style={{background:T.card,borderRadius:14,overflow:"hidden",marginBottom:32,border:`1px solid ${T.border}`,boxShadow:"0 4px 16px -8px rgba(15,23,42,0.12)"}}>
+            {(envio.livemodeResumo||[]).map(n => (
+              <div key={n.id} style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:12,fontWeight:600,color:T.text,flex:"1 1 120px",minWidth:80}}>{n.fornecedor}</span>
+                <span className="num" style={{fontSize:13,fontWeight:700,color:purple,minWidth:80}}>{fmt(n.valor)}</span>
+                <span style={{fontSize:10,color:T.textSm,background:T.surfaceAlt,padding:"2px 8px",borderRadius:4}}>Rd {n.rodada}</span>
+                <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
+                {(n.servicosLabels||[]).length > 0 && <span style={{fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>}
+                {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"livemode",e.target.value)} className="no-print"
+                  style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                  {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_LM_${n.fornecedor}`)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
+              </div>
+            ))}
+            <div style={{padding:"14px 18px",background:T.surfaceAlt,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.04em",color:T.text}}>Total</span>
+              <span className="num" style={{fontSize:14,fontWeight:700,color:purple}}>{fmt(envio.totalLivemode)}</span>
             </div>
           </div>
         </>)}

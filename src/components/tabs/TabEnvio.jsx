@@ -8,12 +8,13 @@ import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink
 
 const catTotal = (subs, cat) => cat.subs.reduce((s, sub) => s + (subs?.[sub.key]||0), 0);
 
-export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios, setEnvios, T }) {
+export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [], servicos, envios, setEnvios, T }) {
   const [view, setView] = useState("lista");
   const [envioDetalheId, setEnvioDetalheId] = useState(null);
 
   const [selJogosNFs, setSelJogosNFs] = useState(new Set());
   const [selMensaisNFs, setSelMensaisNFs] = useState(new Set());
+  const [selLivemodeNFs, setSelLivemodeNFs] = useState(new Set());
   const [obs, setObs] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
   const [nomeEnvio, setNomeEnvio] = useState("");
@@ -26,6 +27,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const [addingNotas, setAddingNotas] = useState(false);
   const [addSelJogos, setAddSelJogos] = useState(new Set());
   const [addSelMensais, setAddSelMensais] = useState(new Set());
+  const [addSelLivemode, setAddSelLivemode] = useState(new Set());
 
   const IS = iSty(T);
   const TS = tableStyles(T);
@@ -33,22 +35,28 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const cyan = "#06b6d4";
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
 
-  const nfsEnviadas = new Set(envios.flatMap(e => [...(e.notasIds||[]), ...(e.mensaisIds||[])]));
+  const teal = "#14b8a6";
+  const nfsEnviadas = new Set(envios.flatMap(e => [...(e.notasIds||[]), ...(e.mensaisIds||[]), ...(e.livemodeIds||[])]));
   const nfsDisponiveis = notas.filter(n => !nfsEnviadas.has(n.id));
   const mensaisDisponiveis = notasMensais.filter(n => !nfsEnviadas.has(n.id));
+  const livemodeDisponiveis = notasLivemode.filter(n => !nfsEnviadas.has(n.id));
 
   const toggleJogoNF = id => setSelJogosNFs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleMensalNF = id => setSelMensaisNFs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const selectAllJogos = () => setSelJogosNFs(new Set(nfsDisponiveis.map(n => n.id)));
   const selectAllMensais = () => setSelMensaisNFs(new Set(mensaisDisponiveis.map(n => n.id)));
+  const toggleLivemodeNF = id => setSelLivemodeNFs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectAllLivemode = () => setSelLivemodeNFs(new Set(livemodeDisponiveis.map(n => n.id)));
 
   const selJogosArr = notas.filter(n => selJogosNFs.has(n.id));
   const selMensaisArr = notasMensais.filter(n => selMensaisNFs.has(n.id));
-  const totalSelValor = selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0) + selMensaisArr.reduce((s, n) => s + (n.valor||0), 0);
+  const selLivemodeArr = notasLivemode.filter(n => selLivemodeNFs.has(n.id));
+  const totalSelValor = selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0) + selMensaisArr.reduce((s, n) => s + (n.valor||0), 0) + selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0);
 
   const criarEnvio = () => {
-    if (selJogosNFs.size === 0 && selMensaisNFs.size === 0) return;
+    if (selJogosNFs.size === 0 && selMensaisNFs.size === 0 && selLivemodeNFs.size === 0) return;
     const numero = envios.length + 1;
+    const totalLivemode = selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0);
     const novo = {
       id: Date.now(),
       numero,
@@ -58,17 +66,21 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
       obs,
       notasIds: [...selJogosNFs],
       mensaisIds: [...selMensaisNFs],
+      livemodeIds: [...selLivemodeNFs],
       notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      livemodeResumo: selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       totalJogos: selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0),
       totalMensais: selMensaisArr.reduce((s, n) => s + (n.valor||0), 0),
+      totalLivemode,
       totalGeral: totalSelValor,
-      qtdNotas: selJogosNFs.size + selMensaisNFs.size,
+      qtdNotas: selJogosNFs.size + selMensaisNFs.size + selLivemodeNFs.size,
     };
     setEnvios(ev => [...ev, novo]);
     setView("lista");
     setSelJogosNFs(new Set());
     setSelMensaisNFs(new Set());
+    setSelLivemodeNFs(new Set());
     setObs("");
     setDataPagamento("");
     setNomeEnvio("");
@@ -94,6 +106,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
           ...e, pago: true,
           notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
           mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
         };
       }
       return {...e, pago: false};
@@ -106,7 +119,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const updateNotaStatus = (envioId, notaId, tipo, novoStatus) => {
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
-      const campo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
       return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n)};
     }));
   };
@@ -122,24 +135,21 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const removerNotaDoEnvio = (envioId, notaId, tipo) => {
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
-      const idsCampo = tipo === "jogo" ? "notasIds" : "mensaisIds";
-      const resumoCampo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      const idsCampo = tipo === "jogo" ? "notasIds" : tipo === "mensal" ? "mensaisIds" : "livemodeIds";
+      const resumoCampo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
       const novasIds = (e[idsCampo]||[]).filter(id => id !== notaId);
       const novoResumo = (e[resumoCampo]||[]).filter(n => n.id !== notaId);
-      const totalJogos = tipo === "jogo"
-        ? novoResumo.reduce((s, n) => s + (n.valorNF||0), 0)
-        : e.totalJogos;
-      const totalMensais = tipo === "mensal"
-        ? novoResumo.reduce((s, n) => s + (n.valor||0), 0)
-        : e.totalMensais;
+      const totalJogos = tipo === "jogo" ? novoResumo.reduce((s, n) => s + (n.valorNF||0), 0) : (e.totalJogos||0);
+      const totalMensais = tipo === "mensal" ? novoResumo.reduce((s, n) => s + (n.valor||0), 0) : (e.totalMensais||0);
+      const totalLivemode = tipo === "livemode" ? novoResumo.reduce((s, n) => s + (n.valor||0), 0) : (e.totalLivemode||0);
+      const qtdNotas = (tipo==="jogo"?novasIds:(e.notasIds||[])).length + (tipo==="mensal"?novasIds:(e.mensaisIds||[])).length + (tipo==="livemode"?novasIds:(e.livemodeIds||[])).length;
       return {
         ...e,
         [idsCampo]: novasIds,
         [resumoCampo]: novoResumo,
-        totalJogos,
-        totalMensais,
-        totalGeral: totalJogos + totalMensais,
-        qtdNotas: (tipo === "jogo" ? novasIds : (e.notasIds||[])).length + (tipo === "mensal" ? novasIds : (e.mensaisIds||[])).length,
+        totalJogos, totalMensais, totalLivemode,
+        totalGeral: totalJogos + totalMensais + totalLivemode,
+        qtdNotas,
       };
     }));
   };
@@ -147,26 +157,32 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   // ── Adicionar notas a envio existente ──
   const toggleAddJogo = id => setAddSelJogos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAddMensal = id => setAddSelMensais(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAddLivemode = id => setAddSelLivemode(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const confirmarAdicionarNotas = (envioId) => {
-    if (addSelJogos.size === 0 && addSelMensais.size === 0) return;
+    if (addSelJogos.size === 0 && addSelMensais.size === 0 && addSelLivemode.size === 0) return;
     const novosJogos = notas.filter(n => addSelJogos.has(n.id));
     const novosMensais = notasMensais.filter(n => addSelMensais.has(n.id));
+    const novosLivemode = notasLivemode.filter(n => addSelLivemode.has(n.id));
 
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
       const notasIds = [...(e.notasIds||[]), ...[...addSelJogos]];
       const mensaisIds = [...(e.mensaisIds||[]), ...[...addSelMensais]];
+      const livemodeIds = [...(e.livemodeIds||[]), ...[...addSelLivemode]];
       const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
       const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const livemodeResumo = [...(e.livemodeResumo||[]), ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
       const totalJogos = notasResumo.reduce((s, n) => s + (n.valorNF||0), 0);
       const totalMensais = mensaisResumo.reduce((s, n) => s + (n.valor||0), 0);
-      return {...e, notasIds, mensaisIds, notasResumo, mensaisResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: notasIds.length + mensaisIds.length};
+      const totalLivemode = livemodeResumo.reduce((s, n) => s + (n.valor||0), 0);
+      return {...e, notasIds, mensaisIds, livemodeIds, notasResumo, mensaisResumo, livemodeResumo, totalJogos, totalMensais, totalLivemode, totalGeral: totalJogos + totalMensais + totalLivemode, qtdNotas: notasIds.length + mensaisIds.length + livemodeIds.length};
     }));
 
     setAddingNotas(false);
     setAddSelJogos(new Set());
     setAddSelMensais(new Set());
+    setAddSelLivemode(new Set());
   };
 
   const envioLabel = e => e?.nome || `Envio ${e?.numero}`;
@@ -230,6 +246,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
                 {envio.totalJogos > 0 && <Pill label={`Jogos: ${fmt(envio.totalJogos)}`} color={T.brand}/>}
                 {envio.totalMensais > 0 && <Pill label={`Mensais: ${fmt(envio.totalMensais)}`} color={cyan}/>}
+                {(envio.totalLivemode||0) > 0 && <Pill label={`Livemode: ${fmt(envio.totalLivemode)}`} color={teal}/>}
                 {envio.dataPagamento && <Pill label={`Pgto: ${envio.dataPagamento}`} color={purple}/>}
                 {envio.obs && <span style={{color:T.textSm,fontSize:11}}>Obs: {envio.obs}</span>}
               </div>
@@ -321,13 +338,38 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
           )}
         </Card>
 
+        <Card T={T} style={{marginBottom:16}} accent={teal}>
+          <PanelTitle T={T} title={`NFs Livemode (${livemodeDisponiveis.length} disponíveis)`} subtitle={`${selLivemodeNFs.size} selecionada${selLivemodeNFs.size!==1?"s":""}`} color={teal}
+            right={<Button T={T} variant="secondary" size="sm" onClick={selectAllLivemode}>Selecionar todas</Button>}
+          />
+          {livemodeDisponiveis.length === 0 ? (
+            <p style={{color:T.textSm,fontSize:12,padding:16,margin:0}}>Todas as NFs Livemode já foram enviadas</p>
+          ) : (
+            <div style={{maxHeight:320,overflowY:"auto"}}>
+              {livemodeDisponiveis.map(n => {
+                const sel = selLivemodeNFs.has(n.id);
+                return (
+                  <div key={n.id} onClick={()=>toggleLivemodeNF(n.id)}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?teal+"15":"transparent",transition:"background .15s"}}>
+                    <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
+                    <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                    <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
+                    <span style={{fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>
+                    <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(n.valor)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
         <Card T={T}>
           <div style={{padding:"18px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
             <div>
-              <p style={{color:T.textMd,fontSize:13,margin:"0 0 4px"}}>{selJogosNFs.size + selMensaisNFs.size} nota{selJogosNFs.size+selMensaisNFs.size!==1?"s":""} selecionada{selJogosNFs.size+selMensaisNFs.size!==1?"s":""}</p>
+              <p style={{color:T.textMd,fontSize:13,margin:"0 0 4px"}}>{selJogosNFs.size + selMensaisNFs.size + selLivemodeNFs.size} nota{selJogosNFs.size+selMensaisNFs.size+selLivemodeNFs.size!==1?"s":""} selecionada{selJogosNFs.size+selMensaisNFs.size+selLivemodeNFs.size!==1?"s":""}</p>
               <p className="num" style={{color:cyan,fontWeight:800,fontSize:22,margin:0,letterSpacing:"-0.02em"}}>{fmt(totalSelValor)}</p>
             </div>
-            <Button T={T} variant="primary" size="lg" icon={Send} onClick={criarEnvio} disabled={selJogosNFs.size+selMensaisNFs.size===0}>
+            <Button T={T} variant="primary" size="lg" icon={Send} onClick={criarEnvio} disabled={selJogosNFs.size+selMensaisNFs.size+selLivemodeNFs.size===0}>
               Criar Envio
             </Button>
           </div>
@@ -363,7 +405,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
             <Button T={T} variant={(envioDetalhe?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
               {(envioDetalhe?.pago)?"Marcar pendente":"Marcar pago"}
             </Button>
-            <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());}}>
+            <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());setAddSelLivemode(new Set());}}>
               {addingNotas?"Cancelar":"Adicionar notas"}
             </Button>
             <Button T={T} variant="secondary" size="sm" icon={Share2} onClick={()=>{const url=`${window.location.origin}${window.location.pathname}#envio/${envioDetalhe.numero}`;navigator.clipboard.writeText(url);alert("Link copiado!");}}>Compartilhar</Button>
@@ -375,7 +417,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
         {addingNotas && (
           <Card T={T} style={{marginBottom:16}} accent={T.brand}>
             <PanelTitle T={T} title="Adicionar notas a este envio" subtitle={`${addSelJogos.size + addSelMensais.size} selecionadas`} color={T.brand}/>
-            {nfsDisponiveis.length + mensaisDisponiveis.length === 0 ? (
+            {nfsDisponiveis.length + mensaisDisponiveis.length + livemodeDisponiveis.length === 0 ? (
               <p style={{color:T.textSm,fontSize:12,padding:16,margin:0}}>Todas as NFs já foram enviadas</p>
             ) : (<>
               {nfsDisponiveis.length > 0 && (
@@ -416,18 +458,38 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                   </div>
                 </div>
               )}
+              {livemodeDisponiveis.length > 0 && (
+                <div style={{borderTop:`1px solid ${T.border}`}}>
+                  <p style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",padding:"10px 22px 4px",margin:0}}>NFs Livemode</p>
+                  <div style={{maxHeight:200,overflowY:"auto"}}>
+                    {livemodeDisponiveis.map(n => {
+                      const sel = addSelLivemode.has(n.id);
+                      return (
+                        <div key={n.id} onClick={()=>toggleAddLivemode(n.id)}
+                          style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?teal+"15":"transparent",transition:"background .15s"}}>
+                          <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
+                          <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
+                          <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valor)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"flex-end"}}>
-                <Button T={T} variant="primary" size="md" icon={PlusCircle} onClick={()=>confirmarAdicionarNotas(envioDetalhe.id)} disabled={addSelJogos.size+addSelMensais.size===0}>
-                  Adicionar {addSelJogos.size + addSelMensais.size} nota{addSelJogos.size+addSelMensais.size!==1?"s":""}
+                <Button T={T} variant="primary" size="md" icon={PlusCircle} onClick={()=>confirmarAdicionarNotas(envioDetalhe.id)} disabled={addSelJogos.size+addSelMensais.size+addSelLivemode.size===0}>
+                  Adicionar {addSelJogos.size + addSelMensais.size + addSelLivemode.size} nota{addSelJogos.size+addSelMensais.size+addSelLivemode.size!==1?"s":""}
                 </Button>
               </div>
             </>)}
           </Card>
         )}
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:16,marginBottom:20}}>
           <KPI label="NFs de Jogos" value={fmt(envioDetalhe.totalJogos)} sub={`${(envioDetalhe.notasResumo||[]).length} notas`} color={T.brand} T={T}/>
           <KPI label="NFs Mensais" value={fmt(envioDetalhe.totalMensais)} sub={`${(envioDetalhe.mensaisResumo||[]).length} notas`} color={cyan} T={T}/>
+          <KPI label="NFs Livemode" value={fmt(envioDetalhe.totalLivemode||0)} sub={`${(envioDetalhe.livemodeResumo||[]).length} notas`} color={teal} T={T}/>
           <KPI label="Total Envio" value={fmt(envioDetalhe.totalGeral)} sub={`${envioDetalhe.qtdNotas} notas`} color={purple} T={T}/>
         </div>
 
@@ -510,6 +572,44 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                       <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, `NF_${n.fornecedor}`)}/>}</td>
                       <td style={TS.td}>
                         <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "mensal")}/>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {(envioDetalhe.livemodeResumo||[]).length > 0 && (
+          <Card T={T} style={{marginTop:16}}>
+            <PanelTitle T={T} title="Notas Fiscais Livemode" color={teal}/>
+            <div style={TS.wrap}>
+              <table style={{...TS.table, minWidth:600}}>
+                <thead>
+                  <tr style={TS.thead}>
+                    {["Rd","Nº NF","Fornecedor","Serviços","Valor","Emissão","Status","",""].map((h,i) =>
+                      <th key={h+i} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {envioDetalhe.livemodeResumo.map(n => (
+                    <tr key={n.id} style={TS.tr}>
+                      <td className="num" style={{...TS.td, fontWeight:700}}>Rd {n.rodada}</td>
+                      <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
+                      <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
+                      <td style={{...TS.td, fontSize:10, color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>
+                      <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(n.valor)}</td>
+                      <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
+                      <td style={TS.td}>
+                        <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(envioDetalhe.id, n.id, "livemode", e.target.value)}
+                          style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                          {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, `NF_LM_${n.fornecedor}`)}/>}</td>
+                      <td style={TS.td}>
+                        <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "livemode")}/>
                       </td>
                     </tr>
                   ))}

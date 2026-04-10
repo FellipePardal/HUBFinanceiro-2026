@@ -123,13 +123,13 @@ function NFLivemodeModal({ onSave, onClose, fornecedores, T }) {
           <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:6}}>Serviços</label>
           <div style={{background:T.bg,borderRadius:8,padding:8}}>
             {SERVICOS_LM.map(s => {
-              const checked = form.servicos[s.key] !== undefined;
+              const checked = servicos[s.key] !== undefined;
               return (
                 <div key={s.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,background:checked?"#22c55e18":"transparent"}}>
                   <input type="checkbox" checked={checked} onChange={()=>toggleServico(s.key)} style={{accentColor:"#22c55e"}}/>
                   <span style={{flex:1,fontSize:13,color:T.text}}>{s.label}</span>
                   {checked
-                    ? <input type="number" value={form.servicos[s.key]} onChange={e=>setServicoValor(s.key, e.target.value)}
+                    ? <input type="number" value={servicos[s.key]} onChange={e=>setServicoValor(s.key, e.target.value)}
                         style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#a855f7",fontWeight:600}}/>
                     : <span className="num" style={{fontSize:11,color:T.textSm,width:100,textAlign:"right"}}>{fmt(s.valorPadrao)}</span>
                   }
@@ -199,12 +199,14 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
   const green = "#22c55e";
   const teal = "#14b8a6";
 
-  const dados = livemode && livemode.length > 0 ? livemode : gerarDadosIniciais();
+  const dados = Array.isArray(livemode) && livemode.length > 0 ? livemode : gerarDadosIniciais();
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    if (!livemode || livemode.length === 0) {
-      setLivemode(() => gerarDadosIniciais());
+    if (!initialized && (!Array.isArray(livemode) || livemode.length === 0)) {
+      setInitialized(true);
+      try { setLivemode(() => gerarDadosIniciais()); } catch(_){}
     }
-  }, []);
+  }, [livemode, initialized]);
 
   const totalRodada = r => (r.grafismo||0) + (r.starlink||0) + (r.downlink||0) + (r.distribuicao||0);
 

@@ -45,7 +45,9 @@ export const JOGOS_REAIS = [
   makeJogo(16,8,"B1","São Paulo","22/03","20:30","Corinthians","Flamengo","CazeTV/Record/Premiere"),
 ];
 
-export const JOGOS_PLACEHOLDER = Array.from({length:60}, (_,i) => {
+const TOTAL_JOGOS = 76;
+const QTD_PLACEHOLDER = Math.max(0, TOTAL_JOGOS - JOGOS_REAIS.length);
+export const JOGOS_PLACEHOLDER = Array.from({length:QTD_PLACEHOLDER}, (_,i) => {
   const rodada = 9+Math.floor(i/2), cat = i%2===0 ? "B1" : "B2";
   return { id:100+i, rodada, categoria:cat, cidade:"A definir", data:"A definir", hora:"A definir", mandante:"A definir", visitante:"A definir", detentor:"A definir", orcado:{...getDefaults(cat)}, provisionado:{...getDefaults(cat)}, realizado:{...allSubKeys()} };
 });

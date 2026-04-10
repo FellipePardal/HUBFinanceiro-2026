@@ -69,7 +69,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       livemodeIds: [...selLivemodeNFs],
       notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
-      livemodeResumo: selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      livemodeResumo: selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       totalJogos: selJogosArr.reduce((s, n) => s + (n.valorNF||0), 0),
       totalMensais: selMensaisArr.reduce((s, n) => s + (n.valor||0), 0),
       totalLivemode,
@@ -172,7 +172,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       const livemodeIds = [...(e.livemodeIds||[]), ...[...addSelLivemode]];
       const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
       const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
-      const livemodeResumo = [...(e.livemodeResumo||[]), ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const livemodeResumo = [...(e.livemodeResumo||[]), ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
       const totalJogos = notasResumo.reduce((s, n) => s + (n.valorNF||0), 0);
       const totalMensais = mensaisResumo.reduce((s, n) => s + (n.valor||0), 0);
       const totalLivemode = livemodeResumo.reduce((s, n) => s + (n.valor||0), 0);
@@ -352,9 +352,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                   <div key={n.id} onClick={()=>toggleLivemodeNF(n.id)}
                     style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?teal+"15":"transparent",transition:"background .15s"}}>
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
-                    <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
-                    <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
+                    <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor || "Livemode"}</span>
+                    <Pill label={n.rodadasLabel || `Rd ${n.rodada}`} color={T.warning}/>
                     <span style={{fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>
+                    <span style={{fontSize:10,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                     <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(n.valor)}</span>
                   </div>
                 );
@@ -468,8 +469,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                         <div key={n.id} onClick={()=>toggleAddLivemode(n.id)}
                           style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?teal+"15":"transparent",transition:"background .15s"}}>
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
-                          <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
-                          <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
+                          <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor || "Livemode"}</span>
+                          <Pill label={n.rodadasLabel || `Rd ${n.rodada}`} color={T.warning}/>
+                          <span style={{fontSize:9,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>
                           <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valor)}</span>
                         </div>
                       );
@@ -588,14 +590,14 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
               <table style={{...TS.table, minWidth:600}}>
                 <thead>
                   <tr style={TS.thead}>
-                    {["Rd","Nº NF","Fornecedor","Serviços","Valor","Emissão","Status","",""].map((h,i) =>
+                    {["Rodadas","Nº NF","Fornecedor","Serviços","Valor","Emissão","Status","",""].map((h,i) =>
                       <th key={h+i} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {envioDetalhe.livemodeResumo.map(n => (
                     <tr key={n.id} style={TS.tr}>
-                      <td className="num" style={{...TS.td, fontWeight:700}}>Rd {n.rodada}</td>
+                      <td style={{...TS.td, fontWeight:700, fontSize:12}}>{n.rodadasLabel || `Rd ${n.rodada}`}</td>
                       <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
                       <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
                       <td style={{...TS.td, fontSize:10, color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>

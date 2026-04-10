@@ -540,6 +540,8 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
       return s ? s.subLabel : sk;
     });
 
+    const mandante = jogo?.mandante || sub.jogoLabel?.split(/\s*x\s*/)[0] || "";
+    const visitante = jogo?.visitante || sub.jogoLabel?.split(/\s*x\s*/)[1] || "";
     const nota = {
       ...sub,
       servicosValores: sv,
@@ -548,7 +550,7 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
       valorNF,
       tipo: "prevista",
       status: "Conferida",
-      codigo: `RD${String(sub.rodada).padStart(2,"0")}_${sub.jogoLabel?.replace(/\s*x\s*/,"x").replace(/\s+/g,"").slice(0,10)}_${Math.round(valorNF)}_NF${(sub.numeroNF||"SN").replace(/\s/g,"")}`,
+      codigo: gerarCodigo(sub.rodada, mandante, visitante, valorNF, sub.numeroNF),
     };
     addNota(nota);
     salvarHistorico([...historico, {...sub, decisao:"aprovada", decidoEm: new Date().toISOString()}]);

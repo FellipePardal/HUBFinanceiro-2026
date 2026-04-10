@@ -328,8 +328,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?cyan+"15":"transparent",transition:"background .15s"}}>
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:cyan}}/>
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                    <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                     <Pill label={n.mesLabel} color={cyan}/>
                     <Pill label={n.categoria} color={T.warning}/>
+                    {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
                     <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(n.valor)}</span>
                   </div>
                 );
@@ -451,6 +453,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?cyan+"15":"transparent",transition:"background .15s"}}>
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:cyan}}/>
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          <span style={{fontSize:10,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
+                          <Pill label={n.mesLabel} color={cyan}/>
                           <Pill label={n.categoria} color={T.warning}/>
                           <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valor)}</span>
                         </div>

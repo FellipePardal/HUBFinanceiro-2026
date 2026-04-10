@@ -4,7 +4,7 @@ import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { getNFFile } from "../../lib/supabase";
 import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
-import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package } from "lucide-react";
+import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package, Edit2, PlusCircle, X } from "lucide-react";
 
 const catTotal = (subs, cat) => cat.subs.reduce((s, sub) => s + (subs?.[sub.key]||0), 0);
 
@@ -16,6 +16,16 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const [selMensaisNFs, setSelMensaisNFs] = useState(new Set());
   const [obs, setObs] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
+  const [nomeEnvio, setNomeEnvio] = useState("");
+
+  // Edição de nome
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [nomeTemp, setNomeTemp] = useState("");
+
+  // Adicionar notas a envio existente
+  const [addingNotas, setAddingNotas] = useState(false);
+  const [addSelJogos, setAddSelJogos] = useState(new Set());
+  const [addSelMensais, setAddSelMensais] = useState(new Set());
 
   const IS = iSty(T);
   const TS = tableStyles(T);
@@ -42,6 +52,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     const novo = {
       id: Date.now(),
       numero,
+      nome: nomeEnvio.trim() || "",
       criadoEm: new Date().toISOString(),
       dataPagamento,
       obs,
@@ -60,6 +71,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     setSelMensaisNFs(new Set());
     setObs("");
     setDataPagamento("");
+    setNomeEnvio("");
   };
 
   const excluirEnvio = (id) => {
@@ -99,11 +111,97 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     }));
   };
 
+  // ── Renomear envio ──
+  const salvarNome = (envioId) => {
+    setEnvios(ev => ev.map(e => e.id === envioId ? {...e, nome: nomeTemp.trim()} : e));
+    setEditandoNome(false);
+    setNomeTemp("");
+    // Atualizar detalhe local
+    if (envioDetalhe?.id === envioId) setEnvioDetalhe(prev => ({...prev, nome: nomeTemp.trim()}));
+  };
+
+  // ── Remover nota individual do envio ──
+  const removerNotaDoEnvio = (envioId, notaId, tipo) => {
+    setEnvios(ev => ev.map(e => {
+      if (e.id !== envioId) return e;
+      const idsCampo = tipo === "jogo" ? "notasIds" : "mensaisIds";
+      const resumoCampo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+      const novasIds = (e[idsCampo]||[]).filter(id => id !== notaId);
+      const novoResumo = (e[resumoCampo]||[]).filter(n => n.id !== notaId);
+      const totalJogos = tipo === "jogo"
+        ? novoResumo.reduce((s, n) => s + (n.valorNF||0), 0)
+        : e.totalJogos;
+      const totalMensais = tipo === "mensal"
+        ? novoResumo.reduce((s, n) => s + (n.valor||0), 0)
+        : e.totalMensais;
+      return {
+        ...e,
+        [idsCampo]: novasIds,
+        [resumoCampo]: novoResumo,
+        totalJogos,
+        totalMensais,
+        totalGeral: totalJogos + totalMensais,
+        qtdNotas: (tipo === "jogo" ? novasIds : (e.notasIds||[])).length + (tipo === "mensal" ? novasIds : (e.mensaisIds||[])).length,
+      };
+    }));
+    // Atualizar detalhe local
+    if (envioDetalhe?.id === envioId) {
+      setEnvioDetalhe(prev => {
+        const resumoCampo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
+        const novoResumo = (prev[resumoCampo]||[]).filter(n => n.id !== notaId);
+        const totalJogos = tipo === "jogo" ? novoResumo.reduce((s, n) => s + (n.valorNF||0), 0) : prev.totalJogos;
+        const totalMensais = tipo === "mensal" ? novoResumo.reduce((s, n) => s + (n.valor||0), 0) : prev.totalMensais;
+        return {...prev, [resumoCampo]: novoResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: (prev.notasResumo||[]).length + (prev.mensaisResumo||[]).length - 1};
+      });
+    }
+  };
+
+  // ── Adicionar notas a envio existente ──
+  const toggleAddJogo = id => setAddSelJogos(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAddMensal = id => setAddSelMensais(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const confirmarAdicionarNotas = (envioId) => {
+    if (addSelJogos.size === 0 && addSelMensais.size === 0) return;
+    const novosJogos = notas.filter(n => addSelJogos.has(n.id));
+    const novosMensais = notasMensais.filter(n => addSelMensais.has(n.id));
+
+    setEnvios(ev => ev.map(e => {
+      if (e.id !== envioId) return e;
+      const notasIds = [...(e.notasIds||[]), ...[...addSelJogos]];
+      const mensaisIds = [...(e.mensaisIds||[]), ...[...addSelMensais]];
+      const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const totalJogos = notasResumo.reduce((s, n) => s + (n.valorNF||0), 0);
+      const totalMensais = mensaisResumo.reduce((s, n) => s + (n.valor||0), 0);
+      return {...e, notasIds, mensaisIds, notasResumo, mensaisResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: notasIds.length + mensaisIds.length};
+    }));
+
+    // Atualizar detalhe local
+    if (envioDetalhe?.id === envioId) {
+      setEnvioDetalhe(prev => {
+        const notasResumo = [...(prev.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:prev.dataPagamento,hasFile:n.hasFile}))];
+        const mensaisResumo = [...(prev.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:prev.dataPagamento,hasFile:n.hasFile}))];
+        const totalJogos = notasResumo.reduce((s, n) => s + (n.valorNF||0), 0);
+        const totalMensais = mensaisResumo.reduce((s, n) => s + (n.valor||0), 0);
+        return {...prev, notasResumo, mensaisResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: notasResumo.length + mensaisResumo.length};
+      });
+    }
+
+    setAddingNotas(false);
+    setAddSelJogos(new Set());
+    setAddSelMensais(new Set());
+  };
+
+  const envioLabel = e => e.nome || `Envio ${e.numero}`;
+
   const totalEnvios = envios.length;
   const totalNFsEnviadas = envios.reduce((s, e) => s + e.qtdNotas, 0);
   const totalValorEnviado = envios.reduce((s, e) => s + e.totalGeral, 0);
   const totalPago = envios.filter(e => e.pago).reduce((s, e) => s + e.totalGeral, 0);
   const totalPendentePgto = envios.filter(e => !e.pago).reduce((s, e) => s + e.totalGeral, 0);
+
+  // Dados atualizados do envio no detalhe (para refletir mudanças de pago/status)
+  const envioAtual = envioDetalhe ? envios.find(e => e.id === envioDetalhe.id) : null;
 
   return (
     <div>
@@ -142,7 +240,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
             <div style={{padding:"18px 22px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12,marginBottom:12}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                  <span className="num" style={{background:purple,color:"#fff",borderRadius:RADIUS.md,padding:"5px 14px",fontSize:14,fontWeight:800,letterSpacing:"-0.01em"}}>Envio {envio.numero}</span>
+                  <span className="num" style={{background:purple,color:"#fff",borderRadius:RADIUS.md,padding:"5px 14px",fontSize:14,fontWeight:800,letterSpacing:"-0.01em"}}>{envioLabel(envio)}</span>
                   <span style={{display:"inline-flex",alignItems:"center",gap:5,background:envio.pago?T.brand+"22":T.danger+"22",color:envio.pago?T.brand:T.danger,border:`1px solid ${envio.pago?T.brand:T.danger}55`,borderRadius:RADIUS.pill,padding:"4px 11px",fontSize:10,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
                     {envio.pago ? <CheckCircle2 size={11} strokeWidth={2.5}/> : <Clock size={11} strokeWidth={2.5}/>}
                     {envio.pago?"Pago":"Aguardando"}
@@ -162,7 +260,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                 <Button T={T} variant={envio.pago?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envio.id)}>
                   {envio.pago?"Marcar pendente":"Marcar pago"}
                 </Button>
-                <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>{setEnvioDetalhe(envio);setView("detalhe");}}>Ver detalhes</Button>
+                <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>{setEnvioDetalhe(envio);setView("detalhe");setEditandoNome(false);setAddingNotas(false);}}>Ver detalhes</Button>
                 <Button T={T} variant="secondary" size="sm" icon={Share2} onClick={()=>{const url=`${window.location.origin}${window.location.pathname}#envio/${envio.numero}`;navigator.clipboard.writeText(url);alert("Link copiado!\n"+url);}}>Compartilhar</Button>
                 <Button T={T} variant="secondary" size="sm" icon={ExternalLink} onClick={()=>window.open(`#envio/${envio.numero}`,"_blank")}>Abrir página</Button>
                 <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>excluirEnvio(envio.id)}>Excluir</Button>
@@ -177,7 +275,22 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={()=>setView("lista")}>Cancelar</Button>
-            <h3 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Novo Envio · Envio {envios.length + 1}</h3>
+            <h3 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Novo Envio</h3>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:12,marginBottom:16}}>
+          <div>
+            <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Nome do Envio (opcional)</label>
+            <input value={nomeEnvio} onChange={e=>setNomeEnvio(e.target.value)} placeholder={`Envio ${envios.length + 1}`} style={IS}/>
+          </div>
+          <div>
+            <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Data de Pagamento</label>
+            <input value={dataPagamento} onChange={e=>setDataPagamento(e.target.value)} placeholder="dd/mm/aaaa" style={IS}/>
+          </div>
+          <div>
+            <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Observações (opcional)</label>
+            <input value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex: Inclui NF atrasada da Rd 8" style={IS}/>
           </div>
         </div>
 
@@ -231,17 +344,6 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
           )}
         </Card>
 
-        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:12,marginBottom:16}}>
-          <div>
-            <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Data de Pagamento</label>
-            <input value={dataPagamento} onChange={e=>setDataPagamento(e.target.value)} placeholder="dd/mm/aaaa" style={IS}/>
-          </div>
-          <div>
-            <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Observações (opcional)</label>
-            <input value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex: Inclui NF atrasada da Rd 8" style={IS}/>
-          </div>
-        </div>
-
         <Card T={T}>
           <div style={{padding:"18px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
             <div>
@@ -249,7 +351,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <p className="num" style={{color:cyan,fontWeight:800,fontSize:22,margin:0,letterSpacing:"-0.02em"}}>{fmt(totalSelValor)}</p>
             </div>
             <Button T={T} variant="primary" size="lg" icon={Send} onClick={criarEnvio} disabled={selJogosNFs.size+selMensaisNFs.size===0}>
-              Criar Envio {envios.length + 1}
+              Criar Envio
             </Button>
           </div>
         </Card>
@@ -259,22 +361,92 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
       {view === "detalhe" && envioDetalhe && (<>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={()=>setView("lista")}>Voltar</Button>
-            <span className="num" style={{background:purple,color:"#fff",borderRadius:RADIUS.md,padding:"6px 16px",fontSize:16,fontWeight:800,letterSpacing:"-0.01em"}}>Envio {envioDetalhe.numero}</span>
-            <span style={{display:"inline-flex",alignItems:"center",gap:5,background:(envios.find(e=>e.id===envioDetalhe.id)?.pago)?T.brand+"22":T.danger+"22",color:(envios.find(e=>e.id===envioDetalhe.id)?.pago)?T.brand:T.danger,border:`1px solid ${(envios.find(e=>e.id===envioDetalhe.id)?.pago)?T.brand:T.danger}55`,borderRadius:RADIUS.pill,padding:"5px 12px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-              {(envios.find(e=>e.id===envioDetalhe.id)?.pago) ? <CheckCircle2 size={12} strokeWidth={2.5}/> : <Clock size={12} strokeWidth={2.5}/>}
-              {(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"Pago":"Aguardando"}
+            <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={()=>{setView("lista");setAddingNotas(false);setEditandoNome(false);}}>Voltar</Button>
+            {editandoNome ? (
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <input value={nomeTemp} onChange={e=>setNomeTemp(e.target.value)} placeholder={`Envio ${envioDetalhe.numero}`}
+                  autoFocus onKeyDown={e => e.key === "Enter" && salvarNome(envioDetalhe.id)}
+                  style={{...IS,width:220,fontSize:16,fontWeight:700,padding:"6px 12px"}}/>
+                <Button T={T} variant="primary" size="sm" onClick={()=>salvarNome(envioDetalhe.id)}>Salvar</Button>
+                <Button T={T} variant="secondary" size="sm" onClick={()=>setEditandoNome(false)}>Cancelar</Button>
+              </div>
+            ) : (
+              <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>{setEditandoNome(true);setNomeTemp(envioDetalhe.nome||"");}}>
+                <span className="num" style={{background:purple,color:"#fff",borderRadius:RADIUS.md,padding:"6px 16px",fontSize:16,fontWeight:800,letterSpacing:"-0.01em"}}>{envioLabel(envioDetalhe)}</span>
+                <Edit2 size={14} color={T.textSm} strokeWidth={2}/>
+              </div>
+            )}
+            <span style={{display:"inline-flex",alignItems:"center",gap:5,background:(envioAtual?.pago)?T.brand+"22":T.danger+"22",color:(envioAtual?.pago)?T.brand:T.danger,border:`1px solid ${(envioAtual?.pago)?T.brand:T.danger}55`,borderRadius:RADIUS.pill,padding:"5px 12px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+              {(envioAtual?.pago) ? <CheckCircle2 size={12} strokeWidth={2.5}/> : <Clock size={12} strokeWidth={2.5}/>}
+              {(envioAtual?.pago)?"Pago":"Aguardando"}
             </span>
             <span className="num" style={{color:T.textSm,fontSize:12}}>{new Date(envioDetalhe.criadoEm).toLocaleDateString("pt-BR")}</span>
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <Button T={T} variant={(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
-              {(envios.find(e=>e.id===envioDetalhe.id)?.pago)?"Marcar pendente":"Marcar pago"}
+            <Button T={T} variant={(envioAtual?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
+              {(envioAtual?.pago)?"Marcar pendente":"Marcar pago"}
+            </Button>
+            <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());}}>
+              {addingNotas?"Cancelar":"Adicionar notas"}
             </Button>
             <Button T={T} variant="secondary" size="sm" icon={Share2} onClick={()=>{const url=`${window.location.origin}${window.location.pathname}#envio/${envioDetalhe.numero}`;navigator.clipboard.writeText(url);alert("Link copiado!");}}>Compartilhar</Button>
             <Button T={T} variant="secondary" size="sm" icon={ExternalLink} onClick={()=>window.open(`#envio/${envioDetalhe.numero}`,"_blank")}>Abrir página</Button>
           </div>
         </div>
+
+        {/* ── ADICIONAR NOTAS (expandível) ── */}
+        {addingNotas && (
+          <Card T={T} style={{marginBottom:16}} accent={T.brand}>
+            <PanelTitle T={T} title="Adicionar notas a este envio" subtitle={`${addSelJogos.size + addSelMensais.size} selecionadas`} color={T.brand}/>
+            {nfsDisponiveis.length + mensaisDisponiveis.length === 0 ? (
+              <p style={{color:T.textSm,fontSize:12,padding:16,margin:0}}>Todas as NFs já foram enviadas</p>
+            ) : (<>
+              {nfsDisponiveis.length > 0 && (
+                <div style={{borderTop:`1px solid ${T.border}`}}>
+                  <p style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",padding:"10px 22px 4px",margin:0}}>NFs de Jogos</p>
+                  <div style={{maxHeight:200,overflowY:"auto"}}>
+                    {nfsDisponiveis.map(n => {
+                      const sel = addSelJogos.has(n.id);
+                      return (
+                        <div key={n.id} onClick={()=>toggleAddJogo(n.id)}
+                          style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?T.brand+"15":"transparent",transition:"background .15s"}}>
+                          <input type="checkbox" checked={sel} readOnly style={{accentColor:T.brand}}/>
+                          <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          <span style={{fontSize:10,color:T.textSm}}>{n.jogoLabel}</span>
+                          <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {mensaisDisponiveis.length > 0 && (
+                <div style={{borderTop:`1px solid ${T.border}`}}>
+                  <p style={{color:T.textSm,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",padding:"10px 22px 4px",margin:0}}>NFs Mensais</p>
+                  <div style={{maxHeight:200,overflowY:"auto"}}>
+                    {mensaisDisponiveis.map(n => {
+                      const sel = addSelMensais.has(n.id);
+                      return (
+                        <div key={n.id} onClick={()=>toggleAddMensal(n.id)}
+                          style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?cyan+"15":"transparent",transition:"background .15s"}}>
+                          <input type="checkbox" checked={sel} readOnly style={{accentColor:cyan}}/>
+                          <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          <Pill label={n.categoria} color={T.warning}/>
+                          <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valor)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"flex-end"}}>
+                <Button T={T} variant="primary" size="md" icon={PlusCircle} onClick={()=>confirmarAdicionarNotas(envioDetalhe.id)} disabled={addSelJogos.size+addSelMensais.size===0}>
+                  Adicionar {addSelJogos.size + addSelMensais.size} nota{addSelJogos.size+addSelMensais.size!==1?"s":""}
+                </Button>
+              </div>
+            </>)}
+          </Card>
+        )}
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:20}}>
           <KPI label="NFs de Jogos" value={fmt(envioDetalhe.totalJogos)} sub={`${(envioDetalhe.notasResumo||[]).length} notas`} color={T.brand} T={T}/>
@@ -297,8 +469,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <table style={{...TS.table, minWidth:780}}>
                 <thead>
                   <tr style={TS.thead}>
-                    {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços","Status",""].map(h =>
-                      <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
+                    {["Código","Nº NF","Fornecedor","Valor","Emissão","Data Pgto","Jogo","Rd","Serviços","Status","",""].map((h,i) =>
+                      <th key={h+i} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -320,6 +492,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                         </select>
                       </td>
                       <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, n.codigo)}/>}</td>
+                      <td style={TS.td}>
+                        <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "jogo")}/>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -335,8 +510,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
               <table style={{...TS.table, minWidth:680}}>
                 <thead>
                   <tr style={TS.thead}>
-                    {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto","Status",""].map(h =>
-                      <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
+                    {["Fornecedor","Categoria","Mês","Nº NF","Valor","Emissão","Data Pgto","Status","",""].map((h,i) =>
+                      <th key={h+i} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -356,6 +531,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                         </select>
                       </td>
                       <td style={TS.td}>{n.hasFile && <Button T={T} variant="secondary" size="sm" icon={Download} onClick={()=>downloadNF(n.id, `NF_${n.fornecedor}`)}/>}</td>
+                      <td style={TS.td}>
+                        <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "mensal")}/>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

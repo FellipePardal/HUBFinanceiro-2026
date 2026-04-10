@@ -110,7 +110,7 @@ export default function EnvioPublico({ numero }) {
                 <p style={{fontSize:10,letterSpacing:"0.18em",textTransform:"uppercase",margin:0,color:"#bbf7d0",fontWeight:700}}>Livemode · Transmissões · Brasileirão 2026</p>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                <h1 className="num" style={{fontSize:30,fontWeight:800,margin:0,letterSpacing:"-0.025em"}}>Envio {envio.numero}</h1>
+                <h1 className="num" style={{fontSize:30,fontWeight:800,margin:0,letterSpacing:"-0.025em"}}>{envio.nome || `Envio ${envio.numero}`}</h1>
                 <span style={{display:"inline-flex",alignItems:"center",gap:6,background:envio.pago?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)",color:"#fff",border:`1px solid ${envio.pago?"#86efac":"#fca5a5"}`,borderRadius:999,padding:"5px 14px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
                   {envio.pago ? <CheckCircle2 size={13} strokeWidth={2.5}/> : <Clock size={13} strokeWidth={2.5}/>}
                   {envio.pago?"Pago":"Aguardando"}
@@ -246,7 +246,7 @@ export default function EnvioPublico({ numero }) {
             </div>
             <h3 style={{margin:"0 0 8px",fontSize:20,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Confirmar Pagamento</h3>
             <p style={{margin:"0 0 6px",color:T.textMd,fontSize:13}}>
-              Você está prestes a marcar o <b>Envio {envio.numero}</b> como pago.
+              Você está prestes a marcar o <b>{envio.nome || `Envio ${envio.numero}`}</b> como pago.
             </p>
             <p style={{margin:"0 0 22px",color:T.textMd,fontSize:13}}>
               Valor total: <b className="num" style={{color:T.brand,fontWeight:700}}>{fmt(envio.totalGeral)}</b> · {envio.qtdNotas} nota{envio.qtdNotas!==1?"s":""}

@@ -101,7 +101,7 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
         }}>
           <Stat T={T} label="Campeonatos Ativos" value="1" sub="de 2 planejados" color={T.brand} icon={Trophy} />
           <Stat T={T} label="Temporada"          value="2026" sub="Janeiro – Dezembro" color={T.info} icon={Calendar} />
-          <Stat T={T} label="Detentores"         value="2" sub="CazeTV · Amazon" color="#a855f7" icon={Building2} />
+          <Stat T={T} label="Detentores"         value="3" sub="CazeTV · Record · Amazon" color="#a855f7" icon={Building2} />
         </div>
 
         {/* Section header */}
@@ -213,7 +213,7 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
                     </div>
                     <div>
                       <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Detentores</p>
-                      <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>CazeTV · Amazon</p>
+                      <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>CazeTV · Record · Amazon</p>
                     </div>
                   </div>
                 )}

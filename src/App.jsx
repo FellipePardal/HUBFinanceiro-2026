@@ -6,7 +6,7 @@ import { KPI, Pill, CustomTooltip } from "./components/shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./components/ui";
 import {
   LayoutDashboard, FileText, Users, ClipboardList,
-  ArrowLeft, Eye, EyeOff, Sun, Moon,
+  ArrowLeft, Eye, EyeOff, Sun, Moon, Lock,
   Wallet, TrendingUp, Activity, PiggyBank,
 } from "lucide-react";
 import Home             from "./components/Home";
@@ -514,6 +514,73 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   );
 }
 
+// ─── TELA DE ACESSO ──────────────────────────────────────────────────────────
+const LS_AUTH = "ffu_auth_v1";
+const ACCESS_PIN = "2026hub";
+
+function LoginGate({ onAuth, T }) {
+  const [pin, setPin] = useState("");
+  const [erro, setErro] = useState(false);
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (pin === ACCESS_PIN) {
+      lsSet(LS_AUTH, true);
+      onAuth();
+    } else {
+      setErro(true);
+      setTimeout(() => setErro(false), 2000);
+    }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter',sans-serif"}}>
+      <div style={{width:"100%",maxWidth:400,padding:32}}>
+        <div style={{
+          width:56,height:56,borderRadius:16,
+          background:"linear-gradient(135deg,#059669,#10b981)",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          margin:"0 auto 24px",
+          boxShadow:"0 8px 24px rgba(16,185,129,0.35)",
+        }}>
+          <Lock size={26} color="#fff" strokeWidth={2.25}/>
+        </div>
+        <h1 style={{textAlign:"center",fontSize:22,fontWeight:800,color:T.text,margin:"0 0 6px",letterSpacing:"-0.02em"}}>HUB Financeiro</h1>
+        <p style={{textAlign:"center",color:T.textMd,fontSize:13,margin:"0 0 28px"}}>Acesso restrito — insira o código de acesso</p>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            placeholder="Código de acesso"
+            autoFocus
+            style={{
+              width:"100%",boxSizing:"border-box",
+              background:T.card,border:`1px solid ${erro ? (T.danger||"#ef4444") : T.muted}`,
+              borderRadius:10,padding:"12px 16px",fontSize:15,color:T.text,
+              fontFamily:"'Inter',sans-serif",textAlign:"center",letterSpacing:"0.1em",
+              transition:"border-color 0.2s",
+            }}
+          />
+          {erro && <p style={{color:T.danger||"#ef4444",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:600}}>Código incorreto</p>}
+          <button type="submit" style={{
+            width:"100%",marginTop:16,
+            background:"linear-gradient(135deg,#047857,#059669)",
+            color:"#fff",border:"none",borderRadius:10,padding:"12px",
+            cursor:"pointer",fontWeight:700,fontSize:14,
+            boxShadow:"0 4px 14px rgba(5,150,105,0.35)",
+          }}>
+            Entrar
+          </button>
+        </form>
+        <p style={{textAlign:"center",color:T.textSm,fontSize:10,margin:"24px 0 0",letterSpacing:"0.04em"}}>
+          Livemode · Transmissões · 2026
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 import FormularioPublico from "./components/FormularioPublico";
 import EnvioPublico from "./components/EnvioPublico";
@@ -521,6 +588,7 @@ import EnvioPublico from "./components/EnvioPublico";
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
   const [pagina,   setPagina]   = useState("home");
+  const [authed,   setAuthed]   = useState(() => lsGet(LS_AUTH, false));
   const T = darkMode ? DARK : LIGHT;
 
   const toggleDark = v => {
@@ -528,10 +596,13 @@ export default function App() {
     setDarkMode(next); lsSet(LS_DARK, next);
   };
 
-  // Rotas públicas
+  // Rotas públicas — acessíveis sem autenticação
   if (window.location.hash === "#formulario") return <FormularioPublico/>;
   const envioMatch = window.location.hash.match(/^#envio\/(\d+)$/);
   if (envioMatch) return <EnvioPublico numero={parseInt(envioMatch[1])}/>;
+
+  // Tela de login para o HUB
+  if (!authed) return <LoginGate onAuth={() => setAuthed(true)} T={T}/>;
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>

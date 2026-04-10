@@ -10,7 +10,7 @@ const catTotal = (subs, cat) => cat.subs.reduce((s, sub) => s + (subs?.[sub.key]
 
 export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios, setEnvios, T }) {
   const [view, setView] = useState("lista");
-  const [envioDetalhe, setEnvioDetalhe] = useState(null);
+  const [envioDetalheId, setEnvioDetalheId] = useState(null);
 
   const [selJogosNFs, setSelJogosNFs] = useState(new Set());
   const [selMensaisNFs, setSelMensaisNFs] = useState(new Set());
@@ -116,8 +116,6 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
     setEnvios(ev => ev.map(e => e.id === envioId ? {...e, nome: nomeTemp.trim()} : e));
     setEditandoNome(false);
     setNomeTemp("");
-    // Atualizar detalhe local
-    if (envioDetalhe?.id === envioId) setEnvioDetalhe(prev => ({...prev, nome: nomeTemp.trim()}));
   };
 
   // ── Remover nota individual do envio ──
@@ -144,16 +142,6 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
         qtdNotas: (tipo === "jogo" ? novasIds : (e.notasIds||[])).length + (tipo === "mensal" ? novasIds : (e.mensaisIds||[])).length,
       };
     }));
-    // Atualizar detalhe local
-    if (envioDetalhe?.id === envioId) {
-      setEnvioDetalhe(prev => {
-        const resumoCampo = tipo === "jogo" ? "notasResumo" : "mensaisResumo";
-        const novoResumo = (prev[resumoCampo]||[]).filter(n => n.id !== notaId);
-        const totalJogos = tipo === "jogo" ? novoResumo.reduce((s, n) => s + (n.valorNF||0), 0) : prev.totalJogos;
-        const totalMensais = tipo === "mensal" ? novoResumo.reduce((s, n) => s + (n.valor||0), 0) : prev.totalMensais;
-        return {...prev, [resumoCampo]: novoResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: (prev.notasResumo||[]).length + (prev.mensaisResumo||[]).length - 1};
-      });
-    }
   };
 
   // ── Adicionar notas a envio existente ──
@@ -176,23 +164,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
       return {...e, notasIds, mensaisIds, notasResumo, mensaisResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: notasIds.length + mensaisIds.length};
     }));
 
-    // Atualizar detalhe local
-    if (envioDetalhe?.id === envioId) {
-      setEnvioDetalhe(prev => {
-        const notasResumo = [...(prev.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:prev.dataPagamento,hasFile:n.hasFile}))];
-        const mensaisResumo = [...(prev.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:prev.dataPagamento,hasFile:n.hasFile}))];
-        const totalJogos = notasResumo.reduce((s, n) => s + (n.valorNF||0), 0);
-        const totalMensais = mensaisResumo.reduce((s, n) => s + (n.valor||0), 0);
-        return {...prev, notasResumo, mensaisResumo, totalJogos, totalMensais, totalGeral: totalJogos + totalMensais, qtdNotas: notasResumo.length + mensaisResumo.length};
-      });
-    }
-
     setAddingNotas(false);
     setAddSelJogos(new Set());
     setAddSelMensais(new Set());
   };
 
-  const envioLabel = e => e.nome || `Envio ${e.numero}`;
+  const envioLabel = e => e?.nome || `Envio ${e?.numero}`;
 
   const totalEnvios = envios.length;
   const totalNFsEnviadas = envios.reduce((s, e) => s + e.qtdNotas, 0);
@@ -200,8 +177,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
   const totalPago = envios.filter(e => e.pago).reduce((s, e) => s + e.totalGeral, 0);
   const totalPendentePgto = envios.filter(e => !e.pago).reduce((s, e) => s + e.totalGeral, 0);
 
-  // Dados atualizados do envio no detalhe (para refletir mudanças de pago/status)
-  const envioAtual = envioDetalhe ? envios.find(e => e.id === envioDetalhe.id) : null;
+  // Derivado direto do estado — sempre atualizado
+  const envioDetalhe = envioDetalheId ? envios.find(e => e.id === envioDetalheId) : null;
 
   return (
     <div>
@@ -260,7 +237,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                 <Button T={T} variant={envio.pago?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envio.id)}>
                   {envio.pago?"Marcar pendente":"Marcar pago"}
                 </Button>
-                <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>{setEnvioDetalhe(envio);setView("detalhe");setEditandoNome(false);setAddingNotas(false);}}>Ver detalhes</Button>
+                <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>{setEnvioDetalheId(envio.id);setView("detalhe");setEditandoNome(false);setAddingNotas(false);}}>Ver detalhes</Button>
                 <Button T={T} variant="secondary" size="sm" icon={Share2} onClick={()=>{const url=`${window.location.origin}${window.location.pathname}#envio/${envio.numero}`;navigator.clipboard.writeText(url);alert("Link copiado!\n"+url);}}>Compartilhar</Button>
                 <Button T={T} variant="secondary" size="sm" icon={ExternalLink} onClick={()=>window.open(`#envio/${envio.numero}`,"_blank")}>Abrir página</Button>
                 <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>excluirEnvio(envio.id)}>Excluir</Button>
@@ -376,15 +353,15 @@ export default function TabEnvio({ jogos, notas, notasMensais, servicos, envios,
                 <Edit2 size={14} color={T.textSm} strokeWidth={2}/>
               </div>
             )}
-            <span style={{display:"inline-flex",alignItems:"center",gap:5,background:(envioAtual?.pago)?T.brand+"22":T.danger+"22",color:(envioAtual?.pago)?T.brand:T.danger,border:`1px solid ${(envioAtual?.pago)?T.brand:T.danger}55`,borderRadius:RADIUS.pill,padding:"5px 12px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-              {(envioAtual?.pago) ? <CheckCircle2 size={12} strokeWidth={2.5}/> : <Clock size={12} strokeWidth={2.5}/>}
-              {(envioAtual?.pago)?"Pago":"Aguardando"}
+            <span style={{display:"inline-flex",alignItems:"center",gap:5,background:(envioDetalhe?.pago)?T.brand+"22":T.danger+"22",color:(envioDetalhe?.pago)?T.brand:T.danger,border:`1px solid ${(envioDetalhe?.pago)?T.brand:T.danger}55`,borderRadius:RADIUS.pill,padding:"5px 12px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+              {(envioDetalhe?.pago) ? <CheckCircle2 size={12} strokeWidth={2.5}/> : <Clock size={12} strokeWidth={2.5}/>}
+              {(envioDetalhe?.pago)?"Pago":"Aguardando"}
             </span>
             <span className="num" style={{color:T.textSm,fontSize:12}}>{new Date(envioDetalhe.criadoEm).toLocaleDateString("pt-BR")}</span>
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <Button T={T} variant={(envioAtual?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
-              {(envioAtual?.pago)?"Marcar pendente":"Marcar pago"}
+            <Button T={T} variant={(envioDetalhe?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
+              {(envioDetalhe?.pago)?"Marcar pendente":"Marcar pago"}
             </Button>
             <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());}}>
               {addingNotas?"Cancelar":"Adicionar notas"}

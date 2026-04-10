@@ -30,29 +30,39 @@ function gerarDadosIniciais() {
 // ── Modal para registrar NF Livemode ──
 function NFLivemodeModal({ onSave, onClose, fornecedores, T }) {
   const IS = iSty(T);
-  const [form, setForm] = useState({
-    rodada:"1", servicos:{}, numeroNF:"", fornecedor:"", dataEmissao:"", obs:"",
-  });
+  const [rodadas, setRodadas] = useState(new Set());
+  const [servicos, setServicos] = useState({});
+  const [form, setForm] = useState({ numeroNF:"", fornecedor:"", dataEmissao:"", obs:"" });
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const set = (k,v) => setForm(f => ({...f,[k]:v}));
 
+  const toggleRodada = (r) => setRodadas(prev => { const n = new Set(prev); n.has(r) ? n.delete(r) : n.add(r); return n; });
+  const selectRange = (from, to) => {
+    const n = new Set(rodadas);
+    for (let i = from; i <= to; i++) n.add(i);
+    setRodadas(n);
+  };
+
   const toggleServico = (key) => {
-    setForm(f => {
-      const s = {...f.servicos};
+    setServicos(prev => {
+      const s = {...prev};
       if (s[key] !== undefined) { delete s[key]; } else { s[key] = SERVICOS_LM.find(x=>x.key===key)?.valorPadrao || 0; }
-      return {...f, servicos: s};
+      return s;
     });
   };
-  const setServicoValor = (key, val) => setForm(f => ({...f, servicos:{...f.servicos, [key]: parseFloat(val)||0}}));
+  const setServicoValor = (key, val) => setServicos(prev => ({...prev, [key]: parseFloat(val)||0}));
 
-  const totalNF = Object.values(form.servicos).reduce((s,v) => s+(v||0), 0);
-  const selCount = Object.keys(form.servicos).length;
-  const servicosLabels = Object.keys(form.servicos).map(k => SERVICOS_LM.find(x=>x.key===k)?.label||k);
+  const valorPorRodada = Object.values(servicos).reduce((s,v) => s+(v||0), 0);
+  const totalNF = valorPorRodada * rodadas.size;
+  const selCount = Object.keys(servicos).length;
+  const servicosLabels = Object.keys(servicos).map(k => SERVICOS_LM.find(x=>x.key===k)?.label||k);
+  const rodadasArr = [...rodadas].sort((a,b) => a-b);
+  const rodadasLabel = rodadasArr.length === 0 ? "" : rodadasArr.length === 1 ? `Rd ${rodadasArr[0]}` : `Rd ${rodadasArr[0]}-${rodadasArr[rodadasArr.length-1]}${rodadasArr.length !== (rodadasArr[rodadasArr.length-1]-rodadasArr[0]+1) ? ` (${rodadasArr.length})` : ""}`;
 
   const handleSave = async () => {
-    if (selCount === 0 || (!form.numeroNF && !form.fornecedor)) return;
+    if (selCount === 0 || rodadas.size === 0 || (!form.numeroNF && !form.fornecedor)) return;
     setUploading(true);
     const notaId = Date.now();
     let hasFile = false;
@@ -61,12 +71,15 @@ function NFLivemodeModal({ onSave, onClose, fornecedores, T }) {
     }
     onSave({
       id: notaId,
-      rodada: parseInt(form.rodada)||1,
-      servicos: {...form.servicos},
+      rodadas: rodadasArr,
+      rodada: rodadasArr[0],
+      rodadasLabel,
+      servicos: {...servicos},
       servicosLabels,
       numeroNF: form.numeroNF,
       fornecedor: form.fornecedor,
       valor: totalNF,
+      valorPorRodada,
       dataEmissao: form.dataEmissao,
       obs: form.obs,
       hasFile,
@@ -76,15 +89,34 @@ function NFLivemodeModal({ onSave, onClose, fornecedores, T }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:580,maxHeight:"90vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 4px",fontSize:16,color:T.text}}>Registrar NF Livemode</h3>
-        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada e os serviços cobertos por esta nota</p>
+        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione as rodadas cobertas por esta nota e os serviços</p>
 
-        <div style={{marginBottom:12}}>
-          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Rodada</label>
-          <select value={form.rodada} onChange={e=>set("rodada",e.target.value)} style={IS}>
-            {Array.from({length:TOTAL_RODADAS},(_,i)=><option key={i+1} value={i+1}>Rodada {i+1}</option>)}
-          </select>
+        <div style={{marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <label style={{color:T.textMd,fontSize:12}}>Rodadas <span style={{color:T.textSm,fontSize:11}}>({rodadas.size} selecionada{rodadas.size!==1?"s":""})</span></label>
+            <div style={{display:"flex",gap:4}}>
+              <button onClick={()=>selectRange(1,9)} style={{...btnStyle,background:T.border,padding:"3px 8px",fontSize:10,color:T.text}}>1-9</button>
+              <button onClick={()=>selectRange(1,19)} style={{...btnStyle,background:T.border,padding:"3px 8px",fontSize:10,color:T.text}}>1-19</button>
+              <button onClick={()=>selectRange(1,38)} style={{...btnStyle,background:T.border,padding:"3px 8px",fontSize:10,color:T.text}}>Todas</button>
+              <button onClick={()=>setRodadas(new Set())} style={{...btnStyle,background:T.border,padding:"3px 8px",fontSize:10,color:T.text}}>Limpar</button>
+            </div>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {Array.from({length:TOTAL_RODADAS},(_,i)=>i+1).map(r => {
+              const sel = rodadas.has(r);
+              return (
+                <button key={r} onClick={()=>toggleRodada(r)}
+                  style={{
+                    width:36, height:30, borderRadius:6, border:`1px solid ${sel?"#14b8a6":T.muted}`,
+                    background:sel?"#14b8a622":"transparent", color:sel?"#14b8a6":T.textSm,
+                    fontSize:11, fontWeight:sel?700:500, cursor:"pointer",
+                  }}>{r}</button>
+              );
+            })}
+          </div>
+          {rodadas.size > 0 && <p style={{color:"#14b8a6",fontSize:11,margin:"6px 0 0",fontWeight:600}}>{rodadasLabel} · {fmt(valorPorRodada)}/rodada · Total: {fmt(totalNF)}</p>}
         </div>
 
         <div style={{marginBottom:12}}>
@@ -190,24 +222,30 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
     setNotasLivemode(ns => ns.filter(n => n.id !== id));
   };
 
-  // ── Realizado por rodada (soma das NFs) ──
+  // ── Realizado por rodada (soma das NFs, distribuída entre as rodadas cobertas) ──
   const realizadoPorRodada = useMemo(() => {
     const map = {};
     nfs.forEach(n => {
-      if (!map[n.rodada]) map[n.rodada] = 0;
-      map[n.rodada] += n.valor || 0;
+      const rods = n.rodadas || [n.rodada];
+      const valorPorRd = rods.length > 0 ? (n.valorPorRodada || (n.valor / rods.length)) : 0;
+      rods.forEach(r => {
+        map[r] = (map[r] || 0) + valorPorRd;
+      });
     });
     return map;
   }, [nfs]);
 
   // ── Controle por rodada ──
   const totalGeral = dados.reduce((s,r) => s + totalRodada(r), 0);
-  const rodadasComNF = new Set(nfs.map(n => n.rodada));
+  const rodadasComNF = new Set(nfs.flatMap(n => n.rodadas || [n.rodada]));
 
   const totaisPorServico = SERVICOS_LM.map(s => ({
     ...s,
     total: dados.reduce((sum,r) => sum + (r[s.key]||0), 0),
-    realizado: nfs.reduce((sum,n) => sum + (n.servicos?.[s.key]||0), 0),
+    realizado: nfs.reduce((sum,n) => {
+      const rods = n.rodadas || [n.rodada];
+      return sum + (n.servicos?.[s.key] || 0) * rods.length;
+    }, 0),
   }));
 
   const startEdit = (r) => {
@@ -240,8 +278,10 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
   const nfsPorRodada = useMemo(() => {
     const map = {};
     nfs.forEach(n => {
-      if (!map[n.rodada]) map[n.rodada] = [];
-      map[n.rodada].push(n);
+      (n.rodadas || [n.rodada]).forEach(r => {
+        if (!map[r]) map[r] = [];
+        map[r].push(n);
+      });
     });
     return map;
   }, [nfs]);
@@ -307,7 +347,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                 <table style={{...TS.table, minWidth:700}}>
                   <thead>
                     <tr style={TS.thead}>
-                      {["Rd","Nº NF","Fornecedor","Serviços","Valor","Emissão","Obs",""].map(h =>
+                      {["Rodadas","Nº NF","Fornecedor","Serviços","Valor","Emissão","Obs",""].map(h =>
                         <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>
                       )}
                     </tr>
@@ -315,7 +355,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                   <tbody>
                     {[...nfs].sort((a,b) => a.rodada - b.rodada).map(n => (
                       <tr key={n.id} style={TS.tr}>
-                        <td className="num" style={{...TS.td, fontWeight:700}}>Rd {n.rodada}</td>
+                        <td style={{...TS.td, fontWeight:700, fontSize:12}}>{n.rodadasLabel || `Rd ${n.rodada}`}</td>
                         <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
                         <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
                         <td style={{...TS.td, fontSize:11}}>

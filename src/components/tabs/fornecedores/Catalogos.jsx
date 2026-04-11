@@ -170,13 +170,28 @@ function CampeonatoModal({ campeonato, cidades, campeonatos, onSave, onClose, T 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
-export default function Catalogos({ cidades, setCidades, campeonatos, setCampeonatos, T }) {
+export default function Catalogos({ cidades, setCidades, campeonatos, setCampeonatos, filtroCampeonato = "todos", T }) {
   const [cidadeEdit, setCidadeEdit] = useState(null);
   const [campEdit, setCampEdit]     = useState(null);
   const [showNovaCidade, setShowNovaCidade] = useState(false);
   const [showNovoCamp, setShowNovoCamp]     = useState(false);
 
   const tbl = tableStyles(T);
+
+  // Quando o filtro do header está num campeonato específico, restringe
+  // a visão: cidades = só as cidades-sede daquele campeonato; lista de
+  // campeonatos = só o selecionado.
+  const campSelecionado = filtroCampeonato !== "todos"
+    ? campeonatos.find(c => c.id === filtroCampeonato)
+    : null;
+
+  const cidadesVisiveis = campSelecionado
+    ? (campSelecionado.cidadeIds || [])
+        .map(id => cidades.find(c => c.id === id))
+        .filter(Boolean)
+    : cidades;
+
+  const campeonatosVisiveis = campSelecionado ? [campSelecionado] : campeonatos;
 
   // ── Cidades ──────────────────────────────────────────────────────────────
   const saveCidade = (c) => {
@@ -218,7 +233,12 @@ export default function Catalogos({ cidades, setCidades, campeonatos, setCampeon
 
       {/* ── Cidades ───────────────────────────────────────────────── */}
       <Card T={T} padding={0}>
-        <PanelTitle T={T} title="Cidades" subtitle="Praças disponíveis para alocar em campeonatos" color={T.info||"#3b82f6"}
+        <PanelTitle T={T}
+          title={campSelecionado ? `Cidades-sede · ${campSelecionado.nome}` : "Cidades"}
+          subtitle={campSelecionado
+            ? `${cidadesVisiveis.length} praça${cidadesVisiveis.length!==1?"s":""} ativa${cidadesVisiveis.length!==1?"s":""} · edite o campeonato para incluir/remover`
+            : "Praças disponíveis para alocar em campeonatos"}
+          color={T.info||"#3b82f6"}
           right={<Button T={T} variant="primary" size="sm" icon={Plus} onClick={()=>setShowNovaCidade(true)}>Nova</Button>}/>
 
         <div style={{padding:"0 4px 16px"}}>
@@ -231,7 +251,7 @@ export default function Catalogos({ cidades, setCidades, campeonatos, setCampeon
               </tr>
             </thead>
             <tbody>
-              {cidades.map(c => (
+              {cidadesVisiveis.map(c => (
                 <tr key={c.id} style={tbl.tr}>
                   <td style={tbl.td}>
                     <div style={{display:"inline-flex",alignItems:"center",gap:8}}>
@@ -254,8 +274,12 @@ export default function Catalogos({ cidades, setCidades, campeonatos, setCampeon
                   </td>
                 </tr>
               ))}
-              {!cidades.length && (
-                <tr><td colSpan={3} style={{...tbl.td,textAlign:"center",color:T.textSm,padding:"24px 8px"}}>Nenhuma cidade cadastrada</td></tr>
+              {!cidadesVisiveis.length && (
+                <tr><td colSpan={3} style={{...tbl.td,textAlign:"center",color:T.textSm,padding:"24px 8px"}}>
+                  {campSelecionado
+                    ? "Esse campeonato ainda não tem cidades-sede. Edite-o para adicionar."
+                    : "Nenhuma cidade cadastrada"}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -264,11 +288,16 @@ export default function Catalogos({ cidades, setCidades, campeonatos, setCampeon
 
       {/* ── Campeonatos ───────────────────────────────────────────── */}
       <Card T={T} padding={0}>
-        <PanelTitle T={T} title="Campeonatos" subtitle="Temporadas ativas e suas cidades-sede + categorias" color={T.brand||"#10b981"}
+        <PanelTitle T={T}
+          title={campSelecionado ? "Campeonato selecionado" : "Campeonatos"}
+          subtitle={campSelecionado
+            ? "Detalhes da temporada filtrada no header"
+            : "Temporadas ativas e suas cidades-sede + categorias"}
+          color={T.brand||"#10b981"}
           right={<Button T={T} variant="primary" size="sm" icon={Plus} onClick={()=>setShowNovoCamp(true)}>Novo</Button>}/>
 
         <div style={{padding:"0 16px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          {campeonatos.map(c => (
+          {campeonatosVisiveis.map(c => (
             <div key={c.id} style={{
               background:T.surfaceAlt||T.bg,
               border:`1px solid ${c.ativo ? (T.brandBorder || T.border) : T.border}`,
@@ -318,7 +347,7 @@ export default function Catalogos({ cidades, setCidades, campeonatos, setCampeon
               </div>
             </div>
           ))}
-          {!campeonatos.length && (
+          {!campeonatosVisiveis.length && (
             <p style={{color:T.textSm,fontSize:13,textAlign:"center",padding:"32px 0",margin:0}}>Nenhum campeonato cadastrado</p>
           )}
         </div>

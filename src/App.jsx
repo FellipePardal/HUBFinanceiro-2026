@@ -17,7 +17,6 @@ import TabServicos      from "./components/tabs/TabServicos";
 import VisaoMicro       from "./components/tabs/VisaoMicro";
 import TabApresentacoes from "./components/tabs/TabApresentacoes";
 import TabNotas         from "./components/tabs/TabNotas";
-import TabFornecedores  from "./components/tabs/TabFornecedores";
 import TabNotasMensal  from "./components/tabs/TabNotasMensal";
 import TabEnvio        from "./components/tabs/TabEnvio";
 import TabLivemode     from "./components/tabs/TabLivemode";
@@ -28,7 +27,7 @@ import { COTACAO_INIT } from "./data/negociacoes";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
-function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
+function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const [jogos, setJogosRaw]       = useState(ALL_JOGOS);
   const [servicos, setServicosRaw] = useState(SERVICOS_INIT);
   const [notas, setNotasRaw]               = useState([]);
@@ -238,15 +237,15 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
   const TABS_NF   = ["notas fiscais","mensal","serviços livemode"];
-  const TABS_FORN = ["cadastro"];
   const TABS_REL  = ["apresentações","envio"];
-  const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "fornecedores" ? TABS_FORN : TABS_REL;
+  const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : TABS_REL;
 
   const handleSetorChange = s => {
+    // Fornecedores agora é um módulo do HUB — abre filtrado no campeonato atual
+    if (s === "fornecedores") { onOpenHub && onOpenHub("brasileirao-2026"); return; }
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
-    else if (s === "fornecedores") setTab("cadastro");
     else if (s === "relatorio") setTab("apresentações");
   };
 
@@ -257,10 +256,10 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
   );
 
   const SETORES = [
-    {k:"orcamento",    l:"Orçamento",     icon:LayoutDashboard},
-    {k:"notas",        l:"Notas Fiscais", icon:FileText},
-    {k:"fornecedores", l:"Fornecedores",  icon:Users},
-    {k:"relatorio",    l:"Relatório",     icon:ClipboardList},
+    {k:"orcamento",    l:"Orçamento",            icon:LayoutDashboard},
+    {k:"notas",        l:"Notas Fiscais",        icon:FileText},
+    {k:"fornecedores", l:"Hub de Fornecedores →", icon:Users},
+    {k:"relatorio",    l:"Relatório",            icon:ClipboardList},
   ];
 
   const setorAtual = SETORES.find(s => s.k === setor);
@@ -523,7 +522,6 @@ function Brasileirao({ onBack, T, darkMode, setDarkMode }) {
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
-        {tab==="cadastro"      && <TabFornecedores fornecedores={fornecedores} setFornecedores={setFornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 
@@ -608,16 +606,24 @@ function LoginGate({ onAuth, T }) {
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 import FormularioPublico from "./components/FormularioPublico";
 import EnvioPublico from "./components/EnvioPublico";
+import HubFornecedores from "./components/HubFornecedores";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
   const [pagina,   setPagina]   = useState("home");
+  const [hubFiltro, setHubFiltro] = useState("todos"); // filtro pré-aplicado ao abrir o Hub de Fornecedores
   const [authed,   setAuthed]   = useState(() => lsGet(LS_AUTH, false));
   const T = darkMode ? DARK : LIGHT;
 
   const toggleDark = v => {
     const next = typeof v === "function" ? v(darkMode) : v;
     setDarkMode(next); lsSet(LS_DARK, next);
+  };
+
+  // Abre o Hub com filtro pré-aplicado (usado por shortcut de dentro de um campeonato)
+  const abrirHubFornecedores = (filtro = "todos") => {
+    setHubFiltro(filtro);
+    setPagina("hub-fornecedores");
   };
 
   // Rotas públicas — acessíveis sem autenticação
@@ -628,6 +634,7 @@ export default function App() {
   // Tela de login para o HUB
   if (!authed) return <LoginGate onAuth={() => setAuthed(true)} T={T}/>;
 
-  if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
-  return <Home onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>
+  if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  if(pagina==="hub-fornecedores") return <HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  return <Home onEnter={setPagina} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>
 }

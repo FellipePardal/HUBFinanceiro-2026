@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Pill } from "../../shared";
 import { Card, PanelTitle, Chip, Badge, tableStyles } from "../../ui";
-import { iSty, CAMPEONATOS } from "../../../constants";
+import { iSty } from "../../../constants";
+import { CAMPEONATOS_COTACAO } from "../../../data/negociacoes";
 import { Calendar, MapPin, AlertTriangle } from "lucide-react";
 
 const STATUS_FILTROS = [
@@ -31,18 +32,29 @@ const CLASSES = {
   urgente: { label:"Urgente", color:"#ef4444", bg:"rgba(239,68,68,0.10)" },
 };
 
-export default function ProximosJogos({ jogos, cotacoes, T }) {
+export default function ProximosJogos({ jogos, cotacoes, filtroCampeonato = "todos", T }) {
   const IS = iSty(T);
   const TS = tableStyles(T);
   const hoje = new Date().toISOString().slice(0,10);
 
   const [filtroStatus, setFiltroStatus] = useState("futuros");
-  const [filtroCamp,   setFiltroCamp]   = useState("todos");
+  const [filtroCamp,   setFiltroCamp]   = useState(filtroCampeonato);
   const [dataIni,      setDataIni]      = useState("");
   const [dataFim,      setDataFim]      = useState("");
 
+  // Sincroniza filtro local com filtro global recebido via prop
+  useEffect(() => { setFiltroCamp(filtroCampeonato); }, [filtroCampeonato]);
+
+  // Os jogos atuais não têm campeonatoId — pertencem todos ao Brasileirão 2026.
+  // Quando um campeonato diferente for selecionado globalmente, a lista fica vazia
+  // (até que futuros jogos sejam cadastrados com campeonatoId).
+  const jogosDoCampeonato = useMemo(() => {
+    if (filtroCamp === "todos" || filtroCamp === "brasileirao-2026") return jogos || [];
+    return (jogos || []).filter(j => j.campeonatoId === filtroCamp);
+  }, [jogos, filtroCamp]);
+
   const rows = useMemo(() => {
-    const enriched = (jogos||[]).map(j => ({ ...j, _cls: classify(j, hoje) }));
+    const enriched = jogosDoCampeonato.map(j => ({ ...j, _cls: classify(j, hoje) }));
     return enriched.filter(j => {
       if (filtroStatus === "futuros"  && !["hoje","semana","futuro","urgente"].includes(j._cls)) return false;
       if (filtroStatus === "semana"   && !["hoje","semana"].includes(j._cls)) return false;
@@ -55,7 +67,7 @@ export default function ProximosJogos({ jogos, cotacoes, T }) {
       const db = b.data && b.data !== "A definir" ? b.data : "9999";
       return da.localeCompare(db) || (a.rodada||0) - (b.rodada||0);
     });
-  }, [jogos, hoje, filtroStatus, dataIni, dataFim]);
+  }, [jogosDoCampeonato, hoje, filtroStatus, dataIni, dataFim]);
 
   // Contagem de cotações por jogo (para mostrar indicador)
   const cotacoesPorJogo = useMemo(() => {
@@ -74,7 +86,7 @@ export default function ProximosJogos({ jogos, cotacoes, T }) {
           <div style={{width:1,height:24,background:T.border}}/>
           <select value={filtroCamp} onChange={e => setFiltroCamp(e.target.value)} style={{...IS,width:220}}>
             <option value="todos">Todos os campeonatos</option>
-            {CAMPEONATOS.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            {CAMPEONATOS_COTACAO.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
           <div style={{width:1,height:24,background:T.border}}/>
           <div style={{display:"flex",alignItems:"center",gap:6}}>

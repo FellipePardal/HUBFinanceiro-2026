@@ -6,23 +6,29 @@ import { Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { statusInfo, CAMPEONATOS_COTACAO } from "../../../data/negociacoes";
 import CotacaoModal from "./CotacaoModal";
 
-export default function Negociacoes({ fornecedores, cotacoes, setCotacoes, jogos, T }) {
+export default function Negociacoes({ fornecedores, cotacoes, setCotacoes, jogos, filtroCampeonato = "todos", T }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const TS = tableStyles(T);
 
+  // Aplica filtro global de campeonato
+  const cotacoesFiltradas = useMemo(() =>
+    (cotacoes||[]).filter(c => filtroCampeonato === "todos" || c.campeonatoId === filtroCampeonato),
+    [cotacoes, filtroCampeonato]
+  );
+
   // KPIs
-  const cotacoesAtivas = (cotacoes||[]).filter(c => ["aberta","em_analise","negociando"].includes(c.status)).length;
-  const fornecedoresAtivos = new Set((cotacoes||[]).filter(c => ["aberta","em_analise","negociando"].includes(c.status)).map(c => c.fornecedorId)).size;
+  const cotacoesAtivas = cotacoesFiltradas.filter(c => ["aberta","em_analise","negociando"].includes(c.status)).length;
+  const fornecedoresAtivos = new Set(cotacoesFiltradas.filter(c => ["aberta","em_analise","negociando"].includes(c.status)).map(c => c.fornecedorId)).size;
   const hoje = new Date().toISOString().slice(0,10);
   const jogosProgramados = (jogos||[]).filter(j => j.data && j.data !== "A definir" && j.data >= hoje).length;
 
   // Cotações recentes (10 mais recentes por updatedAt/createdAt)
   const recentes = useMemo(() => {
-    return [...(cotacoes||[])]
+    return [...cotacoesFiltradas]
       .sort((a,b) => (b.updatedAt||b.createdAt||"").localeCompare(a.updatedAt||a.createdAt||""))
       .slice(0, 10);
-  }, [cotacoes]);
+  }, [cotacoesFiltradas]);
 
   const fornecedorNome = id => fornecedores.find(f => f.id === id)?.apelido || "—";
   const campeonatoNome = id => CAMPEONATOS_COTACAO.find(c => c.id === id)?.nome || id || "—";
@@ -52,7 +58,7 @@ export default function Negociacoes({ fornecedores, cotacoes, setCotacoes, jogos
         <PanelTitle
           T={T}
           title="Cotações Recentes"
-          subtitle={`${recentes.length} de ${(cotacoes||[]).length} cotação${(cotacoes||[]).length!==1?"es":""}`}
+          subtitle={`${recentes.length} de ${cotacoesFiltradas.length} cotação${cotacoesFiltradas.length!==1?"es":""}${filtroCampeonato!=="todos"?" no campeonato selecionado":""}`}
           right={<Button T={T} variant="primary" size="md" icon={Plus} onClick={() => { setEditing(null); setShowModal(true); }}>Nova Cotação</Button>}
         />
         <div style={TS.wrap}>
@@ -100,6 +106,7 @@ export default function Negociacoes({ fornecedores, cotacoes, setCotacoes, jogos
           cotacao={editing}
           fornecedores={fornecedores}
           jogos={jogos}
+          defaultCampeonatoId={filtroCampeonato !== "todos" ? filtroCampeonato : null}
           onSave={saveCotacao}
           onClose={() => { setShowModal(false); setEditing(null); }}
           T={T}

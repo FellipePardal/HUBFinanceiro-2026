@@ -119,7 +119,7 @@ function ConversaItem({ cotacao, fornecedor, active, ultimaMsg, onClick, T }) {
   );
 }
 
-export default function Chat({ fornecedores, cotacoes, T }) {
+export default function Chat({ fornecedores, cotacoes, filtroCampeonato = "todos", T }) {
   const IS = iSty(T);
   const [selId, setSelId] = useState(null);
   const [mensagens, setMensagens] = useState([]);
@@ -133,10 +133,17 @@ export default function Chat({ fornecedores, cotacoes, T }) {
   const selecionada = useMemo(() => (cotacoes||[]).find(c => c.id === selId), [cotacoes, selId]);
   const fornecedorSel = useMemo(() => fornecedores.find(f => f.id === selecionada?.fornecedorId), [fornecedores, selecionada]);
 
-  // Conversas ordenadas por atualização mais recente
+  // Conversas ordenadas por atualização mais recente (respeitando filtro global)
   const conversas = useMemo(() => {
-    return [...(cotacoes||[])].sort((a,b) => (b.updatedAt||b.createdAt||"").localeCompare(a.updatedAt||a.createdAt||""));
-  }, [cotacoes]);
+    return [...(cotacoes||[])]
+      .filter(c => filtroCampeonato === "todos" || c.campeonatoId === filtroCampeonato)
+      .sort((a,b) => (b.updatedAt||b.createdAt||"").localeCompare(a.updatedAt||a.createdAt||""));
+  }, [cotacoes, filtroCampeonato]);
+
+  // Se a conversa selecionada não estiver no filtro atual, limpa a seleção
+  useEffect(() => {
+    if (selId && !conversas.find(c => c.id === selId)) setSelId(null);
+  }, [conversas, selId]);
 
   // Seleciona a primeira cotação automaticamente
   useEffect(() => {

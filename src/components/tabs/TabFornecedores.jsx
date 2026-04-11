@@ -68,7 +68,9 @@ function SubTabNav({ active, onChange, T }) {
 export default function TabFornecedores({
   fornecedores, setFornecedores,
   cotacoes, setCotacoes,
-  jogos, T,
+  jogos,
+  filtroCampeonato = "todos",
+  T,
 }) {
   const [sub, setSub] = useState("cadastro");
 
@@ -77,11 +79,11 @@ export default function TabFornecedores({
       <SubTabNav active={sub} onChange={setSub} T={T}/>
 
       {sub === "cadastro"    && <Cadastro      fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
-      {sub === "negociacoes" && <Negociacoes   fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} T={T}/>}
-      {sub === "jogos"       && <ProximosJogos jogos={jogos} cotacoes={cotacoes} T={T}/>}
-      {sub === "cotacoes"    && <Cotacoes      fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} T={T}/>}
-      {sub === "chat"        && <Chat          fornecedores={fornecedores} cotacoes={cotacoes} T={T}/>}
-      {sub === "dashboard"   && <Dashboard     fornecedores={fornecedores} cotacoes={cotacoes} jogos={jogos} T={T}/>}
+      {sub === "negociacoes" && <Negociacoes   fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
+      {sub === "jogos"       && <ProximosJogos jogos={jogos} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
+      {sub === "cotacoes"    && <Cotacoes      fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
+      {sub === "chat"        && <Chat          fornecedores={fornecedores} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
+      {sub === "dashboard"   && <Dashboard     fornecedores={fornecedores} cotacoes={cotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
     </>
   );
 }

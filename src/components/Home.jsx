@@ -2,10 +2,10 @@ import { CAMPEONATOS, RADIUS } from "../constants";
 import { Card, Stat, Button, Badge } from "./ui";
 import {
   Radio, Trophy, Calendar, Building2, Sun, Moon,
-  ArrowRight, Lock, Activity, BarChart3,
+  ArrowRight, Lock, Activity, BarChart3, Handshake, Globe2,
 } from "lucide-react";
 
-export default function Home({ onEnter, T, darkMode, setDarkMode }) {
+export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text }}>
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
@@ -236,6 +236,127 @@ export default function Home({ onEnter, T, darkMode, setDarkMode }) {
               </div>
             </Card>
           ))}
+        </div>
+
+        {/* ── Módulos Transversais ────────────────────────────────── */}
+        <div style={{ marginTop: 48, marginBottom: 16 }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: 16,
+            color: T.text,
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}>
+            <Globe2 size={16} color={T.brand || "#10b981"} strokeWidth={2.25}/>
+            Módulos
+          </h3>
+          <p style={{ color: T.textSm, fontSize: 12, margin: "2px 0 0" }}>
+            Ferramentas financeiras transversais a todos os campeonatos
+          </p>
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
+          gap: 20,
+        }}>
+          <Card T={T} hoverable style={{ cursor: "pointer" }}>
+            <div style={{
+              background: "linear-gradient(135deg,#047857 0%,#10b981 60%,#34d399 100%)",
+              padding: "22px 24px 20px",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div style={{
+                position: "absolute",
+                top: -40, right: -40,
+                width: 180, height: 180,
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 60%)",
+                pointerEvents: "none",
+              }}/>
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                position: "relative",
+                gap: 12,
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: "rgba(255,255,255,0.18)",
+                    border: "1px solid rgba(255,255,255,0.28)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    marginBottom: 12,
+                    backdropFilter: "blur(4px)",
+                  }}>
+                    <Handshake size={22} color="#fff" strokeWidth={2.25}/>
+                  </div>
+                  <h4 style={{
+                    margin: "0 0 4px",
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#fff",
+                    letterSpacing: "-0.015em",
+                  }}>Hub de Fornecedores</h4>
+                  <p style={{
+                    margin: 0,
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.78)",
+                  }}>Cadastro, cotações, chat com IA e análise preditiva</p>
+                </div>
+                <span style={{
+                  background: "rgba(255,255,255,0.18)",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.32)",
+                  borderRadius: RADIUS.pill,
+                  padding: "4px 10px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                }}>Ativo</span>
+              </div>
+            </div>
+            <div style={{ padding: "18px 24px 22px" }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 12,
+                marginBottom: 18,
+                paddingBottom: 18,
+                borderBottom: `1px solid ${T.border}`,
+              }}>
+                <div>
+                  <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Escopo</p>
+                  <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>Cross-camp.</p>
+                </div>
+                <div>
+                  <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Sub-abas</p>
+                  <p className="num" style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>6 módulos</p>
+                </div>
+                <div>
+                  <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>IA</p>
+                  <p style={{ color: T.brand, fontSize: 12, fontWeight: 600, margin: 0 }}>Claude</p>
+                </div>
+              </div>
+              <Button
+                T={T}
+                variant="primary"
+                size="md"
+                fullWidth
+                icon={ArrowRight}
+                onClick={() => onOpenHub && onOpenHub("todos")}
+              >
+                Abrir Hub
+              </Button>
+            </div>
+          </Card>
         </div>
 
         <div style={{

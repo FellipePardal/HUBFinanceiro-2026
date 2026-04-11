@@ -7,14 +7,25 @@ import { statusInfo, CAMPEONATOS_COTACAO } from "../../../data/negociacoes";
 import { RADIUS } from "../../../constants";
 import CotacaoModal from "./CotacaoModal";
 
-export default function Cotacoes({ fornecedores, cotacoes, setCotacoes, jogos, T }) {
+export default function Cotacoes({ fornecedores, cotacoes, setCotacoes, jogos, filtroCampeonato = "todos", T }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [modalCampId, setModalCampId] = useState(null);
-  const [expanded, setExpanded] = useState(() => new Set(CAMPEONATOS_COTACAO.map(c => c.id)));
+  // Quando há filtro, só expande o campeonato selecionado; sem filtro, todos abertos
+  const [expanded, setExpanded] = useState(() => new Set(
+    filtroCampeonato === "todos" ? CAMPEONATOS_COTACAO.map(c => c.id) : [filtroCampeonato]
+  ));
   const TS = tableStyles(T);
 
   const fornecedorNome = id => fornecedores.find(f => f.id === id)?.apelido || "—";
+
+  // Lista de campeonatos a renderizar: só o filtrado ou todos
+  const campeonatosVisiveis = useMemo(() =>
+    filtroCampeonato === "todos"
+      ? CAMPEONATOS_COTACAO
+      : CAMPEONATOS_COTACAO.filter(c => c.id === filtroCampeonato),
+    [filtroCampeonato]
+  );
 
   const grouped = useMemo(() => {
     const map = {};
@@ -58,7 +69,7 @@ export default function Cotacoes({ fornecedores, cotacoes, setCotacoes, jogos, T
       </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        {CAMPEONATOS_COTACAO.map(camp => {
+        {campeonatosVisiveis.map(camp => {
           const items = grouped[camp.id] || [];
           const isOpen = expanded.has(camp.id);
           const totalProposto = items.reduce((s,c) => s + (c.valorProposto||0), 0);

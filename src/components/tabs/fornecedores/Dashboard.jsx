@@ -35,11 +35,11 @@ function scoreFornecedor(stats) {
   return Math.round(aprovRate * 60 + savingRate * 30 + velocidadeNorm * 10);
 }
 
-export default function Dashboard({ fornecedores, cotacoes, jogos, T }) {
+export default function Dashboard({ fornecedores, cotacoes, jogos, filtroCampeonato = "todos", T }) {
   const TS = tableStyles(T);
 
   const metricas = useMemo(() => {
-    const all = cotacoes || [];
+    const all = (cotacoes || []).filter(c => filtroCampeonato === "todos" || c.campeonatoId === filtroCampeonato);
     const total = all.length;
     const aprovadas = all.filter(c => c.status === "aprovada");
     const recusadas = all.filter(c => c.status === "recusada");
@@ -116,7 +116,7 @@ export default function Dashboard({ fornecedores, cotacoes, jogos, T }) {
     }
 
     return { total, aprovadas: aprovadas.length, recusadas: recusadas.length, ativas: ativas.length, taxa, savingTotal, savingPct, tempoMedio, ranking, porStatus, meses };
-  }, [cotacoes, fornecedores]);
+  }, [cotacoes, fornecedores, filtroCampeonato]);
 
   // Top 10 fornecedores para o gráfico
   const topFornecedoresChart = metricas.ranking.slice(0, 10).map(r => ({

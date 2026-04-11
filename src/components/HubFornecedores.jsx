@@ -22,6 +22,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [jogos,        setJogosRaw]        = useState(ALL_JOGOS);
   const [cidades,      setCidadesRaw]      = useState(CIDADES_INIT);
   const [campeonatos,  setCampeonatosRaw]  = useState(CAMPEONATOS_FORN_INIT);
+  const [tabelas,      setTabelasRaw]      = useState([]);
   const [loading,      setLoading]         = useState(true);
   const [ocultar,      setOcultar]         = useState(false);
   const [filtroCamp,   setFiltroCamp]      = useState(filtroInicial || FILTRO_TODOS);
@@ -29,18 +30,20 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   // Carga inicial + realtime
   useEffect(() => {
     async function load() {
-      const [f, c, j, ci, ca] = await Promise.all([
+      const [f, c, j, ci, ca, tb] = await Promise.all([
         getState('fornecedores'),
         getState('cotacoes'),
         getState('jogos'),
         getState('forn_cidades'),
         getState('forn_campeonatos'),
+        getState('forn_tabelas_preco'),
       ]);
       if (f)  setFornecedoresRaw(f);
       if (c)  setCotacoesRaw(c);
       if (j)  setJogosRaw(j);
       if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
       if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
+      if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
       setLoading(false);
     }
     load();
@@ -48,11 +51,12 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
     const channel = supabase
       .channel('hub_fornecedores_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
-        if (payload.new.key === 'fornecedores')     setFornecedoresRaw(payload.new.value);
-        if (payload.new.key === 'cotacoes')         setCotacoesRaw(payload.new.value);
-        if (payload.new.key === 'jogos')            setJogosRaw(payload.new.value);
-        if (payload.new.key === 'forn_cidades')     setCidadesRaw(payload.new.value);
-        if (payload.new.key === 'forn_campeonatos') setCampeonatosRaw(payload.new.value);
+        if (payload.new.key === 'fornecedores')       setFornecedoresRaw(payload.new.value);
+        if (payload.new.key === 'cotacoes')           setCotacoesRaw(payload.new.value);
+        if (payload.new.key === 'jogos')              setJogosRaw(payload.new.value);
+        if (payload.new.key === 'forn_cidades')       setCidadesRaw(payload.new.value);
+        if (payload.new.key === 'forn_campeonatos')   setCampeonatosRaw(payload.new.value);
+        if (payload.new.key === 'forn_tabelas_preco') setTabelasRaw(payload.new.value);
       })
       .subscribe();
 
@@ -74,6 +78,10 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const setCampeonatos = fn => setCampeonatosRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('forn_campeonatos', next); return next;
+  });
+  const setTabelas = fn => setTabelasRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('forn_tabelas_preco', next); return next;
   });
 
   // Métricas consolidadas (todas as cotações, independente do filtro)
@@ -273,6 +281,8 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
             setCidades={setCidades}
             campeonatos={campeonatos}
             setCampeonatos={setCampeonatos}
+            tabelas={tabelas}
+            setTabelas={setTabelas}
             filtroCampeonato={filtroCamp}
             T={T}
           />

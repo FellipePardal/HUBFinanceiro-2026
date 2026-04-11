@@ -66,3 +66,80 @@ export const UNIDADES_MEDIDA = [
 
 export const unidadeLabel = key =>
   UNIDADES_MEDIDA.find(u => u.key === key)?.label || key || "—";
+
+// ── Tabelas de preço ───────────────────────────────────────────────────────
+// Cada tabela = um snapshot da matriz de preços de UM fornecedor para UM
+// campeonato. Persistida em app_state.forn_tabelas_preco como array.
+//
+// Estrutura de valores: objeto aninhado para tornar a edição na UI eficiente
+//   valores[itemId][cidadeId][categoriaCodigo] = number
+//
+// Status do ciclo de vida:
+//   rascunho   — admin criou e está montando localmente
+//   enviada    — admin gerou link e fornecedor preencheu/devolveu
+//   devolvida  — admin revisou e devolveu para ajustes
+//   vigente    — aprovada, valores em uso para cotações
+//   arquivada  — substituída por uma versão mais nova
+export const STATUS_TABELA = [
+  { key:"rascunho",  label:"Rascunho",  color:"#64748b" },
+  { key:"enviada",   label:"Enviada",   color:"#3b82f6" },
+  { key:"devolvida", label:"Devolvida", color:"#f59e0b" },
+  { key:"vigente",   label:"Vigente",   color:"#10b981" },
+  { key:"arquivada", label:"Arquivada", color:"#94a3b8" },
+];
+
+export const statusTabelaInfo = key =>
+  STATUS_TABELA.find(s => s.key === key) || STATUS_TABELA[0];
+
+export function criarTabelaVazia({ fornecedorId, campeonatoId }) {
+  const now = new Date().toISOString();
+  return {
+    id: `tab-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    fornecedorId,
+    campeonatoId,
+    status: "rascunho",
+    versao: 1,
+    observacoes: "",
+    valores: {},
+    criadoEm: now,
+    atualizadoEm: now,
+    enviadaEm: null,
+    aprovadaEm: null,
+    token: null,
+    tokenExpiraEm: null,
+    tokenRevogado: false,
+  };
+}
+
+// Lê um valor de célula com segurança
+export const getCelula = (tabela, itemId, cidadeId, categoria) =>
+  tabela?.valores?.[itemId]?.[cidadeId]?.[categoria] ?? null;
+
+// Atualiza imutavelmente um valor de célula e devolve nova tabela
+export function setCelula(tabela, itemId, cidadeId, categoria, valor) {
+  const valores = { ...(tabela.valores || {}) };
+  const porItem = { ...(valores[itemId] || {}) };
+  const porCidade = { ...(porItem[cidadeId] || {}) };
+  if (valor === null || valor === "" || Number.isNaN(valor)) {
+    delete porCidade[categoria];
+  } else {
+    porCidade[categoria] = Number(valor);
+  }
+  // Limpeza ascendente: se a cidade ficou vazia, remove do item; idem item
+  if (Object.keys(porCidade).length === 0) delete porItem[cidadeId];
+  else porItem[cidadeId] = porCidade;
+  if (Object.keys(porItem).length === 0) delete valores[itemId];
+  else valores[itemId] = porItem;
+  return { ...tabela, valores, atualizadoEm: new Date().toISOString() };
+}
+
+// Conta quantas células estão preenchidas (para progresso/percentual)
+export function contarCelulasPreenchidas(tabela) {
+  let n = 0;
+  Object.values(tabela?.valores || {}).forEach(porItem => {
+    Object.values(porItem).forEach(porCidade => {
+      Object.values(porCidade).forEach(v => { if (v != null && v !== "") n++; });
+    });
+  });
+  return n;
+}

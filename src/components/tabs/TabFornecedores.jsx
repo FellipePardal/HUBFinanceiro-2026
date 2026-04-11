@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { RADIUS } from "../../constants";
 import {
-  Users, Handshake, CalendarDays, FileSpreadsheet, LineChart, Library,
+  Users, Handshake, CalendarDays, FileSpreadsheet, LineChart, Library, Table2,
 } from "lucide-react";
 
 import Cadastro      from "./fornecedores/Cadastro";
 import Catalogos     from "./fornecedores/Catalogos";
+import Tabelas       from "./fornecedores/Tabelas";
 import Negociacoes   from "./fornecedores/Negociacoes";
 import ProximosJogos from "./fornecedores/ProximosJogos";
 import Cotacoes      from "./fornecedores/Cotacoes";
@@ -15,6 +16,7 @@ import Dashboard     from "./fornecedores/Dashboard";
 const SUBTABS = [
   { key:"cadastro",    label:"Cadastro",      icon:Users },
   { key:"catalogos",   label:"Catálogos",     icon:Library },
+  { key:"tabelas",     label:"Tabelas",       icon:Table2 },
   { key:"negociacoes", label:"Negociações",   icon:Handshake },
   { key:"jogos",       label:"Próximos Jogos",icon:CalendarDays },
   { key:"cotacoes",    label:"Cotações",      icon:FileSpreadsheet },
@@ -71,6 +73,7 @@ export default function TabFornecedores({
   jogos,
   cidades = [], setCidades = () => {},
   campeonatos = [], setCampeonatos = () => {},
+  tabelas = [], setTabelas = () => {},
   filtroCampeonato = "todos",
   T,
 }) {
@@ -82,6 +85,7 @@ export default function TabFornecedores({
 
       {sub === "cadastro"    && <Cadastro      fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
       {sub === "catalogos"   && <Catalogos     cidades={cidades} setCidades={setCidades} campeonatos={campeonatos} setCampeonatos={setCampeonatos} T={T}/>}
+      {sub === "tabelas"     && <Tabelas       fornecedores={fornecedores} cidades={cidades} campeonatos={campeonatos} tabelas={tabelas} setTabelas={setTabelas} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "negociacoes" && <Negociacoes   fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "jogos"       && <ProximosJogos jogos={jogos} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "cotacoes"    && <Cotacoes      fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}

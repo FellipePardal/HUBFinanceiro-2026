@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { RADIUS } from "../../constants";
 import {
-  Users, Handshake, CalendarDays, FileSpreadsheet, MessageSquare, LineChart,
+  Users, Handshake, CalendarDays, FileSpreadsheet, LineChart,
 } from "lucide-react";
 
 import Cadastro      from "./fornecedores/Cadastro";
 import Negociacoes   from "./fornecedores/Negociacoes";
 import ProximosJogos from "./fornecedores/ProximosJogos";
 import Cotacoes      from "./fornecedores/Cotacoes";
-import Chat          from "./fornecedores/Chat";
 import Dashboard     from "./fornecedores/Dashboard";
 
 // Navegação das sub-abas da aba Fornecedores
@@ -17,7 +16,6 @@ const SUBTABS = [
   { key:"negociacoes", label:"Negociações",   icon:Handshake },
   { key:"jogos",       label:"Próximos Jogos",icon:CalendarDays },
   { key:"cotacoes",    label:"Cotações",      icon:FileSpreadsheet },
-  { key:"chat",        label:"Chat",          icon:MessageSquare },
   { key:"dashboard",   label:"Dashboard",     icon:LineChart },
 ];
 
@@ -82,7 +80,6 @@ export default function TabFornecedores({
       {sub === "negociacoes" && <Negociacoes   fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "jogos"       && <ProximosJogos jogos={jogos} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "cotacoes"    && <Cotacoes      fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
-      {sub === "chat"        && <Chat          fornecedores={fornecedores} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "dashboard"   && <Dashboard     fornecedores={fornecedores} cotacoes={cotacoes} jogos={jogos} filtroCampeonato={filtroCampeonato} T={T}/>}
     </>
   );

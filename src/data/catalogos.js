@@ -143,3 +143,31 @@ export function contarCelulasPreenchidas(tabela) {
   });
   return n;
 }
+
+// ── Token público ──────────────────────────────────────────────────────────
+// Gera/regenera o token de compartilhamento de uma tabela. O fornecedor abre
+// /#tabela/<token> sem login para preencher e devolver. Validade padrão 30d.
+export function gerarTokenTabela(tabela, diasValidade = 30) {
+  const token = (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `tok-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
+  return {
+    ...tabela,
+    token,
+    tokenExpiraEm: new Date(Date.now() + diasValidade * 86400000).toISOString(),
+    tokenRevogado: false,
+    atualizadoEm: new Date().toISOString(),
+  };
+}
+
+export function revogarTokenTabela(tabela) {
+  return { ...tabela, tokenRevogado: true, atualizadoEm: new Date().toISOString() };
+}
+
+// Estado do token: 'sem' | 'ativo' | 'expirado' | 'revogado'
+export function statusTokenTabela(tabela) {
+  if (!tabela?.token) return "sem";
+  if (tabela.tokenRevogado) return "revogado";
+  if (tabela.tokenExpiraEm && new Date(tabela.tokenExpiraEm) < new Date()) return "expirado";
+  return "ativo";
+}

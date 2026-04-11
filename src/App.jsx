@@ -607,6 +607,7 @@ function LoginGate({ onAuth, T }) {
 import FormularioPublico from "./components/FormularioPublico";
 import EnvioPublico from "./components/EnvioPublico";
 import HubFornecedores from "./components/HubFornecedores";
+import TabelaPrecoPublica from "./components/TabelaPrecoPublica";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
@@ -630,6 +631,8 @@ export default function App() {
   if (window.location.hash === "#formulario") return <FormularioPublico/>;
   const envioMatch = window.location.hash.match(/^#envio\/(\d+)$/);
   if (envioMatch) return <EnvioPublico numero={parseInt(envioMatch[1])}/>;
+  const tabelaMatch = window.location.hash.match(/^#tabela\/([0-9a-fA-F-]+)$/);
+  if (tabelaMatch) return <TabelaPrecoPublica token={tabelaMatch[1]}/>;
 
   // Tela de login para o HUB
   if (!authed) return <LoginGate onAuth={() => setAuthed(true)} T={T}/>;

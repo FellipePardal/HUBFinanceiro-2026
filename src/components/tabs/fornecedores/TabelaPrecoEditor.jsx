@@ -9,10 +9,13 @@ import {
   getCelula,
   contarCelulasPreenchidas,
   unidadeLabel,
+  gerarTokenTabela,
+  revogarTokenTabela,
+  statusTokenTabela,
 } from "../../../data/catalogos";
 import {
   X, Save, Send, CheckCircle2, Archive, RotateCcw, Package,
-  AlertCircle, MapPin, Tag,
+  AlertCircle, MapPin, Tag, Link2, Copy, Check, Ban,
 } from "lucide-react";
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -50,9 +53,35 @@ export default function TabelaPrecoEditor({
 }) {
   const [tabela, setTabela] = useState(tabelaInicial);
   const [dirty, setDirty]   = useState(false);
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   // Sincroniza quando o pai trocar a tabela (raro, mas seguro)
   useEffect(() => { setTabela(tabelaInicial); setDirty(false); }, [tabelaInicial?.id]);
+
+  // ── Link público ─────────────────────────────────────────────────────────
+  const tokenStatus = statusTokenTabela(tabela);
+  const linkPublico = tabela.token
+    ? `${window.location.origin}${window.location.pathname}#tabela/${tabela.token}`
+    : null;
+
+  const gerarLink = () => {
+    const next = gerarTokenTabela(tabela);
+    setTabela(next);
+    onSave(next);
+    setDirty(false);
+  };
+  const revogarLink = () => {
+    if (!confirm("Revogar este link? O fornecedor não conseguirá mais acessá-lo.")) return;
+    const next = revogarTokenTabela(tabela);
+    setTabela(next);
+    onSave(next);
+  };
+  const copiarLink = () => {
+    if (!linkPublico) return;
+    navigator.clipboard?.writeText(linkPublico);
+    setLinkCopiado(true);
+    setTimeout(() => setLinkCopiado(false), 2000);
+  };
 
   const itens = (fornecedor?.catalogo || []).filter(i => i.ativo !== false);
   const cidadesDoCamp = useMemo(
@@ -137,9 +166,44 @@ export default function TabelaPrecoEditor({
           </div>
         </div>
 
-        {dirty && (
-          <div style={{marginTop:12,display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",color:T.warning||"#f59e0b",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,letterSpacing:"0.02em"}}>
-            <AlertCircle size={12}/> Alterações não salvas
+        <div style={{marginTop:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          {dirty && (
+            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",color:T.warning||"#f59e0b",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,letterSpacing:"0.02em"}}>
+              <AlertCircle size={12}/> Alterações não salvas
+            </span>
+          )}
+          {tokenStatus === "ativo" && (
+            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:T.brandSoft||"rgba(16,185,129,0.12)",color:T.brand||"#10b981",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,letterSpacing:"0.02em"}}>
+              <Link2 size={12}/> Link público ativo
+              {tabela.tokenExpiraEm && <span style={{color:T.textMd,fontWeight:500}}>· expira {new Date(tabela.tokenExpiraEm).toLocaleDateString("pt-BR")}</span>}
+            </span>
+          )}
+          {tokenStatus === "expirado" && (
+            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",color:T.warning||"#f59e0b",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,letterSpacing:"0.02em"}}>
+              <AlertCircle size={12}/> Link expirado
+            </span>
+          )}
+          {tokenStatus === "revogado" && (
+            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"rgba(239,68,68,0.12)",color:T.danger||"#ef4444",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,letterSpacing:"0.02em"}}>
+              <Ban size={12}/> Link revogado
+            </span>
+          )}
+        </div>
+
+        {/* Caixa do link público */}
+        {tokenStatus === "ativo" && linkPublico && (
+          <div style={{marginTop:12,padding:"10px 14px",background:T.surface||T.card,border:`1px solid ${T.brandBorder||T.border}`,borderRadius:RADIUS.md,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <Link2 size={14} color={T.brand||"#10b981"}/>
+            <input
+              readOnly
+              value={linkPublico}
+              onClick={e => e.target.select()}
+              style={{flex:1,minWidth:240,background:"transparent",border:"none",outline:"none",color:T.text,fontSize:12,fontFamily:"'JetBrains Mono',ui-monospace,monospace"}}
+            />
+            <Button T={T} variant="secondary" size="sm" icon={linkCopiado?Check:Copy} onClick={copiarLink}>
+              {linkCopiado?"Copiado":"Copiar"}
+            </Button>
+            <Button T={T} variant="danger" size="sm" icon={Ban} onClick={revogarLink}>Revogar</Button>
           </div>
         )}
       </div>
@@ -242,6 +306,11 @@ export default function TabelaPrecoEditor({
           {tabela.atualizadoEm && <>Atualizada {new Date(tabela.atualizadoEm).toLocaleString("pt-BR")}</>}
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {tabela.status !== "arquivada" && tokenStatus !== "ativo" && (
+            <Button T={T} variant="secondary" size="md" icon={Link2} onClick={gerarLink}>
+              {tokenStatus === "sem" ? "Gerar link público" : "Gerar novo link"}
+            </Button>
+          )}
           {tabela.status !== "arquivada" && (
             <Button T={T} variant="secondary" size="md" icon={Save} onClick={() => salvar(tabela.status)} disabled={!dirty}>
               Salvar rascunho

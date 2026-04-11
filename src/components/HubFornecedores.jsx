@@ -3,6 +3,7 @@ import { RADIUS } from "../constants";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
+import { CIDADES_INIT, CAMPEONATOS_FORN_INIT } from "../data/catalogos";
 import { ALL_JOGOS } from "../data";
 import { fmt, fmtK } from "../utils";
 import { Stat, Badge, IconButton } from "./ui";
@@ -19,6 +20,8 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
   const [cotacoes,     setCotacoesRaw]     = useState(COTACAO_INIT);
   const [jogos,        setJogosRaw]        = useState(ALL_JOGOS);
+  const [cidades,      setCidadesRaw]      = useState(CIDADES_INIT);
+  const [campeonatos,  setCampeonatosRaw]  = useState(CAMPEONATOS_FORN_INIT);
   const [loading,      setLoading]         = useState(true);
   const [ocultar,      setOcultar]         = useState(false);
   const [filtroCamp,   setFiltroCamp]      = useState(filtroInicial || FILTRO_TODOS);
@@ -26,10 +29,18 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   // Carga inicial + realtime
   useEffect(() => {
     async function load() {
-      const [f, c, j] = await Promise.all([getState('fornecedores'), getState('cotacoes'), getState('jogos')]);
-      if (f) setFornecedoresRaw(f);
-      if (c) setCotacoesRaw(c);
-      if (j) setJogosRaw(j);
+      const [f, c, j, ci, ca] = await Promise.all([
+        getState('fornecedores'),
+        getState('cotacoes'),
+        getState('jogos'),
+        getState('forn_cidades'),
+        getState('forn_campeonatos'),
+      ]);
+      if (f)  setFornecedoresRaw(f);
+      if (c)  setCotacoesRaw(c);
+      if (j)  setJogosRaw(j);
+      if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
+      if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
       setLoading(false);
     }
     load();
@@ -37,9 +48,11 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
     const channel = supabase
       .channel('hub_fornecedores_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
-        if (payload.new.key === 'fornecedores') setFornecedoresRaw(payload.new.value);
-        if (payload.new.key === 'cotacoes')     setCotacoesRaw(payload.new.value);
-        if (payload.new.key === 'jogos')        setJogosRaw(payload.new.value);
+        if (payload.new.key === 'fornecedores')     setFornecedoresRaw(payload.new.value);
+        if (payload.new.key === 'cotacoes')         setCotacoesRaw(payload.new.value);
+        if (payload.new.key === 'jogos')            setJogosRaw(payload.new.value);
+        if (payload.new.key === 'forn_cidades')     setCidadesRaw(payload.new.value);
+        if (payload.new.key === 'forn_campeonatos') setCampeonatosRaw(payload.new.value);
       })
       .subscribe();
 
@@ -53,6 +66,14 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const setCotacoes = fn => setCotacoesRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('cotacoes', next); return next;
+  });
+  const setCidades = fn => setCidadesRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('forn_cidades', next); return next;
+  });
+  const setCampeonatos = fn => setCampeonatosRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('forn_campeonatos', next); return next;
   });
 
   // Métricas consolidadas (todas as cotações, independente do filtro)
@@ -248,6 +269,10 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
             cotacoes={cotacoes}
             setCotacoes={setCotacoes}
             jogos={jogos}
+            cidades={cidades}
+            setCidades={setCidades}
+            campeonatos={campeonatos}
+            setCampeonatos={setCampeonatos}
             filtroCampeonato={filtroCamp}
             T={T}
           />

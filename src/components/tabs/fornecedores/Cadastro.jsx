@@ -3,7 +3,8 @@ import { KPI, Pill } from "../../shared";
 import { CIDADES, iSty, RADIUS } from "../../../constants";
 import { fmt } from "../../../utils";
 import { Card, PanelTitle, Button, Chip, Badge, tableStyles } from "../../ui";
-import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight, DollarSign, MapPin } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight, DollarSign, MapPin, Package } from "lucide-react";
+import CatalogoItensModal from "./CatalogoItensModal";
 
 const AREAS = ["Todas","Operações","Conteúdo"];
 const TIPOS = ["Todos","Fornecedor","Prestador"];
@@ -464,6 +465,7 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
   const [busca, setBusca] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [catalogoEdit, setCatalogoEdit] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
 
   const filtered = fornecedores.filter(f =>
@@ -575,6 +577,7 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
                     </td>
                     <td style={TS.td} onClick={e => e.stopPropagation()}>
                       <div style={{display:"flex",gap:4}}>
+                        <Button T={T} variant="secondary" size="sm" icon={Package} title={`Catálogo de itens (${(f.catalogo||[]).length})`} onClick={()=>setCatalogoEdit(f)}/>
                         <Button T={T} variant="secondary" size="sm" icon={Pencil} onClick={()=>{setEditing(f);setShowModal(true);}}/>
                         <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteFornecedor(f.id)}/>
                       </div>
@@ -599,6 +602,14 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
       </Card>
 
       {showModal && <FornecedorModal fornecedor={editing} onSave={saveFornecedor} onClose={() => {setShowModal(false);setEditing(null);}} T={T}/>}
+      {catalogoEdit && (
+        <CatalogoItensModal
+          fornecedor={catalogoEdit}
+          onSave={(f) => { updateFornecedor(f); setCatalogoEdit(null); }}
+          onClose={() => setCatalogoEdit(null)}
+          T={T}
+        />
+      )}
     </>
   );
 }

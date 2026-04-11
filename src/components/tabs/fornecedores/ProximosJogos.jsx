@@ -1,160 +1,370 @@
-import { useState, useMemo, useEffect } from "react";
-import { Pill } from "../../shared";
-import { Card, PanelTitle, Chip, Badge, tableStyles } from "../../ui";
-import { iSty } from "../../../constants";
-import { CAMPEONATOS_COTACAO } from "../../../data/negociacoes";
-import { Calendar, MapPin, AlertTriangle } from "lucide-react";
+import { useState, useMemo } from "react";
+import { iSty, RADIUS } from "../../../constants";
+import { KPI } from "../../shared";
+import { Card, PanelTitle, Button, Badge, Chip, tableStyles } from "../../ui";
+import { filtrarJogos, classificarTemporal } from "../../../lib/portalMatriz";
+import {
+  Calendar, MapPin, Tag, Search, Plus, Pencil, Trash2, Clock,
+} from "lucide-react";
 
-const STATUS_FILTROS = [
-  { key:"todos",    label:"Todos" },
+// ════════════════════════════════════════════════════════════════════════════
+// PRÓXIMOS JOGOS — visão cronológica dos jogos do(s) campeonato(s)
+// ----------------------------------------------------------------------------
+// Consome a coleção forn_jogos via adapter portalMatriz. Hoje os jogos são
+// editáveis manualmente; quando o portal matriz interno entrar no ar, o
+// botão "Novo jogo" desaparece e a coleção passa a ser sincronizada.
+// ════════════════════════════════════════════════════════════════════════════
+
+const FILTROS_TEMPORAL = [
   { key:"futuros",  label:"Futuros" },
   { key:"semana",   label:"Próximos 7 dias" },
-  { key:"sem_data", label:"Sem data / A definir" },
+  { key:"hoje",     label:"Hoje" },
+  { key:"passados", label:"Passados" },
+  { key:"todos",    label:"Todos" },
 ];
 
-// Retorna classificação visual por linha
-function classify(j, hoje) {
-  if (!j.data || j.data === "A definir" || j.mandante === "A definir") return "urgente";
-  if (j.data < hoje) return "passado";
-  if (j.data === hoje) return "hoje";
-  const dt = new Date(j.data);
-  const hj = new Date(hoje);
-  const diff = (dt - hj) / 86400000;
-  if (diff <= 7) return "semana";
-  return "futuro";
-}
-
-const CLASSES = {
-  passado: { label:"Passado", color:"#94a3b8", bg:"rgba(148,163,184,0.06)" },
-  hoje:    { label:"Hoje",    color:"#10b981", bg:"rgba(16,185,129,0.14)" },
-  semana:  { label:"7 dias",  color:"#f59e0b", bg:"rgba(245,158,11,0.10)" },
-  futuro:  { label:"Futuro",  color:"#3b82f6", bg:"rgba(59,130,246,0.06)" },
-  urgente: { label:"Urgente", color:"#ef4444", bg:"rgba(239,68,68,0.10)" },
+const COR_TEMPORAL = {
+  passado:  "#94a3b8",
+  hoje:     "#ef4444",
+  urgente:  "#f59e0b",
+  semana:   "#3b82f6",
+  futuro:   "#10b981",
+  sem_data: "#64748b",
+};
+const LABEL_TEMPORAL = {
+  passado:"Passado",hoje:"Hoje",urgente:"Em até 3 dias",semana:"Esta semana",futuro:"Futuro",sem_data:"Sem data",
 };
 
-export default function ProximosJogos({ jogos, cotacoes, filtroCampeonato = "todos", T }) {
+const fmtData = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  } catch { return iso; }
+};
+
+// ── Modal de jogo (criar/editar manualmente) ────────────────────────────────
+function JogoModal({ jogo, campeonatos, cidades, onSave, onClose, T }) {
   const IS = iSty(T);
-  const TS = tableStyles(T);
-  const hoje = new Date().toISOString().slice(0,10);
+  const camposPadrao = useMemo(() => {
+    const camp = campeonatos.find(c => c.ativo) || campeonatos[0];
+    return {
+      campeonatoId: camp?.id || "",
+      cidadeId:     camp?.cidadeIds?.[0] || "",
+      categoria:    camp?.categorias?.[0]?.codigo || "",
+      rodada:       1,
+      data:         "",
+      mandante:     "",
+      visitante:    "",
+      estadio:      "",
+    };
+  }, [campeonatos]);
+  const [form, setForm] = useState(jogo || camposPadrao);
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
-  const [filtroStatus, setFiltroStatus] = useState("futuros");
-  const [filtroCamp,   setFiltroCamp]   = useState(filtroCampeonato);
-  const [dataIni,      setDataIni]      = useState("");
-  const [dataFim,      setDataFim]      = useState("");
+  const camp = campeonatos.find(c => c.id === form.campeonatoId);
+  const cidadesDoCamp = (camp?.cidadeIds || []).map(id => cidades.find(c => c.id === id)).filter(Boolean);
+  const categoriasDoCamp = camp?.categorias || [];
 
-  // Sincroniza filtro local com filtro global recebido via prop
-  useEffect(() => { setFiltroCamp(filtroCampeonato); }, [filtroCampeonato]);
+  const handleSave = () => {
+    if (!form.mandante.trim() || !form.visitante.trim()) return alert("Informe mandante e visitante.");
+    if (!form.cidadeId) return alert("Selecione a cidade.");
+    if (!form.categoria) return alert("Selecione a categoria.");
+    const id = jogo?.id || `j-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;
+    onSave({ ...form, id, rodada: parseInt(form.rodada,10) || 1 });
+  };
 
-  // Os jogos atuais não têm campeonatoId — pertencem todos ao Brasileirão 2026.
-  // Quando um campeonato diferente for selecionado globalmente, a lista fica vazia
-  // (até que futuros jogos sejam cadastrados com campeonatoId).
-  const jogosDoCampeonato = useMemo(() => {
-    if (filtroCamp === "todos" || filtroCamp === "brasileirao-2026") return jogos || [];
-    return (jogos || []).filter(j => j.campeonatoId === filtroCamp);
-  }, [jogos, filtroCamp]);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:T.surface||T.card,borderRadius:RADIUS.xl,padding:28,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",border:`1px solid ${T.border}`,boxShadow:T.shadow}}>
+        <h3 style={{margin:"0 0 6px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>{jogo ? "Editar jogo" : "Novo jogo"}</h3>
+        <p style={{margin:"0 0 18px",fontSize:12,color:T.textMd}}>
+          Cadastro manual provisório — quando o portal matriz integrar, jogos vêm direto de lá.
+        </p>
 
-  const rows = useMemo(() => {
-    const enriched = jogosDoCampeonato.map(j => ({ ...j, _cls: classify(j, hoje) }));
-    return enriched.filter(j => {
-      if (filtroStatus === "futuros"  && !["hoje","semana","futuro","urgente"].includes(j._cls)) return false;
-      if (filtroStatus === "semana"   && !["hoje","semana"].includes(j._cls)) return false;
-      if (filtroStatus === "sem_data" && j._cls !== "urgente") return false;
-      if (dataIni && j.data && j.data !== "A definir" && j.data < dataIni) return false;
-      if (dataFim && j.data && j.data !== "A definir" && j.data > dataFim) return false;
-      return true;
-    }).sort((a,b) => {
-      const da = a.data && a.data !== "A definir" ? a.data : "9999";
-      const db = b.data && b.data !== "A definir" ? b.data : "9999";
-      return da.localeCompare(db) || (a.rodada||0) - (b.rodada||0);
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}}>
+          <div style={{marginBottom:12,gridColumn:"1 / -1"}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Campeonato</label>
+            <select value={form.campeonatoId} onChange={e=>set("campeonatoId",e.target.value)} style={IS}>
+              {campeonatos.filter(c => c.ativo).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Cidade</label>
+            <select value={form.cidadeId} onChange={e=>set("cidadeId",e.target.value)} style={IS}>
+              <option value="">— Selecione —</option>
+              {cidadesDoCamp.map(c => <option key={c.id} value={c.id}>{c.nome}/{c.uf}</option>)}
+            </select>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Categoria</label>
+            <select value={form.categoria} onChange={e=>set("categoria",e.target.value)} style={IS}>
+              <option value="">— Selecione —</option>
+              {categoriasDoCamp.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo}</option>)}
+            </select>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Rodada</label>
+            <input type="number" value={form.rodada} onChange={e=>set("rodada",e.target.value)} style={IS}/>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Data e hora</label>
+            <input type="datetime-local" value={form.data ? form.data.slice(0,16) : ""} onChange={e=>set("data", e.target.value ? new Date(e.target.value).toISOString() : "")} style={IS}/>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Mandante</label>
+            <input value={form.mandante} onChange={e=>set("mandante",e.target.value)} style={IS}/>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Visitante</label>
+            <input value={form.visitante} onChange={e=>set("visitante",e.target.value)} style={IS}/>
+          </div>
+
+          <div style={{marginBottom:12,gridColumn:"1 / -1"}}>
+            <label style={{color:T.textMd,fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"}}>Estádio (opcional)</label>
+            <input value={form.estadio||""} onChange={e=>set("estadio",e.target.value)} style={IS}/>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
+          <Button T={T} variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
+          <Button T={T} variant="primary" size="md" onClick={handleSave}>Salvar</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════════
+export default function ProximosJogos({
+  jogosForn = [], setJogosForn = ()=>{},
+  cidades = [], campeonatos = [],
+  cotacoes = [],
+  filtroCampeonato = "todos",
+  T,
+}) {
+  const [filtroTemporal, setFiltroTemporal] = useState("futuros");
+  const [filtroCidade, setFiltroCidade] = useState("todas");
+  const [filtroCategoria, setFiltroCategoria] = useState("todas");
+  const [busca, setBusca] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const cidadeById = useMemo(() => Object.fromEntries(cidades.map(c => [c.id, c])), [cidades]);
+  const campById = useMemo(() => Object.fromEntries(campeonatos.map(c => [c.id, c])), [campeonatos]);
+
+  const agora = useMemo(() => new Date(), []);
+
+  const jogosFiltrados = useMemo(() => {
+    let lista = filtrarJogos(jogosForn, {
+      campeonatoId: filtroCampeonato !== "todos" ? filtroCampeonato : undefined,
+      cidadeId:     filtroCidade !== "todas"   ? filtroCidade   : undefined,
+      categoria:    filtroCategoria !== "todas"? filtroCategoria: undefined,
     });
-  }, [jogosDoCampeonato, hoje, filtroStatus, dataIni, dataFim]);
+    if (busca.trim()) {
+      const q = busca.toLowerCase();
+      lista = lista.filter(j =>
+        (j.mandante||"").toLowerCase().includes(q) ||
+        (j.visitante||"").toLowerCase().includes(q) ||
+        (j.estadio||"").toLowerCase().includes(q)
+      );
+    }
+    return lista
+      .map(j => ({ ...j, _temporal: classificarTemporal(j, agora) }))
+      .filter(j => {
+        if (filtroTemporal === "todos") return true;
+        if (filtroTemporal === "futuros")  return ["hoje","urgente","semana","futuro"].includes(j._temporal);
+        if (filtroTemporal === "passados") return j._temporal === "passado";
+        if (filtroTemporal === "semana")   return ["hoje","urgente","semana"].includes(j._temporal);
+        if (filtroTemporal === "hoje")     return j._temporal === "hoje";
+        return true;
+      })
+      .sort((a,b) => (a.data||"").localeCompare(b.data||""));
+  }, [jogosForn, filtroCampeonato, filtroCidade, filtroCategoria, busca, filtroTemporal, agora]);
 
-  // Contagem de cotações por jogo (para mostrar indicador)
+  const kpis = useMemo(() => {
+    const escopo = filtrarJogos(jogosForn, {
+      campeonatoId: filtroCampeonato !== "todos" ? filtroCampeonato : undefined,
+    }).map(j => ({...j, _t: classificarTemporal(j, agora)}));
+    return {
+      total:    escopo.length,
+      futuros:  escopo.filter(j => ["hoje","urgente","semana","futuro"].includes(j._t)).length,
+      semana:   escopo.filter(j => ["hoje","urgente","semana"].includes(j._t)).length,
+      passados: escopo.filter(j => j._t === "passado").length,
+    };
+  }, [jogosForn, filtroCampeonato, agora]);
+
   const cotacoesPorJogo = useMemo(() => {
     const map = {};
-    (cotacoes||[]).forEach(c => (c.jogoIds||[]).forEach(jid => { map[jid] = (map[jid]||0) + 1; }));
+    (cotacoes||[]).forEach(c => {
+      if (!c.jogoId) return;
+      map[c.jogoId] = (map[c.jogoId] || 0) + 1;
+    });
     return map;
   }, [cotacoes]);
 
+  const cidadesDisponiveis = useMemo(() => {
+    if (filtroCampeonato === "todos") return cidades;
+    const camp = campById[filtroCampeonato];
+    return (camp?.cidadeIds || []).map(id => cidadeById[id]).filter(Boolean);
+  }, [filtroCampeonato, campById, cidades, cidadeById]);
+
+  const categoriasDisponiveis = useMemo(() => {
+    if (filtroCampeonato === "todos") {
+      const set = new Set();
+      campeonatos.forEach(c => (c.categorias||[]).forEach(cat => set.add(cat.codigo)));
+      return [...set];
+    }
+    return (campById[filtroCampeonato]?.categorias || []).map(c => c.codigo);
+  }, [filtroCampeonato, campById, campeonatos]);
+
+  const salvar = (jogo) => {
+    setJogosForn(list => {
+      const idx = list.findIndex(j => j.id === jogo.id);
+      return idx >= 0 ? list.map(j => j.id===jogo.id?jogo:j) : [...list, jogo];
+    });
+    setShowModal(false); setEditing(null);
+  };
+  const remover = (id) => {
+    if (!confirm("Remover este jogo?")) return;
+    setJogosForn(list => list.filter(j => j.id !== id));
+  };
+
+  const TS = tableStyles(T);
+
   return (
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          {STATUS_FILTROS.map(s => (
-            <Chip key={s.key} active={filtroStatus===s.key} onClick={() => setFiltroStatus(s.key)} T={T}>{s.label}</Chip>
-          ))}
-          <div style={{width:1,height:24,background:T.border}}/>
-          <select value={filtroCamp} onChange={e => setFiltroCamp(e.target.value)} style={{...IS,width:220}}>
-            <option value="todos">Todos os campeonatos</option>
-            {CAMPEONATOS_COTACAO.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
-          <div style={{width:1,height:24,background:T.border}}/>
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <Calendar size={14} color={T.textSm}/>
-            <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} style={{...IS,width:150}}/>
-            <span style={{color:T.textSm,fontSize:12}}>até</span>
-            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} style={{...IS,width:150}}/>
-          </div>
-        </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:20}}>
+        <KPI label="Total de Jogos" value={String(kpis.total)} sub={filtroCampeonato==="todos"?"Todos os campeonatos":campById[filtroCampeonato]?.nome||""} color={T.info||"#3b82f6"} T={T}/>
+        <KPI label="Próximos" value={String(kpis.futuros)} sub="Hoje em diante" color={T.brand||"#10b981"} T={T}/>
+        <KPI label="Próximos 7 dias" value={String(kpis.semana)} sub="Janela crítica" color={T.warning||"#f59e0b"} T={T}/>
+        <KPI label="Passados" value={String(kpis.passados)} sub="Já realizados" color="#94a3b8" T={T}/>
       </div>
 
-      <Card T={T}>
-        <PanelTitle T={T} title="Próximos Jogos" subtitle={`${rows.length} jogo${rows.length!==1?"s":""} após filtros`}/>
-        <div style={TS.wrap}>
-          <table style={{...TS.table, minWidth:880}}>
-            <thead>
-              <tr style={TS.thead}>
-                {["Status","Rodada","Data","Hora","Cidade","Mandante × Visitante","Cat.","Detentor","Cotações"].map(h =>
-                  <th key={h} style={{...TS.th, ...(h==="Cotações" ? TS.thRight : TS.thLeft)}}>{h}</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={9} style={{padding:32,textAlign:"center",color:T.textSm,fontSize:12}}>
-                  Nenhum jogo encontrado com os filtros atuais.
-                </td></tr>
-              )}
-              {rows.map(j => {
-                const cls = CLASSES[j._cls];
-                const nCot = cotacoesPorJogo[j.id] || 0;
-                return (
-                  <tr key={j.id} style={{
-                    ...TS.tr,
-                    background: cls.bg,
-                    borderLeft: `3px solid ${cls.color}`,
-                  }}>
-                    <td style={TS.td}>
-                      <Badge color={cls.color} T={T} size="sm">
-                        {j._cls === "urgente" && <AlertTriangle size={11} style={{marginRight:2}}/>}
-                        {cls.label}
-                      </Badge>
-                    </td>
-                    <td style={{...TS.td,fontWeight:600,fontSize:12}}>R{j.rodada}</td>
-                    <td style={{...TS.td,fontSize:12,color:T.textMd}}>{j.data || "—"}</td>
-                    <td style={{...TS.td,fontSize:12,color:T.textMd}}>{j.hora || "—"}</td>
-                    <td style={TS.td}>
-                      <div style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12}}>
-                        <MapPin size={11} color={T.textSm}/>{j.cidade || "—"}
-                      </div>
-                    </td>
-                    <td style={{...TS.td,fontWeight:600,fontSize:13}}>
-                      {j.mandante} <span style={{color:T.textSm,fontWeight:400}}>×</span> {j.visitante}
-                    </td>
-                    <td style={TS.td}><Pill label={j.categoria||"—"} color={j.categoria==="B1"?(T.brand||"#10b981"):(T.warning||"#f59e0b")}/></td>
-                    <td style={{...TS.td,fontSize:11,color:T.textSm}}>{j.detentor || "—"}</td>
-                    <td className="num" style={{...TS.tdNum}}>
-                      {nCot > 0
-                        ? <Badge color={T.info||"#3b82f6"} T={T} size="sm">{nCot}</Badge>
-                        : <span style={{fontSize:11,color:T.textSm}}>—</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Filtros */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{position:"relative"}}>
+            <Search size={14} color={T.textSm} style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por time ou estádio..." style={{...iSty(T),width:260,padding:"8px 12px 8px 34px"}}/>
+          </div>
+
+          <div style={{width:1,height:24,background:T.border}}/>
+          {FILTROS_TEMPORAL.map(f => (
+            <Chip key={f.key} active={filtroTemporal===f.key} onClick={()=>setFiltroTemporal(f.key)} T={T}>{f.label}</Chip>
+          ))}
+
+          <div style={{width:1,height:24,background:T.border}}/>
+          <select value={filtroCidade} onChange={e=>setFiltroCidade(e.target.value)} style={{...iSty(T), width:160}}>
+            <option value="todas">Todas cidades</option>
+            {cidadesDisponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}/{c.uf}</option>)}
+          </select>
+          <select value={filtroCategoria} onChange={e=>setFiltroCategoria(e.target.value)} style={{...iSty(T), width:130}}>
+            <option value="todas">Todas categorias</option>
+            {categoriasDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
+
+        <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>{setEditing(null);setShowModal(true);}}>Novo jogo</Button>
+      </div>
+
+      {/* Listagem */}
+      <Card T={T} padding={0}>
+        <PanelTitle T={T}
+          title="Próximos Jogos"
+          subtitle={`${jogosFiltrados.length} jogo${jogosFiltrados.length!==1?"s":""} · ordenados por data`}
+          color={T.info||"#3b82f6"}
+        />
+
+        {jogosFiltrados.length === 0 ? (
+          <div style={{padding:"56px 20px",textAlign:"center"}}>
+            <div style={{
+              width:64,height:64,borderRadius:16,
+              background:T.surfaceAlt||T.bg,
+              border:`1px solid ${T.border}`,
+              color:T.textSm,
+              display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14,
+            }}><Calendar size={28} strokeWidth={2}/></div>
+            <p style={{margin:0,fontSize:13,color:T.textMd}}>Nenhum jogo encontrado com esses filtros.</p>
+          </div>
+        ) : (
+          <div style={TS.wrap}>
+            <table style={{...TS.table, minWidth:920}}>
+              <thead>
+                <tr style={TS.thead}>
+                  {["Status","Data","Rodada","Cidade","Cat.","Jogo","Cotações",""].map(h =>
+                    <th key={h} style={{...TS.th, ...TS.thLeft}}>{h}</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {jogosFiltrados.map(j => {
+                  const cid = cidadeById[j.cidadeId];
+                  const cor = COR_TEMPORAL[j._temporal];
+                  const numCot = cotacoesPorJogo[j.id] || 0;
+                  return (
+                    <tr key={j.id} style={TS.tr}>
+                      <td style={TS.td}>
+                        <Badge T={T} color={cor} size="sm">{LABEL_TEMPORAL[j._temporal]}</Badge>
+                      </td>
+                      <td style={{...TS.td, fontSize:12, color:T.textMd, whiteSpace:"nowrap"}}>
+                        <Clock size={11} style={{display:"inline",verticalAlign:"-1px",marginRight:4}} color={T.textSm}/>
+                        {fmtData(j.data)}
+                      </td>
+                      <td style={{...TS.td, fontSize:12, color:T.textSm}}>R{j.rodada}</td>
+                      <td style={{...TS.td, fontSize:12}}>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:5}}>
+                          <MapPin size={11} color={T.textSm}/>
+                          {cid ? `${cid.nome}/${cid.uf}` : "—"}
+                        </span>
+                      </td>
+                      <td style={TS.td}>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:RADIUS.pill,background:T.brandSoft||"rgba(16,185,129,0.12)",color:T.brand||"#10b981",fontSize:11,fontWeight:700}}>
+                          <Tag size={10}/>{j.categoria}
+                        </span>
+                      </td>
+                      <td style={{...TS.td, fontWeight:600}}>
+                        {j.mandante} <span style={{color:T.textSm,fontWeight:400,fontSize:12}}>×</span> {j.visitante}
+                        {j.estadio && <div style={{fontSize:11,color:T.textSm,marginTop:2}}>{j.estadio}</div>}
+                      </td>
+                      <td style={TS.td}>
+                        {numCot > 0
+                          ? <Badge T={T} color={T.brand||"#10b981"} size="sm">{numCot} cotação{numCot!==1?"ões":""}</Badge>
+                          : <span style={{fontSize:11,color:T.textSm}}>—</span>}
+                      </td>
+                      <td style={TS.td}>
+                        <div style={{display:"flex",gap:4}}>
+                          <Button T={T} variant="secondary" size="sm" icon={Pencil} onClick={()=>{setEditing(j);setShowModal(true);}}/>
+                          <Button T={T} variant="danger"    size="sm" icon={Trash2} onClick={()=>remover(j.id)}/>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+
+      {showModal && (
+        <JogoModal
+          jogo={editing}
+          campeonatos={campeonatos}
+          cidades={cidades}
+          onSave={salvar}
+          onClose={()=>{setShowModal(false);setEditing(null);}}
+          T={T}
+        />
+      )}
     </>
   );
 }

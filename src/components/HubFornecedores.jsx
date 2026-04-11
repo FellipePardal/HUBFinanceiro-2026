@@ -4,6 +4,7 @@ import { getState, setState as setSupabaseState, supabase } from "../lib/supabas
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
 import { CIDADES_INIT, CAMPEONATOS_FORN_INIT } from "../data/catalogos";
+import { JOGOS_FORN_INIT } from "../data/jogosFornecedores";
 import { ALL_JOGOS } from "../data";
 import { fmt, fmtK } from "../utils";
 import { Stat, Badge, IconButton } from "./ui";
@@ -20,6 +21,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [fornecedores, setFornecedoresRaw] = useState(FORNECEDORES_INIT);
   const [cotacoes,     setCotacoesRaw]     = useState(COTACAO_INIT);
   const [jogos,        setJogosRaw]        = useState(ALL_JOGOS);
+  const [jogosForn,    setJogosFornRaw]    = useState(JOGOS_FORN_INIT);
   const [cidades,      setCidadesRaw]      = useState(CIDADES_INIT);
   const [campeonatos,  setCampeonatosRaw]  = useState(CAMPEONATOS_FORN_INIT);
   const [tabelas,      setTabelasRaw]      = useState([]);
@@ -30,13 +32,14 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   // Carga inicial + realtime
   useEffect(() => {
     async function load() {
-      const [f, c, j, ci, ca, tb] = await Promise.all([
+      const [f, c, j, ci, ca, tb, jf] = await Promise.all([
         getState('fornecedores'),
         getState('cotacoes'),
         getState('jogos'),
         getState('forn_cidades'),
         getState('forn_campeonatos'),
         getState('forn_tabelas_preco'),
+        getState('forn_jogos'),
       ]);
       if (f)  setFornecedoresRaw(f);
       if (c)  setCotacoesRaw(c);
@@ -44,6 +47,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
       if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
       if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
       if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
+      if (jf) setJogosFornRaw(jf);   else setSupabaseState('forn_jogos', JOGOS_FORN_INIT);
       setLoading(false);
     }
     load();
@@ -57,6 +61,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
         if (payload.new.key === 'forn_cidades')       setCidadesRaw(payload.new.value);
         if (payload.new.key === 'forn_campeonatos')   setCampeonatosRaw(payload.new.value);
         if (payload.new.key === 'forn_tabelas_preco') setTabelasRaw(payload.new.value);
+        if (payload.new.key === 'forn_jogos')         setJogosFornRaw(payload.new.value);
       })
       .subscribe();
 
@@ -82,6 +87,10 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const setTabelas = fn => setTabelasRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('forn_tabelas_preco', next); return next;
+  });
+  const setJogosForn = fn => setJogosFornRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('forn_jogos', next); return next;
   });
 
   // Métricas consolidadas (todas as cotações, independente do filtro)
@@ -277,6 +286,8 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
             cotacoes={cotacoes}
             setCotacoes={setCotacoes}
             jogos={jogos}
+            jogosForn={jogosForn}
+            setJogosForn={setJogosForn}
             cidades={cidades}
             setCidades={setCidades}
             campeonatos={campeonatos}

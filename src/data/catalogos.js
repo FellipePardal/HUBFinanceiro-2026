@@ -171,3 +171,95 @@ export function statusTokenTabela(tabela) {
   if (tabela.tokenExpiraEm && new Date(tabela.tokenExpiraEm) < new Date()) return "expirado";
   return "ativo";
 }
+
+// ── Cotações ──────────────────────────────────────────────────────────────
+// O ciclo simplificado: rascunho (provisionado) -> aprovada (confirmado pra
+// realizar) -> cancelada (descartado). A "negociação" em si é a tabela de
+// preços; aqui só aplicamos o valor-base ao jogo + ajustes pré-jogo.
+export const STATUS_COTACAO_NOVO = [
+  { key:"rascunho",  label:"Rascunho",  color:"#64748b" },
+  { key:"aprovada",  label:"Aprovada",  color:"#10b981" },
+  { key:"cancelada", label:"Cancelada", color:"#94a3b8" },
+];
+
+export const statusCotacaoInfo = key =>
+  STATUS_COTACAO_NOVO.find(s => s.key === key) || STATUS_COTACAO_NOVO[0];
+
+// Encontra a tabela vigente de um par (fornecedor, campeonato).
+// Pode haver várias arquivadas + no máximo uma vigente — retorna a vigente.
+export function getTabelaVigente(tabelas, fornecedorId, campeonatoId) {
+  return (tabelas || []).find(t =>
+    String(t.fornecedorId) === String(fornecedorId) &&
+    t.campeonatoId === campeonatoId &&
+    t.status === "vigente"
+  ) || null;
+}
+
+// A partir do catálogo do fornecedor + tabela vigente + (cidade, categoria)
+// do jogo, devolve a lista de itens com valor-base calculado.
+// Itens com valor zero/sem preenchimento são incluídos com valorBase=null,
+// para o usuário decidir se contrata ou não.
+export function calcularItensBase({ tabela, fornecedor, jogo }) {
+  if (!tabela || !fornecedor || !jogo) return [];
+  const itens = (fornecedor.catalogo || []).filter(i => i.ativo !== false);
+  return itens.map(it => {
+    const valor = getCelula(tabela, it.id, jogo.cidadeId, jogo.categoria);
+    return {
+      itemId:    it.id,
+      nome:      it.nome,
+      unidade:   it.unidade,
+      valorBase: valor != null ? Number(valor) : null,
+      incluso:   valor != null && valor > 0, // por padrão, inclui se houver preço
+    };
+  });
+}
+
+// Recalcula totais de uma cotação (chamar sempre que itens/adicionais mudarem)
+export function recalcularCotacao(cotacao) {
+  const valorBase = (cotacao.itensBase || [])
+    .filter(i => i.incluso && i.valorBase != null)
+    .reduce((s, i) => s + Number(i.valorBase || 0), 0);
+  const valorAdicionais = (cotacao.adicionais || [])
+    .reduce((s, a) => s + Number(a.valorTotal || 0), 0);
+  return {
+    ...cotacao,
+    valorBase,
+    valorAdicionais,
+    valorTotal: valorBase + valorAdicionais,
+    atualizadoEm: new Date().toISOString(),
+  };
+}
+
+// Cria uma cotação nova já com valor-base calculado
+export function criarCotacao({ jogo, fornecedor, tabela }) {
+  const now = new Date().toISOString();
+  const itensBase = calcularItensBase({ tabela, fornecedor, jogo });
+  const cot = {
+    id: `cot-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    jogoId:           jogo.id,
+    fornecedorId:     fornecedor.id,
+    campeonatoId:     jogo.campeonatoId,
+    cidadeId:         jogo.cidadeId,
+    categoria:        jogo.categoria,
+    tabelaIdSnapshot: tabela?.id || null,
+    itensBase,
+    adicionais:       [],
+    valorBase:        0,
+    valorAdicionais:  0,
+    valorTotal:       0,
+    status:           "rascunho",
+    observacoes:      "",
+    criadoEm:         now,
+    atualizadoEm:     now,
+  };
+  return recalcularCotacao(cot);
+}
+
+export const novoAdicional = () => ({
+  id: `add-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
+  nome: "",
+  quantidade: 1,
+  valorUnitario: 0,
+  valorTotal: 0,
+  justificativa: "",
+});

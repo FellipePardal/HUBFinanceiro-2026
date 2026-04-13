@@ -37,11 +37,12 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const [cotacoes, setCotacoesRaw]         = useState(COTACAO_INIT);
   const [livemode, setLivemodeRaw]       = useState([]);
   const [notasLivemode, setNotasLivemodeRaw] = useState([]);
+  const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, lm, nlm, co] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes')]);
+      const [j, s, n, f, nm, ev, lm, nlm, co, fj] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
@@ -51,6 +52,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
       if (lm) setLivemodeRaw(lm); else setSupabaseState('livemode', []);
       if (nlm) setNotasLivemodeRaw(nlm); else setSupabaseState('notas_livemode', []);
       if (co) setCotacoesRaw(co); else setSupabaseState('cotacoes', COTACAO_INIT);
+      if (fj) setFornecedoresJogoRaw(fj); else setSupabaseState('fornecedores_jogo', {});
       setLoading(false);
     }
     load();
@@ -67,6 +69,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         if (payload.new.key === 'livemode')      setLivemodeRaw(payload.new.value);
         if (payload.new.key === 'notas_livemode') setNotasLivemodeRaw(payload.new.value);
         if (payload.new.key === 'cotacoes')       setCotacoesRaw(payload.new.value);
+        if (payload.new.key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
       })
       .subscribe();
 
@@ -108,6 +111,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const setCotacoes = fn => setCotacoesRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('cotacoes', next); return next;
+  });
+  const setFornecedoresJogo = fn => setFornecedoresJogoRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('fornecedores_jogo', next); return next;
   });
 
   // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard
@@ -519,7 +526,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}

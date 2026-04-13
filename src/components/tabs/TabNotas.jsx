@@ -707,7 +707,45 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
-export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], T }) {
+function InlineFornecedor({ value, onChange, fornecedores, T }) {
+  const IS = iSty(T);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || "");
+  const filtered = query.length > 0
+    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(query.toLowerCase()) || f.funcao.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
+    : [];
+
+  useEffect(() => { setQuery(value || ""); }, [value]);
+
+  return (
+    <div style={{position:"relative",minWidth:120}}>
+      <input value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => { setOpen(false); if (query !== value) onChange(query); }, 200)}
+        placeholder="—"
+        style={{...IS, padding:"3px 6px", fontSize:11, width:"100%", background:"transparent", border:`1px solid transparent`, borderRadius:4}}
+        onMouseEnter={e => e.currentTarget.style.borderColor = T.muted}
+        onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = "transparent"; }}
+      />
+      {open && filtered.length > 0 && (
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:6,marginTop:2,maxHeight:160,overflowY:"auto",boxShadow:"0 6px 20px rgba(0,0,0,0.3)"}}>
+          {filtered.map(f => (
+            <div key={f.id} onMouseDown={() => { setQuery(f.apelido); onChange(f.apelido); setOpen(false); }}
+              style={{padding:"5px 8px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
+              onMouseEnter={e => e.currentTarget.style.background = T.bg}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <span style={{fontSize:12,fontWeight:600,color:T.text}}>{f.apelido}</span>
+              <span style={{fontSize:10,color:T.textSm,marginLeft:6}}>{f.funcao}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], fornecedoresJogo = {}, setFornecedoresJogo, T }) {
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);
@@ -909,7 +947,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               <div style={TS.wrap}>
                 <table style={{...TS.table, minWidth:600}}>
                   <thead><tr style={TS.thead}>
-                    {["Serviço","Categoria","Valor Ref.","Valor NF","Status","NF Vinculada"].map(h =>
+                    {["Serviço","Categoria","Fornecedor Resp.","Valor Ref.","Valor NF","Status","NF Vinculada"].map(h =>
                       <th key={h} style={{...TS.th, ...TS.thLeft}}>{h}</th>)}
                   </tr></thead>
                   <tbody>
@@ -932,6 +970,14 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                         <tr key={s.subKey} style={TS.tr}>
                           <td style={{...TS.td, fontWeight:600}}>{s.subLabel}</td>
                           <td style={TS.td}><Pill label={s.catLabel} color={s.catColor}/></td>
+                          <td style={TS.td}>
+                            <InlineFornecedor
+                              value={fornecedoresJogo[`${jogo.id}_${s.subKey}`] || ""}
+                              onChange={v => setFornecedoresJogo(prev => ({...prev, [`${jogo.id}_${s.subKey}`]: v}))}
+                              fornecedores={fornecedores}
+                              T={T}
+                            />
+                          </td>
                           <td className="num" style={{...TS.td, color:T.textSm, fontSize:12}}>{fmt(s.valorRef)}</td>
                           <td style={{...TS.td, fontSize:12}}>
                             {hasNotas ? (

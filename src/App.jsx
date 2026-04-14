@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
@@ -112,9 +112,13 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('cotacoes', next); return next;
   });
+  // Debounce da gravação no Supabase para reduzir rollbacks do realtime durante digitação
+  const fornJogoTimer = useRef(null);
   const setFornecedoresJogo = fn => setFornecedoresJogoRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('fornecedores_jogo', next); return next;
+    if (fornJogoTimer.current) clearTimeout(fornJogoTimer.current);
+    fornJogoTimer.current = setTimeout(() => { setSupabaseState('fornecedores_jogo', next); }, 500);
+    return next;
   });
 
   // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard

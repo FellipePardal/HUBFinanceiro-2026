@@ -710,17 +710,29 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
 function InlineFornecedor({ value, onChange, fornecedores, T }) {
   const IS = iSty(T);
   const [open, setOpen] = useState(false);
-  const v = value || "";
+  const [local, setLocal] = useState(value || "");
+  const [focused, setFocused] = useState(false);
+
+  // Sincroniza com o parent somente quando NÃO está focado (evita rollback do realtime)
+  useEffect(() => { if (!focused) setLocal(value || ""); }, [value, focused]);
+
+  const v = local;
   const filtered = v.length > 0
     ? fornecedores.filter(f => f.apelido.toLowerCase().includes(v.toLowerCase()) || f.funcao.toLowerCase().includes(v.toLowerCase())).slice(0, 6)
     : [];
 
+  const commit = (val) => { setLocal(val); onChange(val); };
+
   return (
     <div style={{position:"relative",minWidth:120}}>
       <input value={v}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onChange={e => { setLocal(e.target.value); setOpen(true); }}
+        onFocus={() => { setFocused(true); setOpen(true); }}
+        onBlur={() => setTimeout(() => {
+          setOpen(false);
+          setFocused(false);
+          if (local !== (value || "")) onChange(local); // persiste ao sair
+        }, 200)}
         placeholder="—"
         style={{...IS, padding:"3px 6px", fontSize:11, width:"100%", background:"transparent", border:`1px solid transparent`, borderRadius:4}}
         onMouseEnter={e => e.currentTarget.style.borderColor = T.muted}
@@ -729,7 +741,7 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
       {open && filtered.length > 0 && (
         <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:6,marginTop:2,maxHeight:160,overflowY:"auto",boxShadow:"0 6px 20px rgba(0,0,0,0.3)"}}>
           {filtered.map(f => (
-            <div key={f.id} onMouseDown={() => { onChange(f.apelido); setOpen(false); }}
+            <div key={f.id} onMouseDown={() => { commit(f.apelido); setOpen(false); }}
               style={{padding:"5px 8px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
               onMouseEnter={e => e.currentTarget.style.background = T.bg}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>

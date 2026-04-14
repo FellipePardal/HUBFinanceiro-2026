@@ -710,19 +710,17 @@ function RecebidasTab({ notas, addNota, jogos, T }) {
 function InlineFornecedor({ value, onChange, fornecedores, T }) {
   const IS = iSty(T);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(value || "");
-  const filtered = query.length > 0
-    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(query.toLowerCase()) || f.funcao.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
+  const v = value || "";
+  const filtered = v.length > 0
+    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(v.toLowerCase()) || f.funcao.toLowerCase().includes(v.toLowerCase())).slice(0, 6)
     : [];
-
-  useEffect(() => { setQuery(value || ""); }, [value]);
 
   return (
     <div style={{position:"relative",minWidth:120}}>
-      <input value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+      <input value={v}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => { setOpen(false); if (query !== value) onChange(query); }, 200)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
         placeholder="—"
         style={{...IS, padding:"3px 6px", fontSize:11, width:"100%", background:"transparent", border:`1px solid transparent`, borderRadius:4}}
         onMouseEnter={e => e.currentTarget.style.borderColor = T.muted}
@@ -731,7 +729,7 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
       {open && filtered.length > 0 && (
         <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:6,marginTop:2,maxHeight:160,overflowY:"auto",boxShadow:"0 6px 20px rgba(0,0,0,0.3)"}}>
           {filtered.map(f => (
-            <div key={f.id} onMouseDown={() => { setQuery(f.apelido); onChange(f.apelido); setOpen(false); }}
+            <div key={f.id} onMouseDown={() => { onChange(f.apelido); setOpen(false); }}
               style={{padding:"5px 8px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
               onMouseEnter={e => e.currentTarget.style.background = T.bg}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>

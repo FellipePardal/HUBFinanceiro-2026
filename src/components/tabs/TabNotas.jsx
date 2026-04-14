@@ -162,7 +162,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
       const restante = Math.max(0, s.valorRef - lancado);
       return { ...s, lancado, restante, multi: SUBS_MULTI_NF.has(s.subKey) };
     }).filter(s => {
-      if (s.multi) return s.restante > 0.01; // mantém visível enquanto sobrar valor
+      if (s.multi) return true; // multi-NF sempre visível (pode lançar além do provisionado)
       const key = `${jogo.id}_${s.subKey}`;
       const nota = notasExistentes.find(n => n.servicosKeys?.includes(key));
       return !nota || nota.status !== "Conferida";

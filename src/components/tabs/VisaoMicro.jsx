@@ -7,7 +7,21 @@ import { Card, PanelTitle, Button, Segmented } from "../ui";
 import { ChevronLeft, ChevronRight, Pencil, Save, X, Copy, Trophy } from "lucide-react";
 
 export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
-  const divulgados = jogos.filter(j => j.mandante !== "A definir");
+  const parseData = s => {
+    if (!s || typeof s !== "string") return 99999999;
+    const [d, m] = s.split("/").map(x => parseInt(x, 10));
+    if (!d || !m) return 99999999;
+    return m * 100 + d;
+  };
+  const divulgados = jogos
+    .filter(j => j.mandante !== "A definir")
+    .slice()
+    .sort((a, b) => {
+      if (a.rodada !== b.rodada) return a.rodada - b.rodada;
+      const da = parseData(a.data), db = parseData(b.data);
+      if (da !== db) return da - db;
+      return (a.hora || "").localeCompare(b.hora || "");
+    });
   const idx  = divulgados.findIndex(j => j.id === jogoId);
   const jogo = divulgados[idx];
 

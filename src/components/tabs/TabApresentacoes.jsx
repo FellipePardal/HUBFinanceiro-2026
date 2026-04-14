@@ -386,6 +386,9 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
   const [loading, setLoading] = useState(false);
   const [mesAtual, setMesAtual] = useState(() => new Date().getMonth());
 
+  // Categorias variáveis (excluídas dos "Outros Mensais" fixos)
+  const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
+
   // Auto: para cada seção do portal, somar orçado dos itens e gasto = NFs mensais até o mês selecionado
   const computed = useMemo(() => {
     const sections = servicos.map(sec => {
@@ -396,6 +399,15 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         .reduce((s, n) => s + (n.valor || 0), 0);
       return { secao: sec.secao, orcAuto, gastoAuto };
     });
+
+    // "Outros Mensais": NFs sem servicoId e sem categoria variável mapeada
+    const outrosGasto = notasMensais
+      .filter(n => !n.servicoId && !VAR_CATS_FIX.has(n.categoria) && n.mes <= mesAtual)
+      .reduce((s, n) => s + (n.valor || 0), 0);
+    if (outrosGasto > 0) {
+      sections.push({ secao: "Outros Mensais", orcAuto: 0, gastoAuto: outrosGasto });
+    }
+
     const orcTotalAuto = sections.reduce((s, x) => s + x.orcAuto, 0);
     return { sections, orcTotalAuto };
   }, [servicos, notasMensais, mesAtual]);

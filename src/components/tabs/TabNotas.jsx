@@ -920,7 +920,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
         {jogosRodada.map(jogo => {
           const servicos = extrairServicos(jogo);
-          const nfsDoJogo = notas.filter(n => n.servicosKeys?.some(k => k.startsWith(`${jogo.id}_`)));
+          const nfsDoJogo = notas.filter(n =>
+            n.servicosKeys?.some(k => k.startsWith(`${jogo.id}_`))
+            || (n.tipo === "avulsa" && n.jogoId === jogo.id)
+          );
           const servicosComNF = new Set(nfsDoJogo.flatMap(n => n.servicosKeys || []));
           const pendentes = servicos.filter(s => !servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
           const conferidas = servicos.filter(s => servicosComNF.has(`${jogo.id}_${s.subKey}`)).length;
@@ -1019,15 +1022,25 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               {nfsDoJogo.filter(n => n.tipo === "avulsa").length > 0 && (
                 <div style={{padding:"10px 16px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
                   <p style={{color:T.warning,fontSize:10,fontWeight:700,margin:"0 0 6px",letterSpacing:"0.06em",textTransform:"uppercase"}}>NFs Avulsas neste jogo</p>
-                  {nfsDoJogo.filter(n => n.tipo === "avulsa").map(n => (
-                    <div key={n.id} style={{display:"flex",gap:12,alignItems:"center",fontSize:12,padding:"3px 0"}}>
-                      <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
-                      <span style={{color:T.text}}>{n.fornecedor}</span>
-                      <span className="num" style={{color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
-                      <span style={{color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>
-                      <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
-                    </div>
-                  ))}
+                  {nfsDoJogo.filter(n => n.tipo === "avulsa").map(n => {
+                    const descricao = n.descricao || (n.servicosLabels || [])[0] || "Avulsa";
+                    return (
+                      <div key={n.id} style={{display:"flex",gap:12,alignItems:"center",fontSize:12,padding:"4px 0",flexWrap:"wrap"}}>
+                        <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
+                        <span style={{color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                        <Pill label={descricao} color={T.warning}/>
+                        <span className="num" style={{color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
+                        {n.numeroNF && <span style={{color:T.textSm,fontSize:11}}>NF {n.numeroNF}</span>}
+                        {n.dataEmissao && <span style={{color:T.textSm,fontSize:11}}>Emissão {n.dataEmissao}</span>}
+                        <span style={{marginLeft:"auto",display:"flex",gap:4}}>
+                          {n.hasFile
+                            ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
+                            : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </Card>

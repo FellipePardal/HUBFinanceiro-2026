@@ -175,21 +175,51 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     return map;
   }, [logistica]);
 
+  // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
+  const rateioSegEspacialPorJogo = useMemo(() => {
+    const parseMes = (dataStr) => {
+      if (!dataStr || dataStr === "A definir") return null;
+      let m = dataStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return parseInt(m[2]) - 1;
+      m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) return parseInt(m[2]) - 1;
+      return null;
+    };
+    const jogosPorMes = {};
+    jogos.filter(j => j.mandante !== "A definir").forEach(j => {
+      const mes = parseMes(j.data);
+      if (mes == null) return;
+      (jogosPorMes[mes] = jogosPorMes[mes] || []).push(j.id);
+    });
+    const map = {};
+    (notasMensais||[]).filter(n => n.categoria === "Seg. Espacial").forEach(n => {
+      const ids = jogosPorMes[n.mes] || [];
+      if (ids.length === 0) return;
+      const share = (n.valor || 0) / ids.length;
+      ids.forEach(id => { map[id] = (map[id] || 0) + share; });
+    });
+    return map;
+  }, [notasMensais, jogos]);
+
   // jogosCalc: jogos com realizado de logística derivado (substitui as subs logística)
   const jogosCalc = useMemo(() => jogos.map(j => {
     const lg = logRealizadoPorJogo[j.id];
-    if (!lg) return j;
+    const se = rateioSegEspacialPorJogo[j.id];
+    if (!lg && !se) return j;
     return {
       ...j,
       realizado: {
         ...(j.realizado||{}),
-        transporte: lg.transporte,
-        uber:       lg.uber,
-        hospedagem: lg.hospedagem,
-        outros_log: lg.outros_log,
+        ...(lg ? {
+          transporte: lg.transporte,
+          uber:       lg.uber,
+          hospedagem: lg.hospedagem,
+          outros_log: lg.outros_log,
+        } : {}),
+        ...(se ? { seg_espacial: se } : {}),
       },
     };
-  }), [jogos, logRealizadoPorJogo]);
+  }), [jogos, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
 
   // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
   const servicosCalc = useMemo(() => servicos.map(sec => ({
@@ -204,7 +234,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     const allJ = jogosCalc.filter(j => j.mandante !== "A definir");
     const result = CATS.map(cat => {
       const realizadoMensal = notasMensais
-        .filter(n => !n.servicoId && VAR_CAT_TO_CATKEY[n.categoria] === cat.key)
+        .filter(n => !n.servicoId && VAR_CAT_TO_CATKEY[n.categoria] === cat.key && n.categoria !== "Seg. Espacial")
         .reduce((s, n) => s + (n.valor || 0), 0);
       return {
         nome: cat.label,

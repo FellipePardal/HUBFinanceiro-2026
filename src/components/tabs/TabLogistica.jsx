@@ -35,32 +35,38 @@ function abreviar(nome) {
 
 // ─── Componente Principal ──────────────────────────────────────────────────
 // Modelo de dado: { id, jogoId, prestador, valores:{transporte_locado,uber,hospedagem,outros}, status, obs, hasFile }
-export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, T }) {
+export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, eventosLog, setEventosLog, T }) {
   const fornecedoresList = Array.isArray(fornecedores) ? fornecedores : [];
+  const eventos = Array.isArray(eventosLog) ? eventosLog : [];
   const [tab, setTab] = useState("grade");
-  const [jogoSel, setJogoSel] = useState(null);
+  const [jogoSel, setJogoSel] = useState(null);   // pode ser { tipo:"jogo", id } ou { tipo:"evento", id }
   const [uploadingId, setUploadingId] = useState(null);
+  const [ajusteAberto, setAjusteAberto] = useState(new Set()); // ids de lanc com painel de ajuste passagem aberto
   const fileRefs = useRef({});
   const painelRef = useRef(null);
+  const toggleAjuste = id => setAjusteAberto(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
 
   const TS = tableStyles(T);
   const teal = "#14b8a6";
   const purple = "#a855f7";
   const danger = T.danger || "#ef4444";
 
-  const lancamentos = (Array.isArray(logistica) ? logistica : []).filter(l => l && l.jogoId);
+  const lancamentos = (Array.isArray(logistica) ? logistica : []).filter(l => l && (l.jogoId || l.eventoId));
   const divulgados = jogos.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada || a.id - b.id);
 
 
   // Helpers
-  const valorTotal = l => CATEGORIAS_LOG.reduce((s,c) => s + (parseFloat(l.valores?.[c.key])||0), 0);
+  const valorPassagemAjuste = l => parseFloat(l.ajustePassagem?.valor)||0;
+  const valorTotal = l => CATEGORIAS_LOG.reduce((s,c) => s + (parseFloat(l.valores?.[c.key])||0), 0) + valorPassagemAjuste(l);
   const lancsPorJogo = jogoId => lancamentos.filter(l => l.jogoId === jogoId);
+  const lancsPorEvento = evId => lancamentos.filter(l => l.eventoId === evId);
   const statusInfo = k => STATUS_REEMBOLSO.find(s => s.key === k) || STATUS_REEMBOLSO[0];
 
   // Totais gerais
   const totalGasto = lancamentos.reduce((s,l) => s + valorTotal(l), 0);
   const totalPendente   = lancamentos.filter(l => l.status==="pendente").reduce((s,l) => s+valorTotal(l), 0);
   const totalReembolsado= lancamentos.filter(l => l.status==="reembolsado").reduce((s,l) => s+valorTotal(l), 0);
+  const totalRemarcacoes= lancamentos.reduce((s,l) => s + valorPassagemAjuste(l), 0);
 
   const gastoPorPrestador = useMemo(() => {
     const map = {};
@@ -86,18 +92,59 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
   }, [divulgados]);
 
   // ─── CRUD inline ─────────────────────────────────────────────────────────
-  const addLinha = jogoId => {
+  const addLinhaJogo = jogoId => {
     const novo = {
       id: Date.now() + Math.random(),
       jogoId,
       prestador: "",
       valores: Object.fromEntries(CATEGORIAS_LOG.map(c => [c.key, 0])),
-      arquivos: {}, // { [catKey]: true }
+      arquivos: {},
+      ajustePassagem: { valor:0, motivo:"" },
       status: "pendente",
       obs: "",
     };
     setLogistica(ls => [...(Array.isArray(ls)?ls:[]), novo]);
-    setJogoSel(jogoId);
+    setJogoSel({tipo:"jogo", id:jogoId});
+  };
+  const addLinhaEvento = eventoId => {
+    const novo = {
+      id: Date.now() + Math.random(),
+      eventoId,
+      prestador: "",
+      valores: Object.fromEntries(CATEGORIAS_LOG.map(c => [c.key, 0])),
+      arquivos: {},
+      ajustePassagem: { valor:0, motivo:"" },
+      status: "pendente",
+      obs: "",
+    };
+    setLogistica(ls => [...(Array.isArray(ls)?ls:[]), novo]);
+    setJogoSel({tipo:"evento", id:eventoId});
+  };
+
+  // Eventos
+  const addEvento = () => {
+    const nome = window.prompt("Nome do evento (ex: Media Day, Pré-temporada):");
+    if (!nome) return;
+    const novo = { id: Date.now() + Math.random(), nome, data:"" };
+    setEventosLog(evs => [...(Array.isArray(evs)?evs:[]), novo]);
+    setJogoSel({tipo:"evento", id:novo.id});
+  };
+  const renameEvento = (id, nome) => {
+    setEventosLog(evs => (evs||[]).map(e => e.id===id ? {...e, nome} : e));
+  };
+  const delEvento = id => {
+    const lancs = lancsPorEvento(id);
+    if (lancs.length > 0 && !window.confirm(`Excluir evento e ${lancs.length} lançamento(s) vinculado(s)?`)) return;
+    if (lancs.length === 0 && !window.confirm("Excluir evento?")) return;
+    lancs.forEach(l => CATEGORIAS_LOG.forEach(c => deleteNFFile(`${l.id}_${c.key}`)));
+    setLogistica(ls => (ls||[]).filter(l => l.eventoId !== id));
+    setEventosLog(evs => (evs||[]).filter(e => e.id !== id));
+    setJogoSel(null);
+  };
+  const updateAjustePassagem = (id, patch) => {
+    setLogistica(ls => (ls||[]).map(l => l.id === id
+      ? { ...l, ajustePassagem: { ...(l.ajustePassagem||{valor:0,motivo:""}), ...patch } }
+      : l));
   };
 
   const updateLinha = (id, patch) => {
@@ -172,6 +219,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
              sub={jogoMaisCaro?`Rd${jogoMaisCaro.jogo.rodada} · ${fmt(jogoMaisCaro.total)}`:"sem dados"} color="#f43f5e" T={T}/>
         <KPI label="Pendente"       value={fmt(totalPendente)}    sub="A solicitar" color="#f59e0b" T={T}/>
         <KPI label="Reembolsado"    value={fmt(totalReembolsado)} sub={`${totalGasto?((totalReembolsado/totalGasto)*100).toFixed(0):0}% do total`} color="#22c55e" T={T}/>
+        <KPI label="Custo Remarcações" value={fmt(totalRemarcacoes)} sub="Passagens canceladas/reemitidas" color="#ef4444" T={T}/>
       </div>
 
       {/* Sub-tabs */}
@@ -184,65 +232,26 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
         ))}
       </div>
 
-      {/* GRADE — Cards por jogo */}
-      {tab === "grade" && (
-        <>
-          {rodadasGrade.map(([rod, jgs]) => {
-            const jogoSelNestaRodada = jgs.find(j => j.id === jogoSel);
-            return (
-            <div key={`rd-${rod}`} style={{marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingLeft:4}}>
-                <span style={{color:teal,fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada {rod}</span>
-                <span style={{height:1,flex:1,background:T.border}}/>
-                <span style={{color:T.textSm,fontSize:11}}>{fmt(jgs.reduce((s,j) => s + lancsPorJogo(j.id).reduce((ss,l) => ss+valorTotal(l),0), 0))}</span>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
-                {jgs.map(j => {
-                  const lancs = lancsPorJogo(j.id);
-                  const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
-                  const selecionado = jogoSel === j.id;
-                  return (
-                    <div key={j.id} onClick={()=>{
-                        setJogoSel(selecionado?null:j.id);
-                        if (!selecionado) setTimeout(()=>painelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);
-                      }}
-                      style={{
-                        background: selecionado ? teal+"15" : T.card,
-                        border: `1px solid ${selecionado ? teal : T.border}`,
-                        borderRadius: 10, padding: "12px 14px", cursor: "pointer",
-                        transition: "all 0.15s",
-                      }}>
-                      <div style={{fontSize:12,fontWeight:700,color:T.text,marginBottom:6}}>
-                        {j.mandante} × {j.visitante}
-                      </div>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                        <span style={{fontSize:10,color:T.textSm}}>{lancs.length} prestador{lancs.length!==1?"es":""}</span>
-                        <span style={{fontSize:13,fontWeight:800,color:totalJogo>0?purple:T.textSm}}>{totalJogo>0?fmt(totalJogo):"—"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Painel de detalhe — renderizado logo abaixo da rodada que contém o jogo selecionado */}
-              {jogoSelNestaRodada && (() => {
-                const j = jogoSelNestaRodada;
-                const lancs = lancsPorJogo(j.id);
-                const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
-                return (
-                  <div ref={painelRef}>
-                  <Card T={T} style={{marginTop:12,borderTop:`2px solid ${teal}`}}>
+      {/* GRADE — Cards por jogo/evento */}
+      {tab === "grade" && (() => {
+        // Helper: renderiza painel de detalhe (funciona para jogo ou evento)
+        const renderPainelDetalhe = ({ titulo, subtitulo, lancs, onAddLinha, extraHeader }) => {
+          const totalPainel = lancs.reduce((s,l) => s+valorTotal(l), 0);
+          return (
+            <div ref={painelRef}>
+              <Card T={T} style={{marginTop:12,borderTop:`2px solid ${teal}`}}>
                 <div style={{padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`}}>
                   <div>
-                    <div style={{fontSize:10,color:teal,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada {j.rodada}</div>
-                    <div style={{fontSize:15,fontWeight:700,color:T.text}}>{j.mandante} × {j.visitante}</div>
+                    {subtitulo && <div style={{fontSize:10,color:teal,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>{subtitulo}</div>}
+                    <div style={{fontSize:15,fontWeight:700,color:T.text}}>{titulo}</div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:16}}>
+                    {extraHeader}
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:10,color:T.textSm}}>Total</div>
-                      <div style={{fontSize:16,fontWeight:800,color:purple}}>{fmt(totalJogo)}</div>
+                      <div style={{fontSize:16,fontWeight:800,color:purple}}>{fmt(totalPainel)}</div>
                     </div>
-                    <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>addLinha(j.id)}>Prestador</Button>
+                    <Button T={T} variant="primary" size="md" icon={Plus} onClick={onAddLinha}>Prestador</Button>
                   </div>
                 </div>
                 {lancs.length === 0 ? (
@@ -265,59 +274,90 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                         {lancs.map(l => {
                           const st = statusInfo(l.status);
                           const tot = valorTotal(l);
+                          const temAjuste = valorPassagemAjuste(l) > 0 || ajusteAberto.has(l.id);
                           return (
-                            <tr key={l.id} style={TS.tr}>
-                              <td style={TS.td}>
-                                <input list="fornecedores-logistica" value={l.prestador||""}
-                                  onChange={e=>updateLinha(l.id,{prestador:e.target.value})}
-                                  placeholder="Selecione ou digite"
-                                  style={inputInlineStyle}
-                                  onFocus={e=>e.target.style.border=`1px solid ${teal}`}
-                                  onBlur={e=>e.target.style.border="1px solid transparent"}/>
-                              </td>
-                              {CATEGORIAS_LOG.map(c => {
-                                const uid = fileKey(l.id, c.key);
-                                const temFile = !!l.arquivos?.[c.key];
-                                return (
-                                  <td key={c.key} style={TS.td}>
-                                    <div style={{display:"flex",alignItems:"center",gap:2}}>
-                                      <input type="number" value={l.valores?.[c.key]||""}
-                                        onChange={e=>updateValor(l.id, c.key, e.target.value)} placeholder="—"
-                                        style={{...inputInlineStyle, textAlign:"right", flex:1, minWidth:0}}
-                                        onFocus={e=>e.target.style.border=`1px solid ${teal}`}
-                                        onBlur={e=>e.target.style.border="1px solid transparent"}/>
-                                      <input ref={el=>fileRefs.current[uid]=el} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
-                                        onChange={e=>attachFile(l.id, c.key, e.target.files[0])} style={{display:"none"}}/>
-                                      {temFile ? (
-                                        <>
-                                          <button onClick={()=>verComprovante(l.id, c.key)} title="Ver"
-                                            style={{background:"#22c55e22",color:"#22c55e",border:"none",borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
-                                            <Eye size={11}/>
+                            <Fragment key={l.id}>
+                              <tr style={TS.tr}>
+                                <td style={TS.td}>
+                                  <input list="fornecedores-logistica" value={l.prestador||""}
+                                    onChange={e=>updateLinha(l.id,{prestador:e.target.value})}
+                                    placeholder="Selecione ou digite"
+                                    style={inputInlineStyle}
+                                    onFocus={e=>e.target.style.border=`1px solid ${teal}`}
+                                    onBlur={e=>e.target.style.border="1px solid transparent"}/>
+                                </td>
+                                {CATEGORIAS_LOG.map(c => {
+                                  const uid = fileKey(l.id, c.key);
+                                  const temFile = !!l.arquivos?.[c.key];
+                                  const isPass = c.key === "passagem";
+                                  const ajV = valorPassagemAjuste(l);
+                                  return (
+                                    <td key={c.key} style={TS.td}>
+                                      <div style={{display:"flex",alignItems:"center",gap:2}}>
+                                        <input type="number" value={l.valores?.[c.key]||""}
+                                          onChange={e=>updateValor(l.id, c.key, e.target.value)} placeholder="—"
+                                          style={{...inputInlineStyle, textAlign:"right", flex:1, minWidth:0}}
+                                          onFocus={e=>e.target.style.border=`1px solid ${teal}`}
+                                          onBlur={e=>e.target.style.border="1px solid transparent"}/>
+                                        <input ref={el=>fileRefs.current[uid]=el} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                          onChange={e=>attachFile(l.id, c.key, e.target.files[0])} style={{display:"none"}}/>
+                                        {temFile ? (
+                                          <>
+                                            <button onClick={()=>verComprovante(l.id, c.key)} title="Ver"
+                                              style={{background:"#22c55e22",color:"#22c55e",border:"none",borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+                                              <Eye size={11}/>
+                                            </button>
+                                            <button onClick={()=>removerComprovante(l.id, c.key)} title="Remover"
+                                              style={{background:"transparent",color:T.textSm,border:"none",padding:"3px 2px",cursor:"pointer",fontSize:10}}>×</button>
+                                          </>
+                                        ) : (
+                                          <button onClick={()=>fileRefs.current[uid]?.click()} disabled={uploadingId===uid} title="Anexar"
+                                            style={{background:"transparent",color:T.textSm,border:`1px dashed ${T.muted}`,borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+                                            <Paperclip size={11}/>
                                           </button>
-                                          <button onClick={()=>removerComprovante(l.id, c.key)} title="Remover"
-                                            style={{background:"transparent",color:T.textSm,border:"none",padding:"3px 2px",cursor:"pointer",fontSize:10}}>×</button>
-                                        </>
-                                      ) : (
-                                        <button onClick={()=>fileRefs.current[uid]?.click()} disabled={uploadingId===uid} title="Anexar"
-                                          style={{background:"transparent",color:T.textSm,border:`1px dashed ${T.muted}`,borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
-                                          <Paperclip size={11}/>
-                                        </button>
-                                      )}
+                                        )}
+                                        {isPass && (
+                                          <button onClick={()=>toggleAjuste(l.id)} title={ajV>0?`Ajuste: ${fmt(ajV)}`:"Cancelamento/reemissão"}
+                                            style={{background:ajV>0?"#ef444422":"transparent",color:ajV>0?"#ef4444":T.textSm,border:`1px dashed ${ajV>0?"#ef4444":T.muted}`,borderRadius:4,padding:"2px 4px",cursor:"pointer",fontSize:10,fontWeight:700}}>⚠</button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                                <td className="num" style={{...TS.tdNum,color:purple,fontWeight:700}}>{tot>0?fmt(tot):"—"}</td>
+                                <td style={TS.td}>
+                                  <select value={l.status||"pendente"} onChange={e=>updateLinha(l.id,{status:e.target.value})}
+                                    style={{background:st.color+"22",color:st.color,border:`1px solid ${st.color}55`,borderRadius:6,padding:"3px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                                    {STATUS_REEMBOLSO.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                                  </select>
+                                </td>
+                                <td style={TS.td}>
+                                  <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delLinha(l.id)}/>
+                                </td>
+                              </tr>
+                              {temAjuste && (
+                                <tr style={{background:"#ef444408"}}>
+                                  <td colSpan={CATEGORIAS_LOG.length+4} style={{padding:"8px 16px"}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                                      <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:"0.04em"}}>⚠ Ajuste Passagem</span>
+                                      <label style={{fontSize:11,color:T.textSm}}>Valor:&nbsp;
+                                        <input type="number" value={l.ajustePassagem?.valor||""}
+                                          onChange={e=>updateAjustePassagem(l.id,{valor:parseFloat(e.target.value)||0})}
+                                          placeholder="0" style={{...inputInlineStyle,width:110,textAlign:"right",border:`1px solid ${T.muted}`}}/>
+                                      </label>
+                                      <label style={{fontSize:11,color:T.textSm,flex:1,minWidth:200}}>Motivo:&nbsp;
+                                        <input value={l.ajustePassagem?.motivo||""}
+                                          onChange={e=>updateAjustePassagem(l.id,{motivo:e.target.value})}
+                                          placeholder="Ex: jogo remarcado Rd5→Rd7"
+                                          style={{...inputInlineStyle,border:`1px solid ${T.muted}`,width:"100%"}}/>
+                                      </label>
+                                      <button onClick={()=>{updateAjustePassagem(l.id,{valor:0,motivo:""});toggleAjuste(l.id);}}
+                                        style={{background:"transparent",color:T.textSm,border:"none",fontSize:11,cursor:"pointer"}}>limpar</button>
                                     </div>
                                   </td>
-                                );
-                              })}
-                              <td className="num" style={{...TS.tdNum,color:purple,fontWeight:700}}>{tot>0?fmt(tot):"—"}</td>
-                              <td style={TS.td}>
-                                <select value={l.status||"pendente"} onChange={e=>updateLinha(l.id,{status:e.target.value})}
-                                  style={{background:st.color+"22",color:st.color,border:`1px solid ${st.color}55`,borderRadius:6,padding:"3px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
-                                  {STATUS_REEMBOLSO.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                                </select>
-                              </td>
-                              <td style={TS.td}>
-                                <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delLinha(l.id)}/>
-                              </td>
-                            </tr>
+                                </tr>
+                              )}
+                            </Fragment>
                           );
                         })}
                         <tr style={{background:T.surfaceAlt||T.bg,borderTop:`2px solid ${T.borderStrong||T.border}`}}>
@@ -326,7 +366,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                             const v = lancs.reduce((s,l) => s + (parseFloat(l.valores?.[c.key])||0), 0);
                             return <td key={c.key} className="num" style={{...TS.tdNum,color:v>0?c.color:T.textSm,fontWeight:800}}>{v>0?fmt(v):"—"}</td>;
                           })}
-                          <td className="num" style={{...TS.tdNum,color:purple,fontWeight:800,fontSize:13}}>{fmt(totalJogo)}</td>
+                          <td className="num" style={{...TS.tdNum,color:purple,fontWeight:800,fontSize:13}}>{fmt(totalPainel)}</td>
                           <td colSpan={2}/>
                         </tr>
                       </tbody>
@@ -334,14 +374,118 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                   </div>
                 )}
               </Card>
+            </div>
+          );
+        };
+
+        const isJogoSel = (id) => jogoSel?.tipo === "jogo" && jogoSel.id === id;
+        const isEventoSel = (id) => jogoSel?.tipo === "evento" && jogoSel.id === id;
+
+        return (
+          <>
+            {/* EVENTOS DO CAMPEONATO */}
+            <div style={{marginBottom:24}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingLeft:4}}>
+                <span style={{color:"#f43f5e",fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Eventos do Campeonato</span>
+                <span style={{height:1,flex:1,background:T.border}}/>
+                <Button T={T} variant="secondary" size="sm" icon={Plus} onClick={addEvento}>Novo Evento</Button>
               </div>
-                );
+              {eventos.length === 0 ? (
+                <div style={{padding:"16px 18px",background:T.card,borderRadius:10,border:`1px dashed ${T.muted}`,color:T.textSm,fontSize:12,textAlign:"center"}}>
+                  Nenhum evento cadastrado. Use "Novo Evento" para Media Day, Pré-temporada, etc.
+                </div>
+              ) : (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
+                  {eventos.map(ev => {
+                    const lancs = lancsPorEvento(ev.id);
+                    const totalEv = lancs.reduce((s,l) => s+valorTotal(l), 0);
+                    const selecionado = isEventoSel(ev.id);
+                    return (
+                      <div key={ev.id} onClick={()=>{
+                          setJogoSel(selecionado?null:{tipo:"evento", id:ev.id});
+                          if (!selecionado) setTimeout(()=>painelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+                        }}
+                        style={{
+                          background: selecionado ? "#f43f5e15" : T.card,
+                          border: `1px solid ${selecionado ? "#f43f5e" : T.border}`,
+                          borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+                        }}>
+                        <div style={{fontSize:12,fontWeight:700,color:T.text,marginBottom:6}}>{ev.nome}</div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                          <span style={{fontSize:10,color:T.textSm}}>{lancs.length} prestador{lancs.length!==1?"es":""}</span>
+                          <span style={{fontSize:13,fontWeight:800,color:totalEv>0?purple:T.textSm}}>{totalEv>0?fmt(totalEv):"—"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Painel do evento selecionado */}
+              {jogoSel?.tipo === "evento" && (() => {
+                const ev = eventos.find(e => e.id === jogoSel.id);
+                if (!ev) return null;
+                return renderPainelDetalhe({
+                  titulo: ev.nome,
+                  subtitulo: "Evento",
+                  lancs: lancsPorEvento(ev.id),
+                  onAddLinha: () => addLinhaEvento(ev.id),
+                  extraHeader: (
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <input value={ev.nome} onChange={e=>renameEvento(ev.id, e.target.value)}
+                        style={{...inputInlineStyle,border:`1px solid ${T.muted}`,width:180,fontSize:12}}/>
+                      <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delEvento(ev.id)}/>
+                    </div>
+                  ),
+                });
               })()}
             </div>
-            );
-          })}
-        </>
-      )}
+
+            {/* JOGOS POR RODADA */}
+            {rodadasGrade.map(([rod, jgs]) => {
+              const jogoSelNestaRodada = jogoSel?.tipo === "jogo" ? jgs.find(j => j.id === jogoSel.id) : null;
+              return (
+                <div key={`rd-${rod}`} style={{marginBottom:20}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingLeft:4}}>
+                    <span style={{color:teal,fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada {rod}</span>
+                    <span style={{height:1,flex:1,background:T.border}}/>
+                    <span style={{color:T.textSm,fontSize:11}}>{fmt(jgs.reduce((s,j) => s + lancsPorJogo(j.id).reduce((ss,l) => ss+valorTotal(l),0), 0))}</span>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10}}>
+                    {jgs.map(j => {
+                      const lancs = lancsPorJogo(j.id);
+                      const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
+                      const selecionado = isJogoSel(j.id);
+                      return (
+                        <div key={j.id} onClick={()=>{
+                            setJogoSel(selecionado?null:{tipo:"jogo", id:j.id});
+                            if (!selecionado) setTimeout(()=>painelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+                          }}
+                          style={{
+                            background: selecionado ? teal+"15" : T.card,
+                            border: `1px solid ${selecionado ? teal : T.border}`,
+                            borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+                          }}>
+                          <div style={{fontSize:12,fontWeight:700,color:T.text,marginBottom:6}}>{j.mandante} × {j.visitante}</div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                            <span style={{fontSize:10,color:T.textSm}}>{lancs.length} prestador{lancs.length!==1?"es":""}</span>
+                            <span style={{fontSize:13,fontWeight:800,color:totalJogo>0?purple:T.textSm}}>{totalJogo>0?fmt(totalJogo):"—"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {jogoSelNestaRodada && renderPainelDetalhe({
+                    titulo: `${jogoSelNestaRodada.mandante} × ${jogoSelNestaRodada.visitante}`,
+                    subtitulo: `Rodada ${jogoSelNestaRodada.rodada}`,
+                    lancs: lancsPorJogo(jogoSelNestaRodada.id),
+                    onAddLinha: () => addLinhaJogo(jogoSelNestaRodada.id),
+                  })}
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
 
       {/* GRÁFICOS */}
       {tab === "graficos" && (

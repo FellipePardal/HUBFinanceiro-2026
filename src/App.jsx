@@ -39,12 +39,13 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const [livemode, setLivemodeRaw]       = useState([]);
   const [notasLivemode, setNotasLivemodeRaw] = useState([]);
   const [logistica, setLogisticaRaw]     = useState([]);
+  const [eventosLog, setEventosLogRaw]   = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]            = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica')]);
+      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
       if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
@@ -56,6 +57,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
       if (co) setCotacoesRaw(co); else setSupabaseState('cotacoes', COTACAO_INIT);
       if (fj) setFornecedoresJogoRaw(fj); else setSupabaseState('fornecedores_jogo', {});
       if (lg) setLogisticaRaw(lg); else setSupabaseState('logistica', []);
+      if (elg) setEventosLogRaw(elg); else setSupabaseState('eventos_log', []);
       setLoading(false);
     }
     load();
@@ -74,6 +76,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         if (payload.new.key === 'cotacoes')       setCotacoesRaw(payload.new.value);
         if (payload.new.key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
         if (payload.new.key === 'logistica')     setLogisticaRaw(payload.new.value);
+        if (payload.new.key === 'eventos_log')   setEventosLogRaw(payload.new.value);
       })
       .subscribe();
 
@@ -115,6 +118,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const setCotacoes = fn => setCotacoesRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('cotacoes', next); return next;
+  });
+  const setEventosLog = fn => setEventosLogRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('eventos_log', next); return next;
   });
   const setLogistica = fn => setLogisticaRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
@@ -544,7 +551,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
-        {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 

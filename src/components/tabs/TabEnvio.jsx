@@ -37,7 +37,8 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
 
   const teal = "#14b8a6";
   const nfsEnviadas = new Set(envios.flatMap(e => [...(e.notasIds||[]), ...(e.mensaisIds||[]), ...(e.livemodeIds||[])]));
-  const nfsDisponiveis = notas.filter(n => !nfsEnviadas.has(n.id));
+  const nfsDisponiveis = notas.filter(n => !nfsEnviadas.has(n.id))
+    .sort((a,b) => (a.rodada||0) - (b.rodada||0) || (a.fornecedor||"").localeCompare(b.fornecedor||""));
   const mensaisDisponiveis = notasMensais.filter(n => !nfsEnviadas.has(n.id));
   const livemodeDisponiveis = notasLivemode.filter(n => !nfsEnviadas.has(n.id));
 
@@ -303,6 +304,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?T.brand+"15":"transparent",transition:"background .15s"}}>
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:T.brand}}/>
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                    <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                     <span style={{fontSize:11,color:T.textSm}}>{n.jogoLabel}</span>
                     <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
                     <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(n.valorNF)}</span>
@@ -434,7 +436,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?T.brand+"15":"transparent",transition:"background .15s"}}>
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:T.brand}}/>
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          <span style={{fontSize:10,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                           <span style={{fontSize:10,color:T.textSm}}>{n.jogoLabel}</span>
+                          <Pill label={`Rd ${n.rodada}`} color={T.warning}/>
                           <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
                         </div>
                       );
@@ -519,7 +523,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                   </tr>
                 </thead>
                 <tbody>
-                  {envioDetalhe.notasResumo.map(n => (
+                  {[...envioDetalhe.notasResumo].sort((a,b) => (a.rodada||0) - (b.rodada||0) || (a.fornecedor||"").localeCompare(b.fornecedor||"")).map(n => (
                     <tr key={n.id} style={TS.tr}>
                       <td style={TS.td}><code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{n.codigo}</code></td>
                       <td className="num" style={{...TS.td, fontWeight:600, fontSize:12}}>{n.numeroNF||"—"}</td>

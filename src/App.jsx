@@ -135,11 +135,14 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('eventos_log', next); return next;
   });
+  // Debounce da gravação no Supabase para reduzir rollbacks do realtime durante digitação
+  const logisticaTimer = useRef(null);
   const setLogistica = fn => setLogisticaRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('logistica', next); return next;
+    if (logisticaTimer.current) clearTimeout(logisticaTimer.current);
+    logisticaTimer.current = setTimeout(() => { setSupabaseState('logistica', next); }, 500);
+    return next;
   });
-  // Debounce da gravação no Supabase para reduzir rollbacks do realtime durante digitação
   const fornJogoTimer = useRef(null);
   const setFornecedoresJogo = fn => setFornecedoresJogoRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;

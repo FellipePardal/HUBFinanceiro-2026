@@ -21,6 +21,8 @@ export const CATEGORIAS_LOG = [
   { key:"outros",            label:"Outros",            color:"#a855f7" },
 ];
 
+export const CATS_COM_AJUSTE = ["passagem", "hospedagem"];
+
 export const STATUS_REEMBOLSO = [
   { key:"pendente",    label:"Pendente",    color:"#f59e0b" },
   { key:"solicitado",  label:"Solicitado",  color:"#3b82f6" },
@@ -41,10 +43,11 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
   const [tab, setTab] = useState("grade");
   const [jogoSel, setJogoSel] = useState(null);   // pode ser { tipo:"jogo", id } ou { tipo:"evento", id }
   const [uploadingId, setUploadingId] = useState(null);
-  const [ajusteAberto, setAjusteAberto] = useState(new Set()); // ids de lanc com painel de ajuste passagem aberto
+  const [ajusteAberto, setAjusteAberto] = useState(new Set()); // chaves "id|catKey" abertas
   const fileRefs = useRef({});
   const painelRef = useRef(null);
-  const toggleAjuste = id => setAjusteAberto(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
+  const ajusteKey = (id, catKey) => `${id}|${catKey}`;
+  const toggleAjuste = (id, catKey) => setAjusteAberto(p => { const k = ajusteKey(id,catKey); const n = new Set(p); n.has(k)?n.delete(k):n.add(k); return n; });
 
   const TS = tableStyles(T);
   const teal = "#14b8a6";
@@ -56,8 +59,9 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
 
 
   // Helpers
-  const valorPassagemAjuste = l => parseFloat(l.ajustePassagem?.valor)||0;
-  const valorTotal = l => CATEGORIAS_LOG.reduce((s,c) => s + (parseFloat(l.valores?.[c.key])||0), 0) + valorPassagemAjuste(l);
+  const valorAjusteCat = (l, catKey) => parseFloat(l.ajustes?.[catKey]?.valor)||0;
+  const valorAjustesTotal = l => CATS_COM_AJUSTE.reduce((s,k) => s + valorAjusteCat(l,k), 0);
+  const valorTotal = l => CATEGORIAS_LOG.reduce((s,c) => s + (parseFloat(l.valores?.[c.key])||0), 0) + valorAjustesTotal(l);
   const lancsPorJogo = jogoId => lancamentos.filter(l => l.jogoId === jogoId);
   const lancsPorEvento = evId => lancamentos.filter(l => l.eventoId === evId);
   const statusInfo = k => STATUS_REEMBOLSO.find(s => s.key === k) || STATUS_REEMBOLSO[0];
@@ -66,7 +70,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
   const totalGasto = lancamentos.reduce((s,l) => s + valorTotal(l), 0);
   const totalPendente   = lancamentos.filter(l => l.status==="pendente").reduce((s,l) => s+valorTotal(l), 0);
   const totalReembolsado= lancamentos.filter(l => l.status==="reembolsado").reduce((s,l) => s+valorTotal(l), 0);
-  const totalRemarcacoes= lancamentos.reduce((s,l) => s + valorPassagemAjuste(l), 0);
+  const totalRemarcacoes= lancamentos.reduce((s,l) => s + valorAjustesTotal(l), 0);
 
   const gastoPorPrestador = useMemo(() => {
     const map = {};
@@ -99,7 +103,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
       prestador: "",
       valores: Object.fromEntries(CATEGORIAS_LOG.map(c => [c.key, 0])),
       arquivos: {},
-      ajustePassagem: { valor:0, motivo:"" },
+      ajustes: Object.fromEntries(CATS_COM_AJUSTE.map(k => [k, {valor:0, motivo:""}])),
       status: "pendente",
       obs: "",
     };
@@ -113,7 +117,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
       prestador: "",
       valores: Object.fromEntries(CATEGORIAS_LOG.map(c => [c.key, 0])),
       arquivos: {},
-      ajustePassagem: { valor:0, motivo:"" },
+      ajustes: Object.fromEntries(CATS_COM_AJUSTE.map(k => [k, {valor:0, motivo:""}])),
       status: "pendente",
       obs: "",
     };
@@ -141,9 +145,9 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
     setEventosLog(evs => (evs||[]).filter(e => e.id !== id));
     setJogoSel(null);
   };
-  const updateAjustePassagem = (id, patch) => {
+  const updateAjuste = (id, catKey, patch) => {
     setLogistica(ls => (ls||[]).map(l => l.id === id
-      ? { ...l, ajustePassagem: { ...(l.ajustePassagem||{valor:0,motivo:""}), ...patch } }
+      ? { ...l, ajustes: { ...(l.ajustes||{}), [catKey]: { ...((l.ajustes||{})[catKey]||{valor:0,motivo:""}), ...patch } } }
       : l));
   };
 
@@ -274,7 +278,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                         {lancs.map(l => {
                           const st = statusInfo(l.status);
                           const tot = valorTotal(l);
-                          const temAjuste = valorPassagemAjuste(l) > 0 || ajusteAberto.has(l.id);
+                          const ajustesVisiveis = CATS_COM_AJUSTE.filter(k => valorAjusteCat(l,k) > 0 || ajusteAberto.has(ajusteKey(l.id,k)));
                           return (
                             <Fragment key={l.id}>
                               <tr style={TS.tr}>
@@ -289,8 +293,8 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                                 {CATEGORIAS_LOG.map(c => {
                                   const uid = fileKey(l.id, c.key);
                                   const temFile = !!l.arquivos?.[c.key];
-                                  const isPass = c.key === "passagem";
-                                  const ajV = valorPassagemAjuste(l);
+                                  const temAjusteCat = CATS_COM_AJUSTE.includes(c.key);
+                                  const ajV = valorAjusteCat(l, c.key);
                                   return (
                                     <td key={c.key} style={TS.td}>
                                       <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -316,8 +320,8 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                                             <Paperclip size={11}/>
                                           </button>
                                         )}
-                                        {isPass && (
-                                          <button onClick={()=>toggleAjuste(l.id)} title={ajV>0?`Ajuste: ${fmt(ajV)}`:"Cancelamento/reemissão"}
+                                        {temAjusteCat && (
+                                          <button onClick={()=>toggleAjuste(l.id, c.key)} title={ajV>0?`Ajuste: ${fmt(ajV)}`:"Cancelamento/reemissão"}
                                             style={{background:ajV>0?"#ef444422":"transparent",color:ajV>0?"#ef4444":T.textSm,border:`1px dashed ${ajV>0?"#ef4444":T.muted}`,borderRadius:4,padding:"2px 4px",cursor:"pointer",fontSize:10,fontWeight:700}}>⚠</button>
                                         )}
                                       </div>
@@ -335,28 +339,32 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                                   <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delLinha(l.id)}/>
                                 </td>
                               </tr>
-                              {temAjuste && (
-                                <tr style={{background:"#ef444408"}}>
-                                  <td colSpan={CATEGORIAS_LOG.length+4} style={{padding:"8px 16px"}}>
-                                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                                      <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:"0.04em"}}>⚠ Ajuste Passagem</span>
-                                      <label style={{fontSize:11,color:T.textSm}}>Valor:&nbsp;
-                                        <input type="number" value={l.ajustePassagem?.valor||""}
-                                          onChange={e=>updateAjustePassagem(l.id,{valor:parseFloat(e.target.value)||0})}
-                                          placeholder="0" style={{...inputInlineStyle,width:110,textAlign:"right",border:`1px solid ${T.muted}`}}/>
-                                      </label>
-                                      <label style={{fontSize:11,color:T.textSm,flex:1,minWidth:200}}>Motivo:&nbsp;
-                                        <input value={l.ajustePassagem?.motivo||""}
-                                          onChange={e=>updateAjustePassagem(l.id,{motivo:e.target.value})}
-                                          placeholder="Ex: jogo remarcado Rd5→Rd7"
-                                          style={{...inputInlineStyle,border:`1px solid ${T.muted}`,width:"100%"}}/>
-                                      </label>
-                                      <button onClick={()=>{updateAjustePassagem(l.id,{valor:0,motivo:""});toggleAjuste(l.id);}}
-                                        style={{background:"transparent",color:T.textSm,border:"none",fontSize:11,cursor:"pointer"}}>limpar</button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
+                              {ajustesVisiveis.map(catKey => {
+                                const catLabel = CATEGORIAS_LOG.find(c => c.key === catKey)?.label || catKey;
+                                const aj = l.ajustes?.[catKey] || {valor:0, motivo:""};
+                                return (
+                                  <tr key={`aj-${l.id}-${catKey}`} style={{background:"#ef444408"}}>
+                                    <td colSpan={CATEGORIAS_LOG.length+4} style={{padding:"8px 16px"}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                                        <span style={{fontSize:10,fontWeight:800,color:"#ef4444",textTransform:"uppercase",letterSpacing:"0.04em"}}>⚠ Ajuste {catLabel}</span>
+                                        <label style={{fontSize:11,color:T.textSm}}>Valor:&nbsp;
+                                          <input type="number" value={aj.valor||""}
+                                            onChange={e=>updateAjuste(l.id, catKey, {valor:parseFloat(e.target.value)||0})}
+                                            placeholder="0" style={{...inputInlineStyle,width:110,textAlign:"right",border:`1px solid ${T.muted}`}}/>
+                                        </label>
+                                        <label style={{fontSize:11,color:T.textSm,flex:1,minWidth:200}}>Motivo:&nbsp;
+                                          <input value={aj.motivo||""}
+                                            onChange={e=>updateAjuste(l.id, catKey, {motivo:e.target.value})}
+                                            placeholder={catKey==="passagem"?"Ex: jogo remarcado Rd5→Rd7":"Ex: cancelamento por mudança de data"}
+                                            style={{...inputInlineStyle,border:`1px solid ${T.muted}`,width:"100%"}}/>
+                                        </label>
+                                        <button onClick={()=>{updateAjuste(l.id, catKey, {valor:0,motivo:""}); toggleAjuste(l.id, catKey);}}
+                                          style={{background:"transparent",color:T.textSm,border:"none",fontSize:11,cursor:"pointer"}}>limpar</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </Fragment>
                           );
                         })}

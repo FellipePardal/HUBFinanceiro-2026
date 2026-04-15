@@ -15,6 +15,9 @@ export const CATEGORIAS_LOG = [
   { key:"transporte_locado", label:"Transporte Locado", color:"#6366f1" },
   { key:"uber",              label:"Uber",              color:"#f59e0b" },
   { key:"hospedagem",        label:"Hospedagem",        color:"#22c55e" },
+  { key:"passagem",          label:"Passagem",          color:"#06b6d4" },
+  { key:"clara",             label:"Clara",             color:"#ec4899" },
+  { key:"espresso",          label:"Espresso",          color:"#eab308" },
   { key:"outros",            label:"Outros",            color:"#a855f7" },
 ];
 
@@ -32,7 +35,8 @@ function abreviar(nome) {
 
 // ─── Componente Principal ──────────────────────────────────────────────────
 // Modelo de dado: { id, jogoId, prestador, valores:{transporte_locado,uber,hospedagem,outros}, status, obs, hasFile }
-export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
+export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, T }) {
+  const fornecedoresList = Array.isArray(fornecedores) ? fornecedores : [];
   const [tab, setTab] = useState("grade");
   const [jogoSel, setJogoSel] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
@@ -87,10 +91,10 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
       id: Date.now() + Math.random(),
       jogoId,
       prestador: "",
-      valores: { transporte_locado:0, uber:0, hospedagem:0, outros:0 },
+      valores: Object.fromEntries(CATEGORIAS_LOG.map(c => [c.key, 0])),
+      arquivos: {}, // { [catKey]: true }
       status: "pendente",
       obs: "",
-      hasFile: false,
     };
     setLogistica(ls => [...(Array.isArray(ls)?ls:[]), novo]);
     setJogoSel(jogoId);
@@ -106,23 +110,33 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
   };
   const delLinha = id => {
     if (!window.confirm("Excluir esta linha?")) return;
-    deleteNFFile(id);
+    CATEGORIAS_LOG.forEach(c => deleteNFFile(`${id}_${c.key}`));
     setLogistica(ls => (ls||[]).filter(l => l.id !== id));
   };
-  const attachFile = async (id, file) => {
+  const fileKey = (id, catKey) => `${id}_${catKey}`;
+  const attachFile = async (id, catKey, file) => {
     if (!file) return;
-    setUploadingId(id);
+    const uid = fileKey(id, catKey);
+    setUploadingId(uid);
     try {
       const dataUrl = await fileToDataUrl(file);
-      await saveNFFile(id, dataUrl);
-      updateLinha(id, { hasFile: true });
+      await saveNFFile(uid, dataUrl);
+      setLogistica(ls => (ls||[]).map(l => l.id === id
+        ? { ...l, arquivos: { ...(l.arquivos||{}), [catKey]: true } }
+        : l));
     } catch(_){}
     setUploadingId(null);
   };
-  const verComprovante = async id => {
-    const url = await getNFFile(id);
+  const verComprovante = async (id, catKey) => {
+    const url = await getNFFile(fileKey(id, catKey));
     if (!url) { alert("Sem comprovante anexado"); return; }
     const w = window.open(); w.document.write(`<iframe src="${url}" style="border:none;width:100%;height:100vh"></iframe>`);
+  };
+  const removerComprovante = (id, catKey) => {
+    deleteNFFile(fileKey(id, catKey));
+    setLogistica(ls => (ls||[]).map(l => l.id === id
+      ? { ...l, arquivos: { ...(l.arquivos||{}), [catKey]: false } }
+      : l));
   };
 
   // ─── Gráficos ────────────────────────────────────────────────────────────
@@ -160,9 +174,59 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
       onFocus={e => e.target.style.border = `1px solid ${teal}`}
       onBlur={e => e.target.style.border = "1px solid transparent"}/>
   );
+  const CellPrestador = ({ value, onChange }) => (
+    <>
+      <input list="fornecedores-logistica" value={value||""} onChange={e=>onChange(e.target.value)} placeholder="Selecione ou digite"
+        style={{
+          width:"100%", background:"transparent", border:`1px solid transparent`,
+          color:T.text, fontSize:11, fontWeight:600, padding:"4px 6px",
+          borderRadius:4, outline:"none",
+        }}
+        onFocus={e => e.target.style.border = `1px solid ${teal}`}
+        onBlur={e => e.target.style.border = "1px solid transparent"}/>
+    </>
+  );
+  const CellValorComFile = ({ l, catKey }) => {
+    const v = l.valores?.[catKey];
+    const temFile = !!l.arquivos?.[catKey];
+    const uid = fileKey(l.id, catKey);
+    const setRef = el => fileRefs.current[uid] = el;
+    return (
+      <div style={{display:"flex",alignItems:"center",gap:2}}>
+        <input type="number" value={v||""} onChange={e=>updateValor(l.id, catKey, e.target.value)} placeholder="—"
+          style={{
+            flex:1, minWidth:0, background:"transparent", border:`1px solid transparent`,
+            color:T.text, fontSize:11, fontWeight:600, textAlign:"right", padding:"4px 4px",
+            borderRadius:4, outline:"none",
+          }}
+          onFocus={e => e.target.style.border = `1px solid ${teal}`}
+          onBlur={e => e.target.style.border = "1px solid transparent"}/>
+        <input ref={setRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+          onChange={e=>attachFile(l.id, catKey, e.target.files[0])} style={{display:"none"}}/>
+        {temFile ? (
+          <>
+            <button onClick={()=>verComprovante(l.id, catKey)} title="Ver comprovante"
+              style={{background:"#22c55e22",color:"#22c55e",border:"none",borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+              <Eye size={11}/>
+            </button>
+            <button onClick={()=>removerComprovante(l.id, catKey)} title="Remover comprovante"
+              style={{background:"transparent",color:T.textSm,border:"none",padding:"3px 2px",cursor:"pointer",fontSize:10}}>×</button>
+          </>
+        ) : (
+          <button onClick={()=>fileRefs.current[uid]?.click()} disabled={uploadingId===uid} title="Anexar comprovante"
+            style={{background:"transparent",color:T.textSm,border:`1px dashed ${T.muted}`,borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+            <Paperclip size={11}/>
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
+      <datalist id="fornecedores-logistica">
+        {fornecedoresList.map(f => <option key={f.id} value={f.apelido}/>)}
+      </datalist>
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:16,marginBottom:20}}>
         <KPI label="Total Gasto"    value={fmt(totalGasto)}       sub={`${lancamentos.length} lançamentos`} color={purple} T={T}/>
@@ -248,16 +312,16 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                   <div style={{padding:40,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhum prestador ainda. Clique em "Prestador" para adicionar.</div>
                 ) : (
                   <div style={TS.wrap}>
-                    <table style={{...TS.table,minWidth:900}}>
+                    <table style={{...TS.table,minWidth:1300}}>
                       <thead>
                         <tr style={TS.thead}>
-                          <th style={{...TS.th,...TS.thLeft,minWidth:200}}>Prestador</th>
+                          <th style={{...TS.th,...TS.thLeft,minWidth:180}}>Prestador</th>
                           {CATEGORIAS_LOG.map(c => (
-                            <th key={c.key} style={{...TS.th,...TS.thRight,minWidth:120,color:c.color}}>{c.label}</th>
+                            <th key={c.key} style={{...TS.th,...TS.thRight,minWidth:140,color:c.color}}>{c.label}</th>
                           ))}
                           <th style={{...TS.th,...TS.thRight,color:purple,minWidth:100}}>Total</th>
                           <th style={{...TS.th,...TS.thLeft,minWidth:120}}>Status</th>
-                          <th style={{...TS.th,minWidth:130}}>Ações</th>
+                          <th style={{...TS.th,minWidth:60}}></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -267,11 +331,11 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                           return (
                             <tr key={l.id} style={TS.tr}>
                               <td style={TS.td}>
-                                <CellText value={l.prestador} onChange={v=>updateLinha(l.id,{prestador:v})} placeholder="Nome do prestador"/>
+                                <CellPrestador value={l.prestador} onChange={v=>updateLinha(l.id,{prestador:v})}/>
                               </td>
                               {CATEGORIAS_LOG.map(c => (
                                 <td key={c.key} style={TS.td}>
-                                  <CellNum value={l.valores?.[c.key]} onChange={v=>updateValor(l.id, c.key, v)}/>
+                                  <CellValorComFile l={l} catKey={c.key}/>
                                 </td>
                               ))}
                               <td className="num" style={{...TS.tdNum,color:purple,fontWeight:700}}>{tot>0?fmt(tot):"—"}</td>
@@ -282,14 +346,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                                 </select>
                               </td>
                               <td style={TS.td}>
-                                <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                  <input ref={el => fileRefs.current[l.id] = el} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
-                                    onChange={e=>attachFile(l.id, e.target.files[0])} style={{display:"none"}}/>
-                                  {l.hasFile && <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>verComprovante(l.id)}/>}
-                                  <Button T={T} variant="secondary" size="sm" icon={Paperclip}
-                                    onClick={()=>fileRefs.current[l.id]?.click()} disabled={uploadingId===l.id}/>
-                                  <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delLinha(l.id)}/>
-                                </div>
+                                <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>delLinha(l.id)}/>
                               </td>
                             </tr>
                           );

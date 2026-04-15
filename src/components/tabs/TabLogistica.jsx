@@ -37,6 +37,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
   const [jogoSel, setJogoSel] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
   const fileRefs = useRef({});
+  const painelRef = useRef(null);
 
   const TS = tableStyles(T);
   const teal = "#14b8a6";
@@ -185,7 +186,9 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
       {/* GRADE — Cards por jogo */}
       {tab === "grade" && (
         <>
-          {rodadasGrade.map(([rod, jgs]) => (
+          {rodadasGrade.map(([rod, jgs]) => {
+            const jogoSelNestaRodada = jgs.find(j => j.id === jogoSel);
+            return (
             <div key={`rd-${rod}`} style={{marginBottom:20}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingLeft:4}}>
                 <span style={{color:teal,fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada {rod}</span>
@@ -198,7 +201,10 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                   const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
                   const selecionado = jogoSel === j.id;
                   return (
-                    <div key={j.id} onClick={()=>setJogoSel(selecionado?null:j.id)}
+                    <div key={j.id} onClick={()=>{
+                        setJogoSel(selecionado?null:j.id);
+                        if (!selecionado) setTimeout(()=>painelRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+                      }}
                       style={{
                         background: selecionado ? teal+"15" : T.card,
                         border: `1px solid ${selecionado ? teal : T.border}`,
@@ -216,17 +222,15 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                   );
                 })}
               </div>
-            </div>
-          ))}
 
-          {/* Painel de detalhe do jogo selecionado */}
-          {jogoSel && (() => {
-            const j = divulgados.find(x => x.id === jogoSel);
-            if (!j) return null;
-            const lancs = lancsPorJogo(j.id);
-            const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
-            return (
-              <Card T={T} style={{marginTop:8,borderTop:`2px solid ${teal}`}}>
+              {/* Painel de detalhe — renderizado logo abaixo da rodada que contém o jogo selecionado */}
+              {jogoSelNestaRodada && (() => {
+                const j = jogoSelNestaRodada;
+                const lancs = lancsPorJogo(j.id);
+                const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
+                return (
+                  <div ref={painelRef}>
+                  <Card T={T} style={{marginTop:12,borderTop:`2px solid ${teal}`}}>
                 <div style={{padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`}}>
                   <div>
                     <div style={{fontSize:10,color:teal,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Rodada {j.rodada}</div>
@@ -304,8 +308,12 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
                   </div>
                 )}
               </Card>
+              </div>
+                );
+              })()}
+            </div>
             );
-          })()}
+          })}
         </>
       )}
 

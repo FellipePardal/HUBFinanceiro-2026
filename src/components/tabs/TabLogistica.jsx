@@ -1,8 +1,8 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, Fragment } from "react";
 import { KPI, Pill } from "../shared";
 import { iSty, btnStyle } from "../../constants";
 import { Card, Button, Progress, tableStyles } from "../ui";
-import { Plus, Trash2, Paperclip, Eye, CheckCircle2, Clock, Send } from "lucide-react";
+import { Plus, Trash2, Paperclip, Eye, CheckCircle2, Clock, Send, ChevronDown, ChevronRight } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, CartesianGrid, Legend,
@@ -202,11 +202,14 @@ function LogisticaModal({ onSave, onClose, jogos, lancamento, T }) {
 
 // ─── Componente Principal ────────────────────────────────────────────────────
 export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
-  const [tab, setTab] = useState("lancamentos");
+  const [tab, setTab] = useState("grade");
   const [showModal, setShowModal] = useState(false);
   const [editLanc, setEditLanc] = useState(null);
   const [filtroCat, setFiltroCat] = useState("todas");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [gradeView, setGradeView] = useState("prestador"); // prestador | categoria | ambos
+  const [expandidos, setExpandidos] = useState(new Set());
+  const toggleExpand = id => setExpandidos(p => { const n = new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
 
   const TS = tableStyles(T);
   const teal = "#14b8a6";
@@ -274,17 +277,86 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
   const statusInfo = k => STATUS_REEMBOLSO.find(s => s.key === k) || STATUS_REEMBOLSO[0];
 
   const TABS = [
+    {value:"grade",       label:"Grade Jogo × Prestador"},
     {value:"lancamentos", label:"Lançamentos"},
     {value:"graficos",    label:"Gráficos"},
   ];
 
+  // ─── Dados Grade ───────────────────────────────────────────────────────────
+  // Para cada jogo, calcula gasto por prestador, por categoria, e combinado
+  const gradeData = useMemo(() => {
+    const porJogo = {}; // id jogo -> { prestadores: {forn: valor}, categorias: {cat: valor}, ambos: {"forn|cat": valor}, total, lancs: [] }
+    divulgados.forEach(j => {
+      porJogo[j.id] = { jogo: j, prestadores: {}, categorias: {}, ambos: {}, total: 0, lancs: [] };
+    });
+    lancamentos.forEach(l => {
+      const ids = l.jogosIds || [];
+      if (!ids.length) return;
+      const vpj = l.valorPorJogo || (l.valor / ids.length);
+      const forn = l.fornecedor || "— Sem prestador —";
+      const cat = catLabel(l.categoria);
+      ids.forEach(id => {
+        const bucket = porJogo[id];
+        if (!bucket) return;
+        bucket.prestadores[forn] = (bucket.prestadores[forn] || 0) + vpj;
+        bucket.categorias[cat]   = (bucket.categorias[cat]   || 0) + vpj;
+        const k = `${forn} · ${cat}`;
+        bucket.ambos[k] = (bucket.ambos[k] || 0) + vpj;
+        bucket.total += vpj;
+        bucket.lancs.push({ ...l, valorNesteJogo: vpj });
+      });
+    });
+    return porJogo;
+  }, [lancamentos, divulgados]);
+
+  const prestadoresUnicos = useMemo(() => {
+    const set = new Set();
+    lancamentos.forEach(l => set.add(l.fornecedor || "— Sem prestador —"));
+    return [...set].sort();
+  }, [lancamentos]);
+
+  const categoriasUnicas = CATEGORIAS_LOG.map(c => c.label);
+
+  const colunas = gradeView === "prestador" ? prestadoresUnicos
+                : gradeView === "categoria" ? categoriasUnicas
+                : [...new Set(lancamentos.map(l => `${l.fornecedor||"— Sem prestador —"} · ${catLabel(l.categoria)}`))].sort();
+
+  const valorCelula = (jogoId, coluna) => {
+    const b = gradeData[jogoId];
+    if (!b) return 0;
+    if (gradeView === "prestador") return b.prestadores[coluna] || 0;
+    if (gradeView === "categoria") return b.categorias[coluna]  || 0;
+    return b.ambos[coluna] || 0;
+  };
+
+  // KPIs extras
+  const gastoPorPrestador = useMemo(() => {
+    const map = {};
+    lancamentos.forEach(l => { const f = l.fornecedor || "—"; map[f] = (map[f]||0) + (l.valor||0); });
+    return Object.entries(map).sort((a,b) => b[1]-a[1]);
+  }, [lancamentos]);
+  const topPrestador = gastoPorPrestador[0];
+  const jogoMaisCaro = useMemo(() => {
+    let max = null;
+    Object.values(gradeData).forEach(b => { if (!max || b.total > max.total) max = b; });
+    return max && max.total > 0 ? max : null;
+  }, [gradeData]);
+
+  // Agrupa jogos por rodada para renderização
+  const rodadasGrade = useMemo(() => {
+    const map = {};
+    divulgados.forEach(j => { if (!map[j.rodada]) map[j.rodada] = []; map[j.rodada].push(j); });
+    return Object.entries(map).sort(([a],[b]) => a-b);
+  }, [divulgados]);
+
   return (
     <div>
       {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:16,marginBottom:20}}>
         <KPI label="Total Gasto"       value={fmt(totalGasto)}       sub={`${lancamentos.length} lançamentos`} color={purple} T={T}/>
+        <KPI label="Top Prestador"     value={topPrestador?topPrestador[0]:"—"} sub={topPrestador?fmt(topPrestador[1]):"sem dados"} color={teal} T={T}/>
+        <KPI label="Jogo Mais Caro"    value={jogoMaisCaro?jogoLabel(jogoMaisCaro.jogo):"—"} sub={jogoMaisCaro?`Rd${jogoMaisCaro.jogo.rodada} · ${fmt(jogoMaisCaro.total)}`:"sem dados"} color="#f43f5e" T={T}/>
         <KPI label="Pendente"          value={fmt(totalPendente)}    sub="A solicitar"                          color="#f59e0b" T={T}/>
-        <KPI label="Solicitado"        value={fmt(totalSolicitado)}  sub="Aguardando"                           color="#3b82f6" T={T}/>
         <KPI label="Reembolsado"       value={fmt(totalReembolsado)} sub={`${totalGasto?((totalReembolsado/totalGasto)*100).toFixed(0):0}% do total`} color="#22c55e" T={T}/>
       </div>
 
@@ -300,6 +372,133 @@ export default function TabLogistica({ logistica, setLogistica, jogos, T }) {
         </div>
         <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>{setEditLanc(null);setShowModal(true);}}>Novo Lançamento</Button>
       </div>
+
+      {/* ABA GRADE JOGO × PRESTADOR */}
+      {tab === "grade" && (
+        <>
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{color:T.textSm,fontSize:11,fontWeight:700,letterSpacing:"0.04em",textTransform:"uppercase"}}>Colunas:</span>
+            {[
+              {k:"prestador", l:"Prestador"},
+              {k:"categoria", l:"Categoria"},
+              {k:"ambos",     l:"Prestador + Categoria"},
+            ].map(o => (
+              <button key={o.k} onClick={()=>setGradeView(o.k)} style={{
+                padding:"6px 12px",borderRadius:6,border:`1px solid ${gradeView===o.k?teal:T.muted}`,cursor:"pointer",fontSize:11,fontWeight:600,
+                background:gradeView===o.k?teal+"22":"transparent",color:gradeView===o.k?teal:T.textMd,
+              }}>{o.l}</button>
+            ))}
+          </div>
+
+          {colunas.length === 0 ? (
+            <Card T={T}>
+              <div style={{padding:50,textAlign:"center"}}>
+                <p style={{color:T.text,fontSize:14,margin:"0 0 4px",fontWeight:600}}>Nenhum lançamento</p>
+                <p style={{color:T.textSm,fontSize:12,margin:0}}>Clique em "Novo Lançamento" para começar</p>
+              </div>
+            </Card>
+          ) : (
+            <Card T={T}>
+              <div style={TS.wrap}>
+                <table style={{...TS.table, minWidth: 600 + colunas.length*120}}>
+                  <thead>
+                    <tr style={TS.thead}>
+                      <th style={{...TS.th,...TS.thLeft,position:"sticky",left:0,background:T.surfaceAlt||T.bg,zIndex:2,minWidth:200}}>Jogo</th>
+                      {colunas.map(c => (
+                        <th key={c} style={{...TS.th,...TS.thRight,fontSize:10,minWidth:110}}>{c}</th>
+                      ))}
+                      <th style={{...TS.th,...TS.thRight,fontWeight:800,color:purple,minWidth:110}}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rodadasGrade.map(([rod, jgs]) => {
+                      const subtotalRod = jgs.reduce((s,j) => s + (gradeData[j.id]?.total || 0), 0);
+                      const subtotalCols = colunas.map(c => jgs.reduce((s,j) => s + valorCelula(j.id, c), 0));
+                      return (
+                        <Fragment key={`rd-wrap-${rod}`}>
+                          <tr style={{background:T.surfaceAlt||T.bg}}>
+                            <td colSpan={colunas.length+2} style={{...TS.td,fontSize:11,fontWeight:800,letterSpacing:"0.06em",textTransform:"uppercase",color:teal,padding:"8px 12px"}}>
+                              Rodada {rod} · {jgs.length} jogo{jgs.length!==1?"s":""} · {fmt(subtotalRod)}
+                            </td>
+                          </tr>
+                          {jgs.map(j => {
+                            const b = gradeData[j.id];
+                            const total = b?.total || 0;
+                            const aberto = expandidos.has(j.id);
+                            const lancs = b?.lancs || [];
+                            return (
+                              <Fragment key={`j-wrap-${j.id}`}>
+                                <tr style={{...TS.tr,cursor:total>0?"pointer":"default",opacity:total>0?1:0.55}}
+                                  onClick={()=>total>0 && toggleExpand(j.id)}>
+                                  <td style={{...TS.td,position:"sticky",left:0,background:T.card,zIndex:1,fontSize:12,fontWeight:600}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                      {total>0
+                                        ? (aberto ? <ChevronDown size={14} color={teal}/> : <ChevronRight size={14} color={T.textSm}/>)
+                                        : <span style={{width:14,display:"inline-block"}}/>}
+                                      <span>{j.mandante} × {j.visitante}</span>
+                                    </div>
+                                  </td>
+                                  {colunas.map(c => {
+                                    const v = valorCelula(j.id, c);
+                                    const intens = total>0 ? Math.min(v/total, 1) : 0;
+                                    return (
+                                      <td key={c} className="num" style={{...TS.tdNum,background:v>0?`rgba(20,184,166,${0.08+intens*0.25})`:"transparent",color:v>0?T.text:T.textSm,fontSize:11,fontWeight:v>0?600:400}}>
+                                        {v>0 ? fmt(v) : "—"}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="num" style={{...TS.tdNum,color:total>0?purple:T.textSm,fontWeight:800}}>{total>0?fmt(total):"—"}</td>
+                                </tr>
+                                {aberto && lancs.length > 0 && (
+                                  <tr style={{background:T.bg}}>
+                                    <td colSpan={colunas.length+2} style={{padding:"8px 16px"}}>
+                                      <div style={{display:"grid",gap:4}}>
+                                        {lancs.map(l => {
+                                          const st = statusInfo(l.status);
+                                          return (
+                                            <div key={l.id} style={{display:"flex",alignItems:"center",gap:10,fontSize:11,padding:"4px 8px",background:T.card,borderRadius:6}}>
+                                              <Pill label={catLabel(l.categoria)} color={catColor(l.categoria)}/>
+                                              <span style={{color:T.text,fontWeight:600,minWidth:120}}>{l.fornecedor||"—"}</span>
+                                              <span style={{color:T.textMd,flex:1}}>{l.descricao||"—"}</span>
+                                              <span style={{color:st.color,fontSize:10,fontWeight:700,textTransform:"uppercase"}}>{st.label}</span>
+                                              <span style={{color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(l.valorNesteJogo)}</span>
+                                              {l.hasFile && <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={e=>{e.stopPropagation();verComprovante(l.id);}}/>}
+                                              <Button T={T} variant="secondary" size="sm" icon={Paperclip} onClick={e=>{e.stopPropagation();setEditLanc(l);setShowModal(true);}}/>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                          <tr style={{background:T.bg,borderTop:`1px dashed ${T.border}`}}>
+                            <td style={{...TS.td,fontSize:10,fontWeight:700,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.04em",position:"sticky",left:0,background:T.bg}}>Subtotal Rd{rod}</td>
+                            {subtotalCols.map((v,i) => (
+                              <td key={i} className="num" style={{...TS.tdNum,fontSize:11,color:v>0?teal:T.textSm,fontWeight:700}}>{v>0?fmt(v):"—"}</td>
+                            ))}
+                            <td className="num" style={{...TS.tdNum,color:purple,fontWeight:800}}>{fmt(subtotalRod)}</td>
+                          </tr>
+                        </Fragment>
+                      );
+                    })}
+                    <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg}}>
+                      <td style={{...TS.td,fontSize:11,fontWeight:800,letterSpacing:"0.04em",textTransform:"uppercase",position:"sticky",left:0,background:T.surfaceAlt||T.bg}}>Total Geral</td>
+                      {colunas.map(c => {
+                        const v = divulgados.reduce((s,j) => s + valorCelula(j.id, c), 0);
+                        return <td key={c} className="num" style={{...TS.tdNum,color:teal,fontWeight:800,fontSize:12}}>{v>0?fmt(v):"—"}</td>;
+                      })}
+                      <td className="num" style={{...TS.tdNum,color:purple,fontWeight:800,fontSize:14}}>{fmt(totalGasto)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
 
       {/* ABA LANÇAMENTOS */}
       {tab === "lancamentos" && (

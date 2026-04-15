@@ -66,7 +66,7 @@ export const SERVICOS_INIT = [
   { secao:"Transmissão", itens:[
     {id:6,nome:"Recepção Fibra para MMs, Antipirataria e Arquivo",orcado:234612,provisionado:0,realizado:0,obs:""},
   ]},
-  { secao:"Infraestrutura e Distribuição de Sinais", itens:[
+  { secao:"Serviços Complementares", itens:[
     {id:7,nome:"Antipirataria (Serviço LiveMode)",orcado:425600,provisionado:0,realizado:840,obs:""},
     {id:8,nome:"Estatísticas",orcado:120000,provisionado:0,realizado:7000,obs:""},
     {id:9,nome:"Ferramenta de Clipping",orcado:200000,provisionado:0,realizado:0,obs:""},
@@ -93,7 +93,7 @@ export const CATS_FIXOS_INIT = [
       {id:6,nome:"Recepção Fibra para MMs, Antipirataria e Arquivo",orc:234612,gasto:0,prov:234612},
     ]}
   ]},
-  { id:"infra", label:"Infraestrutura e Distribuição de Sinais", subs:[
+  { id:"infra", label:"Serviços Complementares", subs:[
     { id:3, nome:"Serviços (Pacotes Mensais)", itens:[
       {id:7,nome:"Antipirataria (Serviço LiveMode)",orc:425600,gasto:840,prov:299160},
       {id:8,nome:"Estatísticas",orc:120000,gasto:7000,prov:49000},

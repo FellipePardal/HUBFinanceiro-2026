@@ -79,7 +79,7 @@ export const CATS = [
 // ─── CORES ────────────────────────────────────────────────────────────────────
 export const TIPO_COLOR   = { fixo:"#6366f1", variavel:"#f43f5e" };
 export const PIE_COLORS   = ["#22c55e","#3b82f6","#f59e0b","#ec4899","#8b5cf6","#06b6d4","#f97316"];
-export const SECAO_COLORS = { "Pessoal":"#3b82f6", "Transmissão":"#22c55e", "Infraestrutura e Distribuição de Sinais":"#f59e0b" };
+export const SECAO_COLORS = { "Pessoal":"#3b82f6", "Transmissão":"#22c55e", "Serviços Complementares":"#f59e0b" };
 
 // ─── CENÁRIOS ─────────────────────────────────────────────────────────────────
 export const CENARIO_INFO = {

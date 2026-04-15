@@ -47,7 +47,19 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     async function load() {
       const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
       if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
-      if (s) setServicosRaw(s); else setSupabaseState('servicos', SERVICOS_INIT);
+      if (s) {
+        // Migração: renomear "Infraestrutura e Distribuição de Sinais" -> "Serviços Complementares"
+        const OLD = "Infraestrutura e Distribuição de Sinais";
+        const NEW = "Serviços Complementares";
+        const precisaMigrar = Array.isArray(s) && s.some(sec => sec.secao === OLD);
+        if (precisaMigrar) {
+          const migrado = s.map(sec => sec.secao === OLD ? {...sec, secao: NEW} : sec);
+          setServicosRaw(migrado);
+          setSupabaseState('servicos', migrado);
+        } else {
+          setServicosRaw(s);
+        }
+      } else setSupabaseState('servicos', SERVICOS_INIT);
       if (n) setNotasRaw(n); else setSupabaseState('notas', []);
       if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
       if (nm) setNotasMensaisRaw(nm); else setSupabaseState('notas_mensais', []);

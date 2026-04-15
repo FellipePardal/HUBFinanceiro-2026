@@ -139,6 +139,43 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard
   const VAR_CAT_TO_CATKEY = { "Transporte":"logistica", "Uber":"logistica", "Hospedagem":"logistica", "Seg. Espacial":"operacoes" };
 
+  // Realizado de logística por jogo (fonte única: lançamentos da aba Logística)
+  // Mapeamento: transporte_locado + passagem (+ ajuste passagem) -> transporte
+  //             uber -> uber
+  //             hospedagem + clara + espresso (+ ajuste hospedagem) -> hospedagem
+  //             outros -> outros_log
+  const logRealizadoPorJogo = useMemo(() => {
+    const map = {};
+    (Array.isArray(logistica) ? logistica : []).filter(l => l && l.jogoId).forEach(l => {
+      const v = l.valores || {};
+      const aj = l.ajustes || {};
+      const num = x => parseFloat(x) || 0;
+      const entry = map[l.jogoId] || { transporte:0, uber:0, hospedagem:0, outros_log:0 };
+      entry.transporte += num(v.transporte_locado) + num(v.passagem) + num(aj.passagem?.valor);
+      entry.uber       += num(v.uber);
+      entry.hospedagem += num(v.hospedagem) + num(v.clara) + num(v.espresso) + num(aj.hospedagem?.valor);
+      entry.outros_log += num(v.outros);
+      map[l.jogoId] = entry;
+    });
+    return map;
+  }, [logistica]);
+
+  // jogosCalc: jogos com realizado de logística derivado (substitui as subs logística)
+  const jogosCalc = useMemo(() => jogos.map(j => {
+    const lg = logRealizadoPorJogo[j.id];
+    if (!lg) return j;
+    return {
+      ...j,
+      realizado: {
+        ...(j.realizado||{}),
+        transporte: lg.transporte,
+        uber:       lg.uber,
+        hospedagem: lg.hospedagem,
+        outros_log: lg.outros_log,
+      },
+    };
+  }), [jogos, logRealizadoPorJogo]);
+
   // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
   const servicosCalc = useMemo(() => servicos.map(sec => ({
     ...sec,
@@ -149,7 +186,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   })), [servicos, notasMensais]);
 
   const varCalc = useMemo(() => {
-    const allJ = jogos.filter(j => j.mandante !== "A definir");
+    const allJ = jogosCalc.filter(j => j.mandante !== "A definir");
     const result = CATS.map(cat => {
       const realizadoMensal = notasMensais
         .filter(n => !n.servicoId && VAR_CAT_TO_CATKEY[n.categoria] === cat.key)
@@ -165,7 +202,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     const extraOrc = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
     result.push({ nome:"Extra", orcado:extraOrc, provisionado:0, realizado:0, tipo:"variavel" });
     return result;
-  }, [jogos, notasMensais]);
+  }, [jogosCalc, notasMensais]);
 
   const fixosCalc = useMemo(() => servicosCalc.map(s => ({
     nome: s.secao,
@@ -235,11 +272,11 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const totalReal = RESUMO_CATS.reduce((s,c) => s+c.realizado, 0);
   const pctGasto  = totalOrc ? ((totalReal/totalOrc)*100).toFixed(1) : 0;
 
-  const divulgados  = jogos.filter(j => j.mandante !== "A definir");
+  const divulgados  = jogosCalc.filter(j => j.mandante !== "A definir");
   const aDivulgar   = jogos.filter(j => j.mandante === "A definir");
   const rodadasList = ["Todas", ...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)];
 
-  const filtrados = (showPlaceholder ? jogos : divulgados).filter(j =>
+  const filtrados = (showPlaceholder ? jogosCalc : divulgados).filter(j =>
     (filtroRod==="Todas" || j.rodada===parseInt(filtroRod)) &&
     (filtroCat==="Todas" || j.categoria===filtroCat)
   ).sort((a,b) => a.rodada - b.rodada);
@@ -543,17 +580,17 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         </>)}
 
         {/* ── ABAS ── */}
-        {tab==="jogos"         && <TabJogos         jogos={jogos} filtrados={filtrados} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} rodadasList={rodadasList} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} setNovoRapido={setNovoRapido} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
+        {tab==="jogos"         && <TabJogos         jogos={jogosCalc} filtrados={filtrados} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} rodadasList={rodadasList} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} setNovoRapido={setNovoRapido} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
         {tab==="savings"       && <TabSavings       jogosFiltered={jogosFiltered} divulgados={divulgados} totOrcJogos={totOrcJogos} totProvJogos={totProvJogos} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} rodadasList={rodadasList} T={T}/>}
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
-        {tab==="micro"         && <VisaoMicro       jogos={jogos} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
+        {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
-        {tab==="envio"         && <TabEnvio jogos={jogos} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
 
       </div>
 

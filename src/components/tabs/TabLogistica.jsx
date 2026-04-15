@@ -152,74 +152,11 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
     {value:"graficos", label:"Gráficos"},
   ];
 
-  // Célula editável numérica
-  const CellNum = ({ value, onChange }) => (
-    <input type="number" value={value||""} onChange={e=>onChange(e.target.value)}
-      placeholder="—"
-      style={{
-        width:"100%", background:"transparent", border:`1px solid transparent`,
-        color:T.text, fontSize:11, fontWeight:600, textAlign:"right", padding:"4px 6px",
-        borderRadius:4, outline:"none",
-      }}
-      onFocus={e => e.target.style.border = `1px solid ${teal}`}
-      onBlur={e => e.target.style.border = "1px solid transparent"}/>
-  );
-  const CellText = ({ value, onChange, placeholder }) => (
-    <input value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-      style={{
-        width:"100%", background:"transparent", border:`1px solid transparent`,
-        color:T.text, fontSize:11, fontWeight:600, padding:"4px 6px",
-        borderRadius:4, outline:"none",
-      }}
-      onFocus={e => e.target.style.border = `1px solid ${teal}`}
-      onBlur={e => e.target.style.border = "1px solid transparent"}/>
-  );
-  const CellPrestador = ({ value, onChange }) => (
-    <>
-      <input list="fornecedores-logistica" value={value||""} onChange={e=>onChange(e.target.value)} placeholder="Selecione ou digite"
-        style={{
-          width:"100%", background:"transparent", border:`1px solid transparent`,
-          color:T.text, fontSize:11, fontWeight:600, padding:"4px 6px",
-          borderRadius:4, outline:"none",
-        }}
-        onFocus={e => e.target.style.border = `1px solid ${teal}`}
-        onBlur={e => e.target.style.border = "1px solid transparent"}/>
-    </>
-  );
-  const CellValorComFile = ({ l, catKey }) => {
-    const v = l.valores?.[catKey];
-    const temFile = !!l.arquivos?.[catKey];
-    const uid = fileKey(l.id, catKey);
-    const setRef = el => fileRefs.current[uid] = el;
-    return (
-      <div style={{display:"flex",alignItems:"center",gap:2}}>
-        <input type="number" value={v||""} onChange={e=>updateValor(l.id, catKey, e.target.value)} placeholder="—"
-          style={{
-            flex:1, minWidth:0, background:"transparent", border:`1px solid transparent`,
-            color:T.text, fontSize:11, fontWeight:600, textAlign:"right", padding:"4px 4px",
-            borderRadius:4, outline:"none",
-          }}
-          onFocus={e => e.target.style.border = `1px solid ${teal}`}
-          onBlur={e => e.target.style.border = "1px solid transparent"}/>
-        <input ref={setRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
-          onChange={e=>attachFile(l.id, catKey, e.target.files[0])} style={{display:"none"}}/>
-        {temFile ? (
-          <>
-            <button onClick={()=>verComprovante(l.id, catKey)} title="Ver comprovante"
-              style={{background:"#22c55e22",color:"#22c55e",border:"none",borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
-              <Eye size={11}/>
-            </button>
-            <button onClick={()=>removerComprovante(l.id, catKey)} title="Remover comprovante"
-              style={{background:"transparent",color:T.textSm,border:"none",padding:"3px 2px",cursor:"pointer",fontSize:10}}>×</button>
-          </>
-        ) : (
-          <button onClick={()=>fileRefs.current[uid]?.click()} disabled={uploadingId===uid} title="Anexar comprovante"
-            style={{background:"transparent",color:T.textSm,border:`1px dashed ${T.muted}`,borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
-            <Paperclip size={11}/>
-          </button>
-        )}
-      </div>
-    );
+  // Estilos reutilizados
+  const inputInlineStyle = {
+    width:"100%", background:"transparent", border:`1px solid transparent`,
+    color:T.text, fontSize:11, fontWeight:600, padding:"4px 6px",
+    borderRadius:4, outline:"none",
   };
 
   return (
@@ -331,13 +268,45 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                           return (
                             <tr key={l.id} style={TS.tr}>
                               <td style={TS.td}>
-                                <CellPrestador value={l.prestador} onChange={v=>updateLinha(l.id,{prestador:v})}/>
+                                <input list="fornecedores-logistica" value={l.prestador||""}
+                                  onChange={e=>updateLinha(l.id,{prestador:e.target.value})}
+                                  placeholder="Selecione ou digite"
+                                  style={inputInlineStyle}
+                                  onFocus={e=>e.target.style.border=`1px solid ${teal}`}
+                                  onBlur={e=>e.target.style.border="1px solid transparent"}/>
                               </td>
-                              {CATEGORIAS_LOG.map(c => (
-                                <td key={c.key} style={TS.td}>
-                                  <CellValorComFile l={l} catKey={c.key}/>
-                                </td>
-                              ))}
+                              {CATEGORIAS_LOG.map(c => {
+                                const uid = fileKey(l.id, c.key);
+                                const temFile = !!l.arquivos?.[c.key];
+                                return (
+                                  <td key={c.key} style={TS.td}>
+                                    <div style={{display:"flex",alignItems:"center",gap:2}}>
+                                      <input type="number" value={l.valores?.[c.key]||""}
+                                        onChange={e=>updateValor(l.id, c.key, e.target.value)} placeholder="—"
+                                        style={{...inputInlineStyle, textAlign:"right", flex:1, minWidth:0}}
+                                        onFocus={e=>e.target.style.border=`1px solid ${teal}`}
+                                        onBlur={e=>e.target.style.border="1px solid transparent"}/>
+                                      <input ref={el=>fileRefs.current[uid]=el} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                                        onChange={e=>attachFile(l.id, c.key, e.target.files[0])} style={{display:"none"}}/>
+                                      {temFile ? (
+                                        <>
+                                          <button onClick={()=>verComprovante(l.id, c.key)} title="Ver"
+                                            style={{background:"#22c55e22",color:"#22c55e",border:"none",borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+                                            <Eye size={11}/>
+                                          </button>
+                                          <button onClick={()=>removerComprovante(l.id, c.key)} title="Remover"
+                                            style={{background:"transparent",color:T.textSm,border:"none",padding:"3px 2px",cursor:"pointer",fontSize:10}}>×</button>
+                                        </>
+                                      ) : (
+                                        <button onClick={()=>fileRefs.current[uid]?.click()} disabled={uploadingId===uid} title="Anexar"
+                                          style={{background:"transparent",color:T.textSm,border:`1px dashed ${T.muted}`,borderRadius:4,padding:"3px 4px",cursor:"pointer",display:"flex"}}>
+                                          <Paperclip size={11}/>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })}
                               <td className="num" style={{...TS.tdNum,color:purple,fontWeight:700}}>{tot>0?fmt(tot):"—"}</td>
                               <td style={TS.td}>
                                 <select value={l.status||"pendente"} onChange={e=>updateLinha(l.id,{status:e.target.value})}

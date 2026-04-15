@@ -178,10 +178,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
   const rateioSegEspacialPorJogo = useMemo(() => {
     const parseMes = (dataStr) => {
-      if (!dataStr || dataStr === "A definir") return null;
+      if (!dataStr || /^[aà] definir$/i.test(dataStr.trim())) return null;
       let m = dataStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (m) return parseInt(m[2]) - 1;
-      m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      m = dataStr.match(/^(\d{2})\/(\d{2})(?:\/(\d{2,4}))?/);
       if (m) return parseInt(m[2]) - 1;
       return null;
     };

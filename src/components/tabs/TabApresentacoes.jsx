@@ -389,15 +389,18 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
   // Categorias variáveis (excluídas dos "Outros Mensais" fixos)
   const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
 
-  // Auto: para cada seção do portal, somar orçado dos itens e gasto = NFs mensais até o mês selecionado
+  // Auto: orçado anual ÷ 12 × meses decorridos (acumulado até o mês selecionado)
+  //       gasto = NFs mensais até o mês selecionado
+  const mesesDecorridos = mesAtual + 1; // jan=1, fev=2, ...
   const computed = useMemo(() => {
     const sections = servicos.map(sec => {
       const idsItens = sec.itens.map(it => it.id);
-      const orcAuto  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
+      const orcAnual = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
+      const orcAuto  = (orcAnual / 12) * mesesDecorridos;
       const gastoAuto = notasMensais
         .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
         .reduce((s, n) => s + (n.valor || 0), 0);
-      return { secao: sec.secao, orcAuto, gastoAuto };
+      return { secao: sec.secao, orcAnual, orcAuto, gastoAuto };
     });
 
     // "Outros Mensais": NFs sem servicoId e sem categoria variável mapeada
@@ -405,12 +408,13 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       .filter(n => !n.servicoId && !VAR_CATS_FIX.has(n.categoria) && n.mes <= mesAtual)
       .reduce((s, n) => s + (n.valor || 0), 0);
     if (outrosGasto > 0) {
-      sections.push({ secao: "Outros Mensais", orcAuto: 0, gastoAuto: outrosGasto });
+      sections.push({ secao: "Outros Mensais", orcAnual: 0, orcAuto: 0, gastoAuto: outrosGasto });
     }
 
-    const orcTotalAuto = sections.reduce((s, x) => s + x.orcAuto, 0);
-    return { sections, orcTotalAuto };
-  }, [servicos, notasMensais, mesAtual]);
+    const orcAnualTotal = sections.reduce((s, x) => s + x.orcAnual, 0);
+    const orcTotalAuto  = sections.reduce((s, x) => s + x.orcAuto, 0);
+    return { sections, orcTotalAuto, orcAnualTotal };
+  }, [servicos, notasMensais, mesAtual, mesesDecorridos]);
 
   // Overrides por seção (secao → {orc?, gasto?})
   const [overrides, setOverrides] = useState({});
@@ -466,16 +470,16 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       sl.addText("Custos Fixos – Brasileirão 2026", {
         x:0.3,y:0.08,w:12.7,h:0.38,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"
       });
-      sl.addText(`Serviços Fixos  ·  Acumulado até ${mesLabel}`, {
+      sl.addText(`Serviços Fixos  ·  Orçado ÷ 12 · Acumulado até ${mesLabel}`, {
         x:0.3,y:0.46,w:12.7,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
       });
       sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
 
       // 3 KPIs
       const kpis = [
-        {label:"ORÇADO TOTAL", val:fmtBRL(orcTotalV),   border:"D1D5DB", valColor:"111827"},
-        {label:"GASTO TOTAL",  val:fmtBRL(gastoTotalV), border:"D1D5DB", valColor:"111827"},
-        {label:"SALDO TOTAL",  val:fmtBRL(saldoTotalV), border:"22C55E", valColor:saldoTotalV>=0?"22C55E":"EF4444"},
+        {label:`ORÇADO ACUM. ATÉ ${mesLabel.toUpperCase()}`, val:fmtBRL(orcTotalV),   border:"D1D5DB", valColor:"111827"},
+        {label:"GASTO ACUMULADO",                             val:fmtBRL(gastoTotalV), border:"D1D5DB", valColor:"111827"},
+        {label:"SALDO",                                       val:fmtBRL(saldoTotalV), border:"22C55E", valColor:saldoTotalV>=0?"22C55E":"EF4444"},
       ];
       const kW=4.27, kH=0.92, kY=0.82;
       kpis.forEach(({label,val,border,valColor}, i) => {
@@ -489,8 +493,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       // gráfico barras por seção
       const secLabels = rows.map(r => r.secao.length>18 ? r.secao.substring(0,18)+"…" : r.secao);
       sl.addChart(pptx.ChartType.bar, [
-        {name:"Orçado", labels:secLabels, values:rows.map(r=>r.orc)},
-        {name:"Gasto",  labels:secLabels, values:rows.map(r=>r.gasto)},
+        {name:"Orçado Acum.", labels:secLabels, values:rows.map(r=>r.orc)},
+        {name:"Gasto",        labels:secLabels, values:rows.map(r=>r.gasto)},
       ], {
         x:0.3, y:1.88, w:12.73, h:2.72,
         barDir:"col", barGrouping:"clustered",
@@ -503,7 +507,7 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
 
       // tabela por seção
       const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-      const tblHead = [th("SEÇÃO"), th("ORÇADO","right"), th("GASTO","right"), th("SALDO","right")];
+      const tblHead = [th("SEÇÃO"), th("ORÇADO ACUM.","right"), th("GASTO","right"), th("SALDO","right")];
 
       const tblBody = rows.map((r, i) => {
         const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
@@ -550,7 +554,7 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
           </div>
           <div>
             <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Fixos</h2>
-            <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Acompanhamento mensal · vinculado às NFs Mensais</p>
+            <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Orçado anual ÷ 12 · Acompanhamento acumulado mensal</p>
           </div>
         </div>
       </div>
@@ -565,8 +569,9 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             </select>
           </div>
           <div style={{marginBottom:16}}>
-            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Total – Serviços <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-            <input readOnly value={orcTotalFmt} style={{...IS_RO}}/>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={orcTotalFmt} style={{...IS_RO}} title={`Anual: ${fmtR(computed.orcAnualTotal)} ÷ 12 × ${mesesDecorridos}`}/>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
           </div>
           <div style={{marginBottom:16}}>
             <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
@@ -583,7 +588,7 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
             <thead><tr style={{background:T.bg}}>
-              {["Seção","Orçado (R$)","Gasto (R$)","Saldo (R$)"].map((h,i) => (
+              {["Seção","Orçado Acum. (R$)","Gasto (R$)","Saldo (R$)"].map((h,i) => (
                 <th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>
               ))}
             </tr></thead>

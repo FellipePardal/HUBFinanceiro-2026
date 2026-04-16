@@ -485,8 +485,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       // 4 KPIs
       const kpis = [
         {label:`ORÇADO ACUM. ATÉ ${mesLabel.toUpperCase()}`, val:fmtBRL(orcTotalV),   border:"D1D5DB", valColor:"111827"},
-        {label:"PROVISIONADO ACUM.",                          val:fmtBRL(provTotalV),  border:"D1D5DB", valColor:"3B82F6"},
         {label:"GASTO ACUMULADO",                             val:fmtBRL(gastoTotalV), border:"D1D5DB", valColor:"111827"},
+        {label:"PROVISIONADO ACUM.",                          val:fmtBRL(provTotalV),  border:"D1D5DB", valColor:"3B82F6"},
         {label:"SALDO",                                       val:fmtBRL(saldoTotalV), border:"22C55E", valColor:saldoTotalV>=0?"22C55E":"EF4444"},
       ];
       const kW=3.18, kH=0.92, kY=0.82;
@@ -502,21 +502,21 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       const secLabels = rows.map(r => r.secao.length>18 ? r.secao.substring(0,18)+"…" : r.secao);
       sl.addChart(pptx.ChartType.bar, [
         {name:"Orçado Acum.",  labels:secLabels, values:rows.map(r=>r.orc)},
-        {name:"Provisionado",  labels:secLabels, values:rows.map(r=>r.prov)},
         {name:"Gasto",         labels:secLabels, values:rows.map(r=>r.gasto)},
+        {name:"Provisionado",  labels:secLabels, values:rows.map(r=>r.prov)},
       ], {
         x:0.3, y:1.88, w:12.73, h:2.72,
         barDir:"col", barGrouping:"clustered",
-        chartColors:["D1D5DB","3B82F6","22C55E"],
+        chartColors:["D1D5DB","22C55E","3B82F6"],
         showValue:false,
         showLegend:true, legendPos:"t", legendFontSize:9,
-        title:"Comparativo Orçado × Provisionado × Gasto", showTitle:true, titleFontSize:11, titleBold:true,
+        title:"Comparativo Orçado × Gasto × Provisionado", showTitle:true, titleFontSize:11, titleBold:true,
         valGridLine:{style:"none"},
       });
 
       // tabela por seção
       const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-      const tblHead = [th("SEÇÃO"), th("ORÇADO ACUM.","right"), th("PROVISIONADO","right"), th("GASTO","right"), th("SALDO","right")];
+      const tblHead = [th("SEÇÃO"), th("ORÇADO ACUM.","right"), th("GASTO","right"), th("PROVISIONADO","right"), th("SALDO","right")];
 
       const tblBody = rows.map((r, i) => {
         const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
@@ -524,8 +524,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         return [
           {text:r.secao,         options:{fontSize:8.5,bold:true,color:"111827",fill}},
           {text:fmtBRL(r.orc),   options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-          {text:fmtBRL(r.prov),  options:{fontSize:8.5,color:"3B82F6",fill,align:"right"}},
           {text:fmtBRL(r.gasto), options:{fontSize:8.5,color:"111827",fill,align:"right"}},
+          {text:fmtBRL(r.prov),  options:{fontSize:8.5,color:"3B82F6",fill,align:"right"}},
           {text:fmtBRL(r.saldo), options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
         ];
       });
@@ -534,8 +534,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       const tblTot = [
         {text:"TOTAL",              options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
         {text:fmtBRL(orcTotalV),    options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-        {text:fmtBRL(provTotalV),   options:{fontSize:8.5,bold:true,color:"93C5FD",fill:{color:"111827"},align:"right"}},
         {text:fmtBRL(gastoTotalV),  options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
+        {text:fmtBRL(provTotalV),   options:{fontSize:8.5,bold:true,color:"93C5FD",fill:{color:"111827"},align:"right"}},
         {text:fmtBRL(saldoTotalV),  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
       ];
 
@@ -585,15 +585,15 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
           </div>
           <div style={{marginBottom:16}}>
-            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-            <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Provisionado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provAnualTotal)} ÷ 12 × ${mesesDecorridos}`}/>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
           </div>
         </div>
         <div style={grid3}>
           <div style={{marginBottom:0}}>
-            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Provisionado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-            <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provAnualTotal)} ÷ 12 × ${mesesDecorridos}`}/>
-            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
           </div>
         </div>
       </div>
@@ -606,7 +606,7 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
             <thead><tr style={{background:T.bg}}>
-              {["Seção","Orçado Acum. (R$)","Provisionado (R$)","Gasto (R$)","Saldo (R$)"].map((h,i) => (
+              {["Seção","Orçado Acum. (R$)","Gasto (R$)","Provisionado (R$)","Saldo (R$)"].map((h,i) => (
                 <th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>
               ))}
             </tr></thead>
@@ -623,12 +623,12 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
                         style={{...iSty(T),width:130,textAlign:"right",padding:"4px 8px"}}/>
                     </td>
                     <td style={{padding:"4px 12px",textAlign:"right"}}>
-                      <input value={s.prov} onChange={e=>setSecField(s.secao,"prov",e.target.value)}
-                        style={{...iSty(T),width:130,textAlign:"right",padding:"4px 8px",color:"#3b82f6"}}/>
-                    </td>
-                    <td style={{padding:"4px 12px",textAlign:"right"}}>
                       <input value={s.gasto} onChange={e=>setSecField(s.secao,"gasto",e.target.value)}
                         style={{...iSty(T),width:130,textAlign:"right",padding:"4px 8px",color:"#22c55e"}}/>
+                    </td>
+                    <td style={{padding:"4px 12px",textAlign:"right"}}>
+                      <input value={s.prov} onChange={e=>setSecField(s.secao,"prov",e.target.value)}
+                        style={{...iSty(T),width:130,textAlign:"right",padding:"4px 8px",color:"#3b82f6"}}/>
                     </td>
                     <td style={{padding:"6px 12px",textAlign:"right",fontWeight:700,color:sav>=0?"#a3e635":"#ef4444"}}>{sav>=0?"▲ ":"▼ "}{fmtR(Math.abs(sav))}</td>
                   </tr>
@@ -641,8 +641,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             <tfoot><tr style={{background:T.bg}}>
               <td style={{padding:"10px 12px",fontSize:11,color:T.textSm,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Total</td>
               <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:T.text}}>{fmtR(orcTotal)}</td>
-              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:"#3b82f6"}}>{fmtR(provTotal)}</td>
               <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:T.text}}>{fmtR(gastoTotal)}</td>
+              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:"#3b82f6"}}>{fmtR(provTotal)}</td>
               <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:saldoTotal>=0?"#a3e635":"#ef4444"}}>{saldoTotal>=0?"▲ ":"▼ "}{fmtR(Math.abs(saldoTotal))}</td>
             </tr></tfoot>
           </table>

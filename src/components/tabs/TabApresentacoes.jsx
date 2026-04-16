@@ -438,12 +438,12 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       const orc   = parseBR(s.orc);
       const prov  = parseBR(s.prov);
       const gasto = parseBR(s.gasto);
-      return { secao: s.secao, orc, prov, gasto, saldo: orc - gasto };
+      return { secao: s.secao, orc, prov, gasto, saldo: orc - prov };
     });
     const orcTotal   = rows.reduce((s, r) => s + r.orc, 0);
     const provTotal  = rows.reduce((s, r) => s + r.prov, 0);
     const gastoTotal = rows.reduce((s, r) => s + r.gasto, 0);
-    const saldoTotal = orcTotal - gastoTotal;
+    const saldoTotal = orcTotal - provTotal;
     return { rows, orcTotal, provTotal, gastoTotal, saldoTotal };
   }, [sectionsView]);
 
@@ -613,8 +613,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             <tbody>
               {sectionsView.map((s, i) => {
                 const orcVal   = parseBR(s.orc);
-                const gastoVal = parseBR(s.gasto);
-                const sav      = orcVal - gastoVal;
+                const provVal  = parseBR(s.prov);
+                const sav      = orcVal - provVal;
                 return (
                   <tr key={s.secao} style={{borderBottom:`1px solid ${T.border}`}}>
                     <td style={{padding:"6px 12px",fontWeight:700,color:"#3b82f6",fontSize:13}}>{s.secao}</td>

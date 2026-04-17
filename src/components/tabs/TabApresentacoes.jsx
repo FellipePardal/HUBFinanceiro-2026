@@ -448,6 +448,12 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
   }, [sectionsView]);
 
   const { rows, orcTotal, provTotal, gastoTotal, saldoTotal } = parsed;
+  const nfRecV = gastoTotal;
+  const nfPend = Math.max(0, provTotal - gastoTotal);
+  const pctRec = provTotal > 0 ? nfRecV / provTotal * 100 : 0;
+  const canvasRef = useRef(null);
+  useDonut(canvasRef, nfRecV, nfPend);
+
   const orcTotalFmt = fmtNum(orcTotal);
   const IS    = {...iSty(T), width:"100%"};
   const IS_RO = {...IS, background:T.bg, cursor:"default"};
@@ -498,20 +504,34 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         sl.addText(val,   {x:x+0.1,y:kY+0.34,w:kW-0.2,h:0.46,fontSize:18,color:valColor,fontFace:"Segoe UI"});
       });
 
-      // gráfico barras por seção
+      // gráfico barras por seção (esquerda)
       const secLabels = rows.map(r => r.secao.length>18 ? r.secao.substring(0,18)+"…" : r.secao);
       sl.addChart(pptx.ChartType.bar, [
         {name:"Orçado Acum.",  labels:secLabels, values:rows.map(r=>r.orc)},
         {name:"Gasto",         labels:secLabels, values:rows.map(r=>r.gasto)},
         {name:"Provisionado",  labels:secLabels, values:rows.map(r=>r.prov)},
       ], {
-        x:0.3, y:1.88, w:12.73, h:2.72,
+        x:0.3, y:1.88, w:8.8, h:2.72,
         barDir:"col", barGrouping:"clustered",
         chartColors:["D1D5DB","22C55E","3B82F6"],
         showValue:false,
         showLegend:true, legendPos:"t", legendFontSize:9,
         title:"Comparativo Orçado × Gasto × Provisionado", showTitle:true, titleFontSize:11, titleBold:true,
         valGridLine:{style:"none"},
+      });
+
+      // donut NFs (direita)
+      const nfRecPptx = gastoTotalV;
+      const nfPendPptx = Math.max(0, provTotalV - gastoTotalV);
+      sl.addChart(pptx.ChartType.doughnut, [
+        {name:"NFs", labels:["Recebidas","Pendentes"], values:[nfRecPptx, nfPendPptx]},
+      ], {
+        x:9.3, y:1.88, w:3.73, h:2.72,
+        chartColors:["22C55E","D97706"],
+        holeSize:60,
+        showLabel:true, showPercent:true, dataLabelFontSize:9,
+        showLegend:true, legendPos:"b", legendFontSize:8,
+        title:"Notas Fiscais", showTitle:true, titleFontSize:11, titleBold:true,
       });
 
       // tabela por seção
@@ -646,6 +666,35 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
               <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:saldoTotal>=0?"#a3e635":"#ef4444"}}>{saldoTotal>=0?"▲ ":"▼ "}{fmtR(Math.abs(saldoTotal))}</td>
             </tr></tfoot>
           </table>
+        </div>
+      </div>
+
+      <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais</span></div>
+        <div style={{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"}}>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+            <div style={{position:"relative",width:110,height:110}}>
+              <canvas ref={canvasRef} width={110} height={110}/>
+              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:15,fontWeight:700,color:T.text}}>{Math.round(pctRec)}%</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              <span style={{display:"flex",alignItems:"center",gap:7,fontSize:11,color:T.textMd}}><span style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/> Recebidas · <b style={{color:T.text}}>{fmtRs(nfRecV)}</b></span>
+              <span style={{display:"flex",alignItems:"center",gap:7,fontSize:11,color:T.textMd}}><span style={{width:8,height:8,borderRadius:"50%",background:"#d97706",flexShrink:0}}/> Pendentes · <b style={{color:T.text}}>{fmtRs(nfPend)}</b></span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:28,flexWrap:"wrap",flex:1}}>
+            {[
+              {label:"% Recebidas",     val:`${pctRec.toFixed(1)}%`,                               sub:fmtRs(nfRecV),                               color:"#22c55e"},
+              {label:"% Pendentes",     val:`${(100-pctRec).toFixed(1)}%`,                         sub:fmtRs(nfPend),                               color:"#d97706"},
+              {label:"Saldo (Orç − Prov)", val:(saldoTotal>=0?"▲ ":"▼ ")+fmtRs(Math.abs(saldoTotal)), sub:`${provTotal ? Math.abs((saldoTotal/provTotal)*100).toFixed(1) : 0}% vs. provisionado`, color:saldoTotal>=0?"#a3e635":"#ef4444"},
+            ].map(m=>(
+              <div key={m.label}>
+                <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
+                <p style={{fontSize:22,fontWeight:300,color:m.color,marginBottom:2}}>{m.val}</p>
+                <p style={{fontSize:10,color:T.textSm}}>{m.sub}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

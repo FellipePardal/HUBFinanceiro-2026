@@ -486,8 +486,16 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         x:0.3,y:0.08,w:12.7,h:0.38,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"
       });
       sl.addText(`Serviços Fixos  ·  Orçado ÷ 12 · Acumulado até ${mesLabel}`, {
-        x:0.3,y:0.46,w:12.7,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
+        x:0.3,y:0.46,w:8,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
       });
+
+      // caixa orçado total campeonato (canto superior direito)
+      const orcAnualV = computed.orcAnualTotal;
+      const bxW=3.2, bxH=0.5, bxX=13.33-0.3-bxW, bxY=0.12;
+      sl.addShape(pptx.ShapeType.rect, {x:bxX,y:bxY,w:bxW,h:bxH,fill:{color:"F9FAFB"},line:{color:"D1D5DB",width:1}});
+      sl.addText("ORÇADO TOTAL CAMPEONATO", {x:bxX+0.1,y:bxY+0.04,w:bxW-0.2,h:0.16,fontSize:6.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI",align:"right"});
+      sl.addText(fmtBRL(orcAnualV), {x:bxX+0.1,y:bxY+0.2,w:bxW-0.2,h:0.26,fontSize:14,bold:true,color:"111827",fontFace:"Segoe UI",align:"right"});
+
       sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
 
       // 4 KPIs

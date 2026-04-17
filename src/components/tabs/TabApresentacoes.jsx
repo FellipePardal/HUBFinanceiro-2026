@@ -673,7 +673,8 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       </div>
 
       <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais</span></div>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais vs Provisionado Total</span></div>
+        <p style={{fontSize:12,color:T.textMd,marginBottom:18}}>Provisionado total: <b style={{color:"#3b82f6"}}>{fmtRs(provTotalAnual)}</b> · NFs recebidas: <b style={{color:"#22c55e"}}>{fmtRs(nfRecV)}</b> · Pendente: <b style={{color:"#d97706"}}>{fmtRs(nfPend)}</b></p>
         <div style={{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
             <div style={{position:"relative",width:110,height:110}}>

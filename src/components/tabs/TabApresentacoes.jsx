@@ -686,7 +686,6 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             {[
               {label:"% Recebidas",     val:`${pctRec.toFixed(1)}%`,                               sub:fmtRs(nfRecV),                               color:"#22c55e"},
               {label:"% Pendentes",     val:`${(100-pctRec).toFixed(1)}%`,                         sub:fmtRs(nfPend),                               color:"#d97706"},
-              {label:"Saldo (Orç − Prov)", val:(saldoTotal>=0?"▲ ":"▼ ")+fmtRs(Math.abs(saldoTotal)), sub:`${provTotal ? Math.abs((saldoTotal/provTotal)*100).toFixed(1) : 0}% vs. provisionado`, color:saldoTotal>=0?"#a3e635":"#ef4444"},
             ].map(m=>(
               <div key={m.label}>
                 <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>

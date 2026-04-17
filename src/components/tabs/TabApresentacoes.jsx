@@ -208,7 +208,7 @@ function FormVariaveis({T, onBack, jogos = []}) {
         x:9.3, y:1.88, w:3.73, h:2.72,
         chartColors:["22C55E","D97706"],
         holeSize:60,
-        showLabel:true, showPercent:true, dataLabelFontSize:9,
+        showLabel:false, showPercent:true, dataLabelFontSize:9,
         showLegend:true, legendPos:"b", legendFontSize:8,
         title:"Notas Fiscais", showTitle:true, titleFontSize:11, titleBold:true,
       });

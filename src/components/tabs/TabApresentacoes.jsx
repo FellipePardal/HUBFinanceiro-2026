@@ -396,13 +396,13 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
     const sections = servicos.map(sec => {
       const idsItens = sec.itens.map(it => it.id);
       const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
-      const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
+      const provTotal = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
       const orcAuto   = (orcAnual / 12) * mesesDecorridos;
-      const provAuto  = (provAnual / 12) * mesesDecorridos;
+      const provAuto  = provTotal;
       const gastoAuto = notasMensais
         .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
         .reduce((s, n) => s + (n.valor || 0), 0);
-      return { secao: sec.secao, orcAnual, provAnual, orcAuto, provAuto, gastoAuto };
+      return { secao: sec.secao, orcAnual, orcAuto, provAuto, gastoAuto };
     });
 
     // "Outros Mensais": NFs sem servicoId e sem categoria variável mapeada
@@ -410,13 +410,13 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       .filter(n => !n.servicoId && !VAR_CATS_FIX.has(n.categoria) && n.mes <= mesAtual)
       .reduce((s, n) => s + (n.valor || 0), 0);
     if (outrosGasto > 0) {
-      sections.push({ secao: "Outros Mensais", orcAnual: 0, provAnual: 0, orcAuto: 0, provAuto: 0, gastoAuto: outrosGasto });
+      sections.push({ secao: "Outros Mensais", orcAnual: 0, orcAuto: 0, provAuto: 0, gastoAuto: outrosGasto });
     }
 
     const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
-    const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
+    const provTotalAuto  = sections.reduce((s, x) => s + x.provAuto, 0);
     const orcTotalAuto   = sections.reduce((s, x) => s + x.orcAuto, 0);
-    return { sections, orcTotalAuto, orcAnualTotal, provAnualTotal };
+    return { sections, orcTotalAuto, orcAnualTotal, provTotalAuto };
   }, [servicos, notasMensais, mesAtual, mesesDecorridos]);
 
   // Overrides por seção (secao → {orc?, gasto?})
@@ -605,9 +605,9 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
             <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
           </div>
           <div style={{marginBottom:16}}>
-            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Provisionado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-            <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provAnualTotal)} ÷ 12 × ${mesesDecorridos}`}/>
-            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
+            <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Provisionado Total <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+            <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}}/>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Valor total provisionado (soma dos serviços)</p>
           </div>
         </div>
         <div style={grid3}>

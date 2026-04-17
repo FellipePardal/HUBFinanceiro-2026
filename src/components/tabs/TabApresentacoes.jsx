@@ -532,9 +532,9 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
         x:9.3, y:1.88, w:3.73, h:2.72,
         chartColors:["22C55E","D97706"],
         holeSize:60,
-        showLabel:true, showPercent:true, dataLabelFontSize:9,
+        showLabel:false, showPercent:true, dataLabelFontSize:9,
         showLegend:true, legendPos:"b", legendFontSize:8,
-        title:"Notas Fiscais", showTitle:true, titleFontSize:11, titleBold:true,
+        title:"NFs vs Provisionado Total", showTitle:true, titleFontSize:11, titleBold:true,
       });
 
       // tabela por seção
@@ -580,16 +580,22 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
 
   return (
     <div style={{paddingBottom:80}}>
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
-        <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:40,height:40,borderRadius:12,background:T.info+"1f",border:`1px solid ${T.info}3a`,color:T.info,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <Lock size={18} strokeWidth={2.25}/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,background:T.info+"1f",border:`1px solid ${T.info}3a`,color:T.info,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Lock size={18} strokeWidth={2.25}/>
+            </div>
+            <div>
+              <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Fixos</h2>
+              <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Orçado anual ÷ 12 · Acompanhamento acumulado mensal</p>
+            </div>
           </div>
-          <div>
-            <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Fixos</h2>
-            <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Orçado anual ÷ 12 · Acompanhamento acumulado mensal</p>
-          </div>
+        </div>
+        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 18px",textAlign:"right"}}>
+          <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 2px"}}>Orçado Total Campeonato</p>
+          <p style={{fontSize:18,fontWeight:700,color:T.text,margin:0}}>{fmtR(computed.orcAnualTotal)}</p>
         </div>
       </div>
 

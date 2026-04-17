@@ -491,10 +491,12 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
 
       // caixa orçado total campeonato (canto superior direito)
       const orcAnualV = computed.orcAnualTotal;
-      const bxW=3.2, bxH=0.5, bxX=13.33-0.3-bxW, bxY=0.12;
-      sl.addShape(pptx.ShapeType.rect, {x:bxX,y:bxY,w:bxW,h:bxH,fill:{color:"F9FAFB"},line:{color:"D1D5DB",width:1}});
-      sl.addText("ORÇADO TOTAL CAMPEONATO", {x:bxX+0.1,y:bxY+0.04,w:bxW-0.2,h:0.16,fontSize:6.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI",align:"right"});
-      sl.addText(fmtBRL(orcAnualV), {x:bxX+0.1,y:bxY+0.2,w:bxW-0.2,h:0.26,fontSize:14,bold:true,color:"111827",fontFace:"Segoe UI",align:"right"});
+      const bxW=3.5, bxH=0.56, bxX=13.33-0.3-bxW, bxY=0.1;
+      sl.addShape(pptx.ShapeType.rect, {x:bxX,y:bxY,w:bxW,h:bxH,fill:{color:"EFF6FF"},line:{color:"3B82F6",width:1.5}});
+      sl.addText([
+        {text:"ORÇADO TOTAL CAMPEONATO\n", options:{fontSize:7,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"}},
+        {text:fmtBRL(orcAnualV), options:{fontSize:15,bold:true,color:"1E40AF",fontFace:"Segoe UI"}},
+      ], {x:bxX+0.12,y:bxY+0.04,w:bxW-0.24,h:bxH-0.08,align:"right",valign:"middle"});
 
       sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
 

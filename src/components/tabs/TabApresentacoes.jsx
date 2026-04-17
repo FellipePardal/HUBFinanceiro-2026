@@ -448,10 +448,10 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
   }, [sectionsView]);
 
   const { rows, orcTotal, provTotal, gastoTotal, saldoTotal } = parsed;
-  const provMensal = provTotal / 12;
+  const provAteAgora = (provTotal / 12) * mesesDecorridos;
   const nfRecV = gastoTotal;
-  const nfPend = Math.max(0, provMensal - gastoTotal);
-  const pctRec = provMensal > 0 ? nfRecV / provMensal * 100 : 0;
+  const nfPend = Math.max(0, provAteAgora - gastoTotal);
+  const pctRec = provAteAgora > 0 ? nfRecV / provAteAgora * 100 : 0;
   const canvasRef = useRef(null);
   useDonut(canvasRef, nfRecV, nfPend);
 
@@ -522,9 +522,9 @@ function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
       });
 
       // donut NFs (direita)
-      const provMensalPptx = provTotalV / 12;
+      const provAteAgoraPptx = (provTotalV / 12) * mesesDecorridos;
       const nfRecPptx = gastoTotalV;
-      const nfPendPptx = Math.max(0, provMensalPptx - gastoTotalV);
+      const nfPendPptx = Math.max(0, provAteAgoraPptx - gastoTotalV);
       sl.addChart(pptx.ChartType.doughnut, [
         {name:"NFs", labels:["Recebidas","Pendentes"], values:[nfRecPptx, nfPendPptx]},
       ], {

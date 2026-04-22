@@ -21,7 +21,7 @@ export default function TabServicos({servicos, setServicos, T}) {
     setEditing(null); setDraft(null);
   };
   const addItem    = secao => {
-    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:""};
+    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:"", tipo:"linear", parcelaLinear:0, parcelaPontual:0};
     setServicos(ss => ss.map(s => s.secao===secao ? {...s, itens:[...s.itens, n]} : s));
   };
   const deleteItem = (secao, id) =>
@@ -29,7 +29,7 @@ export default function TabServicos({servicos, setServicos, T}) {
 
   const IS   = iSty(T);
   const TS   = tableStyles(T);
-  const COLS = ["Serviço","Orçado","Provisionado","Realizado","Saving","% Exec.","Progresso","Obs",""];
+  const COLS = ["Serviço","Tipo","Orçado","Provisionado","Realizado","Saving","% Exec.","Progresso","Obs",""];
 
   return (
     <div>
@@ -72,11 +72,31 @@ export default function TabServicos({servicos, setServicos, T}) {
                     const row  = isEd ? draft : item;
                     const sv   = row.orcado - row.realizado;
                     const pct  = row.orcado ? Math.min(100,(row.realizado/row.orcado)*100) : 0;
+                    const tipo = row.tipo || "linear";
 
                     return (
                       <tr key={item.id} style={TS.tr}>
                         <td style={{...TS.td, fontWeight:600}}>
                           {isEd ? <input value={draft.nome} onChange={e=>setDraft(d=>({...d,nome:e.target.value}))} style={{...IS,width:220}}/> : row.nome}
+                        </td>
+                        <td style={TS.td}>
+                          {isEd ? (
+                            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                              <select value={tipo} onChange={e=>setDraft(d=>({...d,tipo:e.target.value}))} style={{...IS,width:110}}>
+                                <option value="linear">Linear</option>
+                                <option value="pontual">Pontual</option>
+                                <option value="misto">Misto</option>
+                              </select>
+                              {tipo==="misto" && (
+                                <div style={{display:"flex",flexDirection:"column",gap:3,fontSize:10,color:T.textSm}}>
+                                  <label>Linear: <input value={draft.parcelaLinear ?? 0} onChange={e=>setDraft(d=>({...d,parcelaLinear:parseFloat(e.target.value)||0}))} style={{...IS,width:90,textAlign:"right",marginLeft:4}}/></label>
+                                  <label>Pontual: <input value={draft.parcelaPontual ?? 0} onChange={e=>setDraft(d=>({...d,parcelaPontual:parseFloat(e.target.value)||0}))} style={{...IS,width:90,textAlign:"right",marginLeft:4}}/></label>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:tipo==="linear"?T.textMd:tipo==="pontual"?T.warning:T.info}}>{tipo}</span>
+                          )}
                         </td>
                         {["orcado","provisionado","realizado"].map(k => {
                           const col = k==="orcado"?T.brand:k==="provisionado"?T.info:T.warning;
@@ -113,6 +133,7 @@ export default function TabServicos({servicos, setServicos, T}) {
                   })}
                   <tr style={TS.totalRow}>
                     <td style={{...TS.td, color:cor, textTransform:"uppercase", letterSpacing:"0.04em", fontSize:11}}>Total {secao}</td>
+                    <td/>
                     <td className="num" style={{...TS.tdNum, color:T.brand}}>{fmt(sOrc)}</td>
                     <td className="num" style={{...TS.tdNum, color:T.info}}>{fmt(sProv)}</td>
                     <td className="num" style={{...TS.tdNum, color:T.warning}}>{fmt(sReal)}</td>

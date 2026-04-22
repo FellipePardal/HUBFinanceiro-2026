@@ -499,7 +499,21 @@ const idsItens = sec.itens.map(it => it.id);
 const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
 const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
 const orcAuto   = (orcAnual / 12) * mesesDecorridos;
-const provAuto  = (provAnual / 12) * mesesDecorridos;
+// Provisionado mensal por-item conforme flag "tipo":
+//   linear  → (prov / 12) * mesesDecorridos
+//   pontual → prov integral
+//   misto   → (parcelaLinear / 12) * mesesDecorridos + parcelaPontual
+const provAuto  = sec.itens.reduce((s, it) => {
+  const prov = it.provisionado || 0;
+  const tipo = it.tipo || "linear";
+  if (tipo === "pontual") return s + prov;
+  if (tipo === "misto") {
+    const pl = it.parcelaLinear || 0;
+    const pp = it.parcelaPontual || 0;
+    return s + (pl / 12) * mesesDecorridos + pp;
+  }
+  return s + (prov / 12) * mesesDecorridos;
+}, 0);
 const provTotalAnual = provAnual;
 const gastoAuto = notasMensais
 .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
@@ -1285,7 +1299,17 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
       const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
       const orcAuto   = (orcAnual / 12) * mesesDecorridos;
-      const provAuto  = (provAnual / 12) * mesesDecorridos;
+      const provAuto  = sec.itens.reduce((s, it) => {
+        const prov = it.provisionado || 0;
+        const tipo = it.tipo || "linear";
+        if (tipo === "pontual") return s + prov;
+        if (tipo === "misto") {
+          const pl = it.parcelaLinear || 0;
+          const pp = it.parcelaPontual || 0;
+          return s + (pl / 12) * mesesDecorridos + pp;
+        }
+        return s + (prov / 12) * mesesDecorridos;
+      }, 0);
       const gastoAuto = notasMensais
         .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
         .reduce((s, n) => s + (n.valor || 0), 0);

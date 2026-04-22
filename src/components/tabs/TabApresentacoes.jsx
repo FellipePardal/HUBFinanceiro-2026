@@ -65,7 +65,7 @@ return (
 // ─── FORM VARIÁVEIS ───────────────────────────────────────────────────────────
 const ORC_GLOBAL_FIXO = 10078880; // Orçado total variáveis do campeonato (travado)
 
-function FormVariaveis({T, onBack, jogos = []}) {
+function FormVariaveis({T, onBack, jogos = [], onDadosCalculados}) {
 const [status,      setStatus]      = useState({msg:"Pronto para gerar",cls:""});
 const [loading,     setLoading]     = useState(false);
 const canvasRef = useRef(null);
@@ -147,117 +147,200 @@ const orcGlobalFmt = fmtNum(ORC_GLOBAL_FIXO);
 // Orçado acumulado = total da coluna Orçado da tabela (com overrides)
 const orcAteRodFmt = fmtNum(totOrc);
 
+useEffect(() => {
+  if (onDadosCalculados) {
+    onDadosCalculados({
+      orcGlobal:   ORC_GLOBAL_FIXO,
+      orcAteRod:   totOrc,
+      realizado:   totReal,
+      saving:      saving,
+      savPct:      savPct,
+      rows:        rows,
+      nfEspV:      nfEspV,
+      nfRecV:      nfRecV,
+      nfPend:      nfPend,
+      pctRec:      pctRec,
+      rodadaAtual: rodadaAtual,
+    });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [totOrc, totReal, saving, savPct, nfEspV, nfRecV, nfPend, pctRec, rodadaAtual]);
+
 async function gerarPPTX() {
-setLoading(true); setStatus({msg:"Gerando...", cls:""});
-try {
-const orcGlobalV = ORC_GLOBAL_FIXO;
-const orcAteRodV = totOrc; // total da coluna Orçado da tabela (com overrides)
-const macroProjV = totReal + (orcGlobalV - orcAteRodV);
+  setLoading(true); setStatus({ msg: "Gerando…", cls: "" });
+  try {
+    const pptx = new PptxGenJS();
+    pptx.layout = "LAYOUT_WIDE";
+    const sl = pptx.addSlide();
+    sl.background = { color: "FFFFFF" };
 
-  const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE";
+    // ── Barra verde topo ────────────────────────────────────────────────────
+    sl.addShape(pptx.ShapeType.rect, {
+      x: 0, y: 0, w: 13.33, h: 0.06,
+      fill: { color: "166534" }, line: { width: 0 }
+    });
 
-  const sl = pptx.addSlide();
-  sl.background = {color:"FFFFFF"};
+    // ── Título e Subtítulo ──────────────────────────────────────────────────
+    sl.addText("Custos Variáveis", {
+      x: 0.35, y: 0.1, w: 12.6, h: 0.38,
+      fontSize: 22, bold: true, color: "111827", fontFace: "Segoe UI"
+    });
 
-  // barra topo
-  sl.addShape(pptx.ShapeType.rect, {x:0,y:0,w:13.33,h:0.05,fill:{color:"22C55E"},line:{width:0}});
+    const rodadaComEstouro = rows.find(r => r.orcado - r.realizado < 0)?.label ?? null;
+    const subtitulo = savPct >= 0
+      ? `Operação jogo a jogo gera saving de ${Math.abs(savPct).toFixed(1)}%, dentro do orçado até a Rodada ${rodadaAtual}.`
+      : `Operação jogo a jogo com estouro de ${Math.abs(savPct).toFixed(1)}%${rodadaComEstouro ? ", alerta isolado na " + rodadaComEstouro : ""}.`;
 
-  // título
-  sl.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
-    x:0.3,y:0.08,w:12.7,h:0.38,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"
-  });
-  sl.addText(`Serviços Variáveis  ·  Rodada ${rodadaAtual} de 38`, {
-    x:0.3,y:0.46,w:12.7,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
-  });
-  sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
+    sl.addText(subtitulo, {
+      x: 0.35, y: 0.5, w: 12.6, h: 0.26,
+      fontSize: 11, color: "374151", fontFace: "Segoe UI"
+    });
 
-  // 4 KPIs
-  const kpiDefs = [
-    {label:"ORÇADO TOTAL",                  val:fmtBRL(orcGlobalV), border:"D1D5DB", valColor:"111827"},
-    {label:`ORÇADO ATÉ R${rodadaAtual}`,    val:fmtBRL(orcAteRodV), border:"D1D5DB", valColor:"111827"},
-    {label:`REALIZADO ATÉ R${rodadaAtual}`, val:fmtBRL(totReal),    border:"D1D5DB", valColor:"111827"},
-    {label:"SAVING ACUMULADO",              val:fmtBRL(Math.abs(saving)), border:"22C55E", valColor:saving>=0?"22C55E":"EF4444"},
-  ];
-  const kW=3.18, kH=0.92, kY=0.82;
-  kpiDefs.forEach(({label,val,border,valColor}, i) => {
-    const x = 0.3 + i*(kW+0.04);
-    sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:kH,fill:{color:"FFFFFF"},line:{color:border,width:1.5}});
-    sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:0.05,fill:{color:border},line:{width:0}});
-    sl.addText(label, {x:x+0.1,y:kY+0.1,w:kW-0.2,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"});
-    sl.addText(val,   {x:x+0.1,y:kY+0.34,w:kW-0.2,h:0.46,fontSize:18,color:valColor,fontFace:"Segoe UI"});
-  });
+    sl.addShape(pptx.ShapeType.line, {
+      x: 0.35, y: 0.82, w: 12.63, h: 0,
+      line: { color: "E5E7EB", width: 1 }
+    });
 
-  // gráfico barras (esquerda)
-  sl.addChart(pptx.ChartType.bar, [
-    {name:"Orçado",    labels:rows.map(r=>r.label), values:rows.map(r=>r.orcado)},
-    {name:"Realizado", labels:rows.map(r=>r.label), values:rows.map(r=>r.realizado)},
-  ], {
-    x:0.3, y:1.88, w:8.8, h:2.72,
-    barDir:"col", barGrouping:"clustered",
-    chartColors:["D1D5DB","22C55E"],
-    showValue:false,
-    showLegend:true, legendPos:"t", legendFontSize:9,
-    title:"Comparativo Orçado × Realizado", showTitle:true, titleFontSize:11, titleBold:true,
-    valGridLine:{style:"none"},
-  });
-
-  // donut NFs (direita)
-  sl.addChart(pptx.ChartType.doughnut, [
-    {name:"NFs", labels:["Recebidas","Pendentes"], values:[nfRecV, nfPend]},
-  ], {
-    x:9.3, y:1.88, w:3.73, h:2.72,
-    chartColors:["22C55E","D97706"],
-    holeSize:60,
-    showLabel:false, showPercent:true, dataLabelFontSize:9,
-    showLegend:true, legendPos:"b", legendFontSize:8,
-    title:"Notas Fiscais", showTitle:true, titleFontSize:11, titleBold:true,
-  });
-
-  // tabela por rodada
-  const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-  const tblHead = [th("RODADA"), th("ORÇADO","right"), th("REALIZADO","right"), th("SAVING","right"), th("SAVING %","right")];
-
-  const tblBody = rows.map((r, i) => {
-    const sav = r.orcado - r.realizado;
-    const savPctRow = r.orcado > 0 ? sav/r.orcado*100 : 0;
-    const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
-    const sc = sav>=0?"16A34A":"DC2626";
-    return [
-      {text:r.label,                                                        options:{fontSize:8.5,bold:true,color:"111827",fill}},
-      {text:fmtBRL(r.orcado),                                               options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-      {text:fmtBRL(r.realizado),                                            options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-      {text:(sav>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(sav)),                      options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
-      {text:(savPctRow>=0?"▲ ":"▼ ")+Math.abs(savPctRow).toFixed(1)+"%",   options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
+    // ── 4 KPI Cards numerados ───────────────────────────────────────────────
+    const kW = 3.1, kH = 1.0, kY = 0.94, kGap = 0.077;
+    const kpis = [
+      { num: "1", label: "ORÇADO TOTAL",                  val: fmtBRL(ORC_GLOBAL_FIXO), valColor: "9CA3AF", accent: false },
+      { num: "2", label: `ORÇADO ATÉ R${rodadaAtual}`,    val: fmtBRL(totOrc),          valColor: "111827", accent: false },
+      { num: "3", label: `REALIZADO ATÉ R${rodadaAtual}`, val: fmtBRL(totReal),         valColor: "111827", accent: false },
+      {
+        num: "4", label: "SAVING ACUMULADO",
+        val: (saving >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saving)),
+        valColor: saving >= 0 ? "16A34A" : "DC2626",
+        accent: true
+      },
     ];
-  });
 
-  // ✅ FIX 2: savPctTot usa totOrc (era orcAteRodV)
-  const savPctTot = totOrc>0 ? saving/totOrc*100 : 0;
-  const stc = saving>=0?"A3E635":"FF6B6B";
-  const tblTot = [
-    {text:"TOTAL",                                                          options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
-    {text:fmtBRL(totOrc),                                                   options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-    {text:fmtBRL(totReal),                                                  options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-    {text:(saving>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(saving)),                  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
-    {text:(savPctTot>=0?"▲ ":"▼ ")+Math.abs(savPctTot).toFixed(1)+"%",     options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
-  ];
+    kpis.forEach(({ num, label, val, valColor, accent }, i) => {
+      const x = 0.35 + i * (kW + kGap);
+      sl.addShape(pptx.ShapeType.rect, {
+        x, y: kY, w: kW, h: kH,
+        fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+      });
+      if (accent) {
+        sl.addShape(pptx.ShapeType.rect, {
+          x, y: kY, w: 0.06, h: kH,
+          fill: { color: saving >= 0 ? "16A34A" : "DC2626" }, line: { width: 0 }
+        });
+      }
+      sl.addText(num, {
+        x: x + 0.12, y: kY + 0.09, w: 0.2, h: 0.16,
+        fontSize: 8, color: "9CA3AF", fontFace: "Segoe UI"
+      });
+      sl.addText(label, {
+        x: x + 0.12, y: kY + 0.28, w: kW - 0.22, h: 0.18,
+        fontSize: 7.5, bold: true, color: "6B7280", charSpacing: 1.2, fontFace: "Segoe UI"
+      });
+      sl.addText(val, {
+        x: x + 0.12, y: kY + 0.5, w: kW - 0.22, h: 0.4,
+        fontSize: 16, color: valColor, fontFace: "Segoe UI"
+      });
+    });
 
-  // tabela ocupa todo o espaço entre os gráficos e a borda inferior do slide
-  const rowH = Math.max(0.18, 2.6 / (rows.length + 1));
-  sl.addTable([tblHead, ...tblBody, tblTot], {
-    x:0.3, y:4.72, w:12.73, colW:[1.5,2.8,2.8,2.8,2.83],
-    border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
-  });
+    // ── Gráfico de Barras (coluna esquerda 60%) ─────────────────────────────
+    sl.addText("Gráfico de Barras (Orçado vs Realizado)", {
+      x: 0.35, y: 2.06, w: 7.8, h: 0.22,
+      fontSize: 11, bold: true, color: "111827", fontFace: "Segoe UI"
+    });
 
-  await pptx.writeFile({fileName:`dashboard_variaveis_R${rodadaAtual}_brasileirao2026.pptx`});
-  setStatus({msg:`✅ dashboard_variaveis_R${rodadaAtual}.pptx baixado!`, cls:"ok"});
-} catch(e) {
-  setStatus({msg:"❌ Erro: "+e.message, cls:"err"});
-  console.error(e);
-}
-setLoading(false);
+    sl.addChart(pptx.ChartType.bar, [
+      { name: "Orçado",    labels: rows.map(r => r.label), values: rows.map(r => r.orcado) },
+      { name: "Realizado", labels: rows.map(r => r.label), values: rows.map(r => r.realizado) },
+    ], {
+      x: 0.35, y: 2.3, w: 7.8, h: 3.1,
+      barDir: "col", barGrouping: "clustered",
+      chartColors: ["C8C8C8", "22C55E"],
+      showValue: false,
+      showLegend: true, legendPos: "b", legendFontSize: 9,
+      valGridLine: { style: "none" }, catGridLine: { style: "none" },
+      valAxisLabelFontSize: 8, catAxisLabelFontSize: 8,
+    });
 
+    // ── Status NFs (coluna direita 40%) ─────────────────────────────────────
+    sl.addText("Status NFs", {
+      x: 8.35, y: 2.06, w: 4.63, h: 0.22,
+      fontSize: 11, bold: true, color: "111827", fontFace: "Segoe UI"
+    });
+
+    const pctRecV = nfEspV > 0 ? Math.min(1, nfRecV / nfEspV) : 0;
+    const barW = 4.63, barH = 0.26, barX = 8.35, barY = 2.32;
+
+    sl.addShape(pptx.ShapeType.rect, { x: barX, y: barY, w: barW, h: barH, fill: { color: "D1D5DB" }, line: { width: 0 } });
+    sl.addShape(pptx.ShapeType.rect, { x: barX, y: barY, w: Math.max(0.05, barW * pctRecV), h: barH, fill: { color: "16A34A" }, line: { width: 0 } });
+
+    sl.addText(`${Math.round(pctRecV * 100)}% Recebidas (${fmtBRL(nfRecV)})`, {
+      x: barX, y: barY + 0.3, w: barW * 0.6, h: 0.18,
+      fontSize: 8, bold: true, color: "16A34A", fontFace: "Segoe UI"
+    });
+    sl.addText(`${Math.round((1 - pctRecV) * 100)}% Pendentes (${fmtBRL(nfPend)})`, {
+      x: barX + barW * 0.6, y: barY + 0.3, w: barW * 0.4, h: 0.18,
+      fontSize: 8, color: "6B7280", fontFace: "Segoe UI", align: "right"
+    });
+
+    // ── Tabela por Rodada (coluna direita) ──────────────────────────────────
+    const th = (txt, align = "left") => ({
+      text: txt,
+      options: { bold: true, fontSize: 7.5, color: "FFFFFF", fill: { color: "111827" }, align }
+    });
+
+    const tblRows = rows.map((r, i) => {
+      const sav    = r.orcado - r.realizado;
+      const savPctRow = r.orcado > 0 ? sav / r.orcado * 100 : 0;
+      const fill   = { color: i % 2 === 0 ? "FFFFFF" : "F9FAFB" };
+      const sc     = sav >= 0 ? "16A34A" : "DC2626";
+      const icon   = sav >= 0 ? "▲ " : "▼ ";
+      return [
+        { text: r.label,                                          options: { fontSize: 8, bold: true, color: "374151", fill } },
+        { text: fmtBRL(r.orcado),                                options: { fontSize: 8, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(r.realizado),                             options: { fontSize: 8, color: "374151", fill, align: "right" } },
+        { text: icon + fmtBRL(Math.abs(sav)),                    options: { fontSize: 8, bold: true, color: sc, fill, align: "right" } },
+        { text: icon + Math.abs(savPctRow).toFixed(1) + "%",     options: { fontSize: 8, bold: true, color: sc, fill, align: "right" } },
+      ];
+    });
+
+    const stcTot  = saving >= 0 ? "A3E635" : "FF6B6B";
+    const iconTot = saving >= 0 ? "▲ " : "▼ ";
+    const totFill = { color: "111827" };
+    const tblTot  = [
+      { text: "TOTAL",                                           options: { fontSize: 8, bold: true, color: "FFFFFF", fill: totFill } },
+      { text: fmtBRL(totOrc),                                   options: { fontSize: 8, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: fmtBRL(totReal),                                  options: { fontSize: 8, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: iconTot + fmtBRL(Math.abs(saving)),               options: { fontSize: 8, bold: true, color: stcTot, fill: totFill, align: "right" } },
+      { text: iconTot + Math.abs(savPct).toFixed(1) + "%",      options: { fontSize: 8, bold: true, color: stcTot, fill: totFill, align: "right" } },
+    ];
+
+    const rowH = Math.max(0.2, 4.5 / (rows.length + 2));
+    sl.addTable(
+      [
+        [th("RODADA"), th("ORÇADO", "right"), th("REALIZADO", "right"), th("SAVING (R$)", "right"), th("SAVING (%)", "right")],
+        ...tblRows,
+        tblTot,
+      ],
+      {
+        x: 8.35, y: 2.7, w: 4.63,
+        colW: [0.65, 1.02, 1.02, 1.18, 0.76],
+        border: { type: "solid", color: "E5E7EB", pt: 0.5 },
+        rowH,
+      }
+    );
+
+    // ── Rodapé ──────────────────────────────────────────────────────────────
+    sl.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
+      x: 0.35, y: 7.28, w: 12.63, h: 0.16,
+      fontSize: 7.5, color: "9CA3AF", align: "center", fontFace: "Segoe UI"
+    });
+
+    await pptx.writeFile({ fileName: `custos_variaveis_R${rodadaAtual}_brasileirao2026.pptx` });
+    setStatus({ msg: `✅ custos_variaveis_R${rodadaAtual}.pptx baixado!`, cls: "ok" });
+  } catch (e) {
+    setStatus({ msg: "❌ Erro: " + e.message, cls: "err" });
+    console.error(e);
+  }
+  setLoading(false);
 }
 
 return (
@@ -1156,8 +1239,24 @@ return (
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = []}) {
-const [tipo, setTipo] = useState(null);
-if (!tipo)               return <SeletorTipo T={T} onSelect={setTipo}/>;
-if (tipo==="variaveis")  return <FormVariaveis T={T} onBack={()=>setTipo(null)} jogos={jogos}/>;
-if (tipo==="visaogeral") return <FormVisaoGeral T={T} onBack={()=>setTipo(null)} jogos={jogos} servicos={servicos} notasMensais={notasMensais}/>;
+  const [tipo, setTipo] = useState(null);
+  const [dadosVar, setDadosVar] = useState(null);
+  const [dadosFix, setDadosFix] = useState(null);
+
+  if (!tipo) return <SeletorTipo T={T} onSelect={setTipo}/>;
+
+  if (tipo === "variaveis")
+    return <FormVariaveis T={T} onBack={()=>setTipo(null)} jogos={jogos}
+              onDadosCalculados={setDadosVar}/>;
+
+  if (tipo === "fixos")
+    return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
+              onDadosCalculados={setDadosFix}/>;
+
+  if (tipo === "visaogeral")
+    return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}
+              jogos={jogos} servicos={servicos} notasMensais={notasMensais}
+              dadosVar={dadosVar} dadosFix={dadosFix}/>;
+
+  return null;
 }

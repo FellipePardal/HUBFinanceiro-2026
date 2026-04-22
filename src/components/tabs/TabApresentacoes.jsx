@@ -658,7 +658,7 @@ async function gerarPPTX() {
       x: bX + 0.1, y: bY + 0.02, w: realW - 0.15, h: bH - 0.04,
       fontSize: 9, bold: true, color: "FFFFFF", valign: "middle", fontFace: "Segoe UI"
     });
-    sl.addText(`Saldo: ${fmtBRL(orcTotal - gastoTotal)}`, {
+    sl.addText(`Saldo: ${fmtBRL(saldoTotal)}`, {
       x: bX + realW + 0.1, y: bY + 0.02, w: saldoW - 0.15, h: bH - 0.04,
       fontSize: 9, color: "374151", valign: "middle", fontFace: "Segoe UI"
     });

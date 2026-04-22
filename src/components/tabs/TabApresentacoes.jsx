@@ -1226,8 +1226,8 @@ const VAR_CATS_FIX_DEFAULT = new Set(["Transporte","Uber","Hospedagem","Seg. Esp
 
 export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = []}) {
   const [tipo, setTipo] = useState(null);
-  const [dadosVar, setDadosVar] = useState(null);
-  const [dadosFix, setDadosFix] = useState(null);
+  const [dadosVar, setDadosVar] = usePersistedState("apres_var_dados", null);
+  const [dadosFix, setDadosFix] = usePersistedState("apres_fix_dados", null);
 
   // Defaults calculados direto dos dados do portal — usados quando o usuário
   // ainda não abriu os formulários de Variáveis/Fixos.

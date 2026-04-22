@@ -23,7 +23,7 @@ export default function TabServicos({servicos, setServicos, T}) {
     setEditing(null); setDraft(null);
   };
   const addItem    = secao => {
-    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:"", tipo:"linear", parcelaLinear:0, parcelaPontual:0, mesAlocacao:0, status:"ativo", realAoEncerrar:0};
+    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:"", tipo:"linear", parcelaLinear:0, parcelaPontual:0, mesesAlocacao:[], status:"ativo", realAoEncerrar:0};
     setServicos(ss => ss.map(s => s.secao===secao ? {...s, itens:[...s.itens, n]} : s));
   };
   const deleteItem = (secao, id) =>
@@ -97,11 +97,29 @@ export default function TabServicos({servicos, setServicos, T}) {
                               )}
                               {(tipo==="pontual" || tipo==="misto") && (
                                 <>
-                                  <label style={{fontSize:10,color:T.textSm}}>Mês:
-                                    <select value={draft.mesAlocacao ?? 0} onChange={e=>setDraft(d=>({...d,mesAlocacao:parseInt(e.target.value)}))} style={{...IS,width:110,marginLeft:4}}>
-                                      {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
-                                    </select>
-                                  </label>
+                                  <div style={{fontSize:10,color:T.textSm}}>
+                                    <div style={{marginBottom:3}}>Meses de recebimento:</div>
+                                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:2}}>
+                                      {MESES.map((m,i) => {
+                                        const list = Array.isArray(draft.mesesAlocacao) ? draft.mesesAlocacao
+                                          : (draft.mesAlocacao != null ? [draft.mesAlocacao] : []);
+                                        const checked = list.includes(i);
+                                        return (
+                                          <label key={i} style={{display:"flex",alignItems:"center",gap:3,fontSize:10,cursor:"pointer"}}>
+                                            <input type="checkbox" checked={checked} onChange={()=>setDraft(d=>{
+                                              const curr = Array.isArray(d.mesesAlocacao) ? [...d.mesesAlocacao]
+                                                : (d.mesAlocacao != null ? [d.mesAlocacao] : []);
+                                              const idx = curr.indexOf(i);
+                                              if (idx >= 0) curr.splice(idx,1); else curr.push(i);
+                                              curr.sort((a,b)=>a-b);
+                                              return {...d, mesesAlocacao: curr};
+                                            })}/>
+                                            {m.slice(0,3)}
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                   <label style={{fontSize:10,color:T.textSm}}>Status:
                                     <select
                                       value={draft.status || "ativo"}
@@ -127,9 +145,11 @@ export default function TabServicos({servicos, setServicos, T}) {
                                   <Check size={10}/> ENCERRADO
                                 </span>
                               )}
-                              {(tipo==="pontual" || tipo==="misto") && (
-                                <span style={{fontSize:10,color:T.textSm}}>{MESES[row.mesAlocacao || 0]}</span>
-                              )}
+                              {(tipo==="pontual" || tipo==="misto") && (() => {
+                                const list = Array.isArray(row.mesesAlocacao) ? row.mesesAlocacao
+                                  : (row.mesAlocacao != null ? [row.mesAlocacao] : []);
+                                return <span style={{fontSize:10,color:T.textSm}}>{list.length ? list.map(i=>MESES[i].slice(0,3)).join(", ") : "—"}</span>;
+                              })()}
                             </div>
                           )}
                         </td>

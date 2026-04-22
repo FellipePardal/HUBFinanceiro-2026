@@ -503,18 +503,25 @@ const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
 //   pontual → total integral a partir do mês alocado
 //   misto   → parte linear /12 + parte pontual a partir do mês alocado
 // Encerrados: provisionado congela em realAoEncerrar (independente do tipo)
+// Rateio pontual: fração = (meses alocados decorridos) / (total de meses alocados)
+const pontualRatio = (it, mes) => {
+  const list = Array.isArray(it.mesesAlocacao) ? it.mesesAlocacao
+    : (it.mesAlocacao != null ? [it.mesAlocacao] : []);
+  if (!list.length) return mes >= 0 ? 1 : 0; // sem config: aparece integral
+  const decorridos = list.filter(m => m <= mes).length;
+  return decorridos / list.length;
+};
 const orcAuto = sec.itens.reduce((s, it) => {
   const orc = it.orcado || 0;
   const tipo = it.tipo || "linear";
-  const mesAloc = it.mesAlocacao || 0;
-  if (tipo === "pontual") return s + (mesAtual >= mesAloc ? orc : 0);
+  if (tipo === "pontual") return s + orc * pontualRatio(it, mesAtual);
   if (tipo === "misto") {
     const pl = it.parcelaLinear || 0;
     const pp = it.parcelaPontual || 0;
     const tot = pl + pp;
     if (tot > 0) {
       const rL = pl / tot;
-      return s + (orc * rL / 12) * mesesDecorridos + (mesAtual >= mesAloc ? orc * (1 - rL) : 0);
+      return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL) * pontualRatio(it, mesAtual);
     }
     return s + (orc / 12) * mesesDecorridos;
   }
@@ -524,12 +531,11 @@ const provAuto  = sec.itens.reduce((s, it) => {
   if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
   const prov = it.provisionado || 0;
   const tipo = it.tipo || "linear";
-  const mesAloc = it.mesAlocacao || 0;
-  if (tipo === "pontual") return s + (mesAtual >= mesAloc ? prov : 0);
+  if (tipo === "pontual") return s + prov * pontualRatio(it, mesAtual);
   if (tipo === "misto") {
     const pl = it.parcelaLinear || 0;
     const pp = it.parcelaPontual || 0;
-    return s + (pl / 12) * mesesDecorridos + (mesAtual >= mesAloc ? pp : 0);
+    return s + (pl / 12) * mesesDecorridos + pp * pontualRatio(it, mesAtual);
   }
   return s + (prov / 12) * mesesDecorridos;
 }, 0);
@@ -1334,18 +1340,23 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const provAnualAtivos = sec.itens
         .filter(it => it.status !== "encerrado")
         .reduce((s, it) => s + (it.provisionado || 0), 0);
+      const pontualRatio = it => {
+        const list = Array.isArray(it.mesesAlocacao) ? it.mesesAlocacao
+          : (it.mesAlocacao != null ? [it.mesAlocacao] : []);
+        if (!list.length) return mesAtual >= 0 ? 1 : 0;
+        return list.filter(m => m <= mesAtual).length / list.length;
+      };
       const orcAuto = sec.itens.reduce((s, it) => {
         const orc = it.orcado || 0;
         const tipo = it.tipo || "linear";
-        const mesAloc = it.mesAlocacao || 0;
-        if (tipo === "pontual") return s + (mesAtual >= mesAloc ? orc : 0);
+        if (tipo === "pontual") return s + orc * pontualRatio(it);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
           const pp = it.parcelaPontual || 0;
           const tot = pl + pp;
           if (tot > 0) {
             const rL = pl / tot;
-            return s + (orc * rL / 12) * mesesDecorridos + (mesAtual >= mesAloc ? orc * (1 - rL) : 0);
+            return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL) * pontualRatio(it);
           }
           return s + (orc / 12) * mesesDecorridos;
         }
@@ -1355,12 +1366,11 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
         if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
         const prov = it.provisionado || 0;
         const tipo = it.tipo || "linear";
-        const mesAloc = it.mesAlocacao || 0;
-        if (tipo === "pontual") return s + (mesAtual >= mesAloc ? prov : 0);
+        if (tipo === "pontual") return s + prov * pontualRatio(it);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
           const pp = it.parcelaPontual || 0;
-          return s + (pl / 12) * mesesDecorridos + (mesAtual >= mesAloc ? pp : 0);
+          return s + (pl / 12) * mesesDecorridos + pp * pontualRatio(it);
         }
         return s + (prov / 12) * mesesDecorridos;
       }, 0);

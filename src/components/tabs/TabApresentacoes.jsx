@@ -1206,10 +1206,79 @@ function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
 }
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
+const MESES_DEFAULT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const VAR_CATS_FIX_DEFAULT = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
+
 export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = []}) {
   const [tipo, setTipo] = useState(null);
   const [dadosVar, setDadosVar] = useState(null);
   const [dadosFix, setDadosFix] = useState(null);
+
+  // Defaults calculados direto dos dados do portal — usados quando o usuário
+  // ainda não abriu os formulários de Variáveis/Fixos.
+  const defaultDadosVar = useMemo(() => {
+    const rodadasDisp = Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b);
+    const rodadaAtual = rodadasDisp[rodadasDisp.length-1] || 1;
+    const jogosAte    = jogos.filter(j => j.rodada <= rodadaAtual);
+    const rows        = rodadasDisp.filter(r => r <= rodadaAtual).map(r => {
+      const jr = jogos.filter(j => j.rodada === r);
+      return {
+        label: `R${r}`,
+        orcado:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
+        realizado: jr.reduce((s, j) => s + subTotal(j.provisionado || {}), 0),
+      };
+    });
+    const orcAteRod = rows.reduce((s, r) => s + r.orcado, 0);
+    const realizado = rows.reduce((s, r) => s + r.realizado, 0);
+    const saving    = orcAteRod - realizado;
+    const savPct    = orcAteRod > 0 ? saving / orcAteRod * 100 : 0;
+    const nfEspV    = realizado;
+    const nfRecV    = jogosAte.reduce((s, j) => s + subTotal(j.realizado || {}), 0);
+    const nfPend    = Math.max(0, nfEspV - nfRecV);
+    const pctRec    = nfEspV > 0 ? nfRecV / nfEspV * 100 : 0;
+    return {
+      orcGlobal: ORC_GLOBAL_FIXO,
+      orcAteRod, realizado, saving, savPct, rows,
+      nfEspV, nfRecV, nfPend, pctRec, rodadaAtual,
+    };
+  }, [jogos]);
+
+  const defaultDadosFix = useMemo(() => {
+    const mesAtual        = new Date().getMonth();
+    const mesesDecorridos = mesAtual + 1;
+    const sections = servicos.map(sec => {
+      const idsItens  = sec.itens.map(it => it.id);
+      const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
+      const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
+      const orc       = (orcAnual / 12) * mesesDecorridos;
+      const prov      = (provAnual / 12) * mesesDecorridos;
+      const gasto     = notasMensais
+        .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
+        .reduce((s, n) => s + (n.valor || 0), 0);
+      return { secao: sec.secao, orcAnual, provAnual, orc, prov, gasto, saldo: orc - prov };
+    });
+    const outrosGasto = notasMensais
+      .filter(n => !n.servicoId && !VAR_CATS_FIX_DEFAULT.has(n.categoria) && n.mes <= mesAtual)
+      .reduce((s, n) => s + (n.valor || 0), 0);
+    if (outrosGasto > 0) {
+      sections.push({ secao: "Outros Mensais", orcAnual: 0, provAnual: 0, orc: 0, prov: 0, gasto: outrosGasto, saldo: 0 });
+    }
+    const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
+    const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
+    const orcAcumulado   = sections.reduce((s, x) => s + x.orc, 0);
+    const provAcumulado  = sections.reduce((s, x) => s + x.prov, 0);
+    const gastoAcumulado = sections.reduce((s, x) => s + x.gasto, 0);
+    const saldo          = orcAcumulado - provAcumulado;
+    const nfRecV         = gastoAcumulado;
+    const nfPend         = Math.max(0, provAnualTotal - gastoAcumulado);
+    const pctRec         = provAnualTotal > 0 ? nfRecV / provAnualTotal * 100 : 0;
+    return {
+      orcAnualTotal, orcAcumulado, gastoAcumulado, provAcumulado,
+      saldo, provAnual: provAnualTotal,
+      nfRecV, nfPend, pctRec, rows: sections,
+      mesAtual, mesLabel: MESES_DEFAULT[mesAtual],
+    };
+  }, [servicos, notasMensais]);
 
   if (!tipo) return <SeletorTipo T={T} onSelect={setTipo}/>;
 
@@ -1223,7 +1292,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}
-              dadosVar={dadosVar} dadosFix={dadosFix}/>;
+              dadosVar={dadosVar || defaultDadosVar}
+              dadosFix={dadosFix || defaultDadosFix}/>;
 
   return null;
 }

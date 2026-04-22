@@ -29,7 +29,7 @@ function SeletorTipo({T, onSelect}) {
 const opts = [
 {key:"variaveis",  icon:BarChart3,  label:"Custos Variáveis",        desc:"Acompanhamento por rodada — orçado × realizado, saving acumulado e notas fiscais.", color:T.brand,   grad:"linear-gradient(135deg,#047857 0%,#10b981 100%)"},
 {key:"fixos",      icon:Lock,       label:"Custos Fixos",            desc:"Serviços fixos do campeonato — orçado × gasto × provisionado por categoria.",        color:T.info,    grad:"linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)"},
-{key:"visaogeral", icon:LayoutGrid, label:"Visão Geral Orçamentária", desc:"Apresentação completa: Visão Geral + Custos Variáveis + Custos Fixos em 3 slides.",  color:"#7c3aed", grad:"linear-gradient(135deg,#5b21b6 0%,#7c3aed 100%)"},
+{key:"visaogeral", icon:LayoutGrid, label:"Visão Geral Orçamentária", desc:"Slide único consolidado — KPIs globais, síntese dos pilares (variáveis + fixos) e tabela de blocos.",  color:"#7c3aed", grad:"linear-gradient(135deg,#5b21b6 0%,#7c3aed 100%)"},
 ];
 return (
 <div>
@@ -833,7 +833,7 @@ const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"upperc
 const secNum  = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
 
 async function gerarPPTX() {
-  setLoading(true); setStatus({msg:"Gerando 3 slides...", cls:""});
+  setLoading(true); setStatus({msg:"Gerando...", cls:""});
   try {
     const pptx = new PptxGenJS();
     pptx.layout = "LAYOUT_WIDE";
@@ -1040,179 +1040,6 @@ async function gerarPPTX() {
       align: "center", fontFace: "Segoe UI"
     });
 
-    // ════════════════════════════════════════════════════════════════
-    // SLIDE 2 — CUSTOS VARIÁVEIS
-    // ════════════════════════════════════════════════════════════════
-    const sl2 = pptx.addSlide();
-    sl2.background = {color:"FFFFFF"};
-    sl2.addShape(pptx.ShapeType.rect, {x:0,y:0,w:13.33,h:0.05,fill:{color:"166534"},line:{width:0}});
-
-    sl2.addText("Custos Variáveis", {x:0.35,y:0.1,w:12.6,h:0.32,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"});
-    sl2.addText(`Operação jogo a jogo — saving acumulado de ${Math.abs(varSavPct).toFixed(1)}%${varSavPct>=0?", com economia":", com estouro"} até a Rodada ${rodadaAtual}.`, {
-      x:0.35,y:0.42,w:12.6,h:0.22,fontSize:10,color:"6B7280",fontFace:"Segoe UI"
-    });
-    sl2.addShape(pptx.ShapeType.line, {x:0.35,y:0.68,w:12.63,h:0,line:{color:"E5E7EB",width:1}});
-
-    // 4 KPIs variáveis
-    const kpi2 = [
-      {label:"ORÇADO TOTAL",                       val:fmtBRL(ORC_TOTAL_CAMPEONATO_VAR), border:"D1D5DB", valColor:"6B7280"},
-      {label:`ORÇADO ATÉ R${rodadaAtual}`,          val:fmtBRL(varOrc),                   border:"D1D5DB", valColor:"111827"},
-      {label:`REALIZADO ATÉ R${rodadaAtual}`,       val:fmtBRL(varReal),                  border:"D1D5DB", valColor:"111827"},
-      {label:"SAVING ACUMULADO",                    val:(varSaving>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(varSaving)), border:"16A34A", valColor:varSaving>=0?"16A34A":"DC2626"},
-    ];
-    const k2W=3.18, k2H=0.92, k2Y=0.78;
-    kpi2.forEach(({label,val,border,valColor},i) => {
-      const x = 0.35 + i*(k2W+0.04);
-      sl2.addShape(pptx.ShapeType.rect, {x,y:k2Y,w:k2W,h:k2H,fill:{color:"FFFFFF"},line:{color:border,width:1.5}});
-      sl2.addShape(pptx.ShapeType.rect, {x,y:k2Y,w:k2W,h:0.05,fill:{color:border},line:{width:0}});
-      sl2.addText(label, {x:x+0.1,y:k2Y+0.1,w:k2W-0.2,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl2.addText(val,   {x:x+0.1,y:k2Y+0.34,w:k2W-0.2,h:0.46,fontSize:17,color:valColor,fontFace:"Segoe UI"});
-    });
-
-    // Gráfico barras — Orçado vs Realizado por rodada
-    const hasEstouro = porRodada.some(r => r.realizado > r.orcado);
-    sl2.addChart(pptx.ChartType.bar, [
-      {name:"Orçado",    labels:porRodada.map(r=>r.label), values:porRodada.map(r=>r.orcado)},
-      {name:"Realizado", labels:porRodada.map(r=>r.label), values:porRodada.map(r=>r.realizado)},
-    ], {
-      x:0.35, y:1.84, w:8.6, h:2.8,
-      barDir:"col", barGrouping:"clustered",
-      chartColors:["D1D5DB","22C55E"],
-      showValue:false,
-      showLegend:true, legendPos:"b", legendFontSize:9,
-      title:"Gráfico de Barras (Orçado vs Realizado)", showTitle:true, titleFontSize:10, titleBold:true,
-      valGridLine:{style:"none"},
-    });
-
-    // Status NFs — barra horizontal simples (shapes)
-    const nfTotal2 = computedVar.nfEspV || 1;
-    const pctRec2  = computedVar.nfRecV / nfTotal2;
-    const barW2=3.5, barH2=0.22, barX2=9.15, barY2=1.86;
-    sl2.addText("Status NFs", {x:barX2,y:barY2-0.2,w:barW2,h:0.18,fontSize:10,bold:true,color:"111827",fontFace:"Segoe UI"});
-    sl2.addShape(pptx.ShapeType.rect, {x:barX2,y:barY2,w:barW2,h:barH2,fill:{color:"E5E7EB"},line:{width:0}});
-    sl2.addShape(pptx.ShapeType.rect, {x:barX2,y:barY2,w:Math.max(0.05,barW2*pctRec2),h:barH2,fill:{color:"16A34A"},line:{width:0}});
-    sl2.addText(`${Math.round(pctRec2*100)}% Recebidas (${fmtBRL(computedVar.nfRecV)})`, {x:barX2,y:barY2+0.26,w:barW2,h:0.16,fontSize:8,bold:true,color:"16A34A",fontFace:"Segoe UI"});
-    sl2.addText(`${Math.round((1-pctRec2)*100)}% Pendentes (${fmtBRL(computedVar.nfPend)})`, {x:barX2,y:barY2+0.44,w:barW2,h:0.16,fontSize:8,color:"6B7280",fontFace:"Segoe UI"});
-
-    // Tabela por rodada
-    const th2 = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8,color:"FFFFFF",fill:{color:"1F2937"},align}});
-    const tblHead2 = [th2("RODADA"), th2("ORÇADO","right"), th2("REALIZADO","right"), th2("SAVING (R$)","right"), th2("SAVING (%)","right")];
-    const tblBody2 = porRodada.map((r, i) => {
-      const sav    = r.orcado - r.realizado;
-      const savPct = r.orcado > 0 ? sav / r.orcado * 100 : 0;
-      const fill   = {color: i%2===0?"FFFFFF":"F9FAFB"};
-      const sc     = sav>=0?"16A34A":"DC2626";
-      return [
-        {text:r.label,                                                     options:{fontSize:8,bold:true,color:"111827",fill}},
-        {text:fmtBRL(r.orcado),                                           options:{fontSize:8,color:"111827",fill,align:"right"}},
-        {text:fmtBRL(r.realizado),                                        options:{fontSize:8,color:"111827",fill,align:"right"}},
-        {text:(sav>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(sav)),                  options:{fontSize:8,bold:true,color:sc,fill,align:"right"}},
-        {text:(savPct>=0?"▲ ":"▼ ")+Math.abs(savPct).toFixed(1)+"%",      options:{fontSize:8,bold:true,color:sc,fill,align:"right"}},
-      ];
-    });
-    const stcVar = varSaving>=0?"A3E635":"FF6B6B";
-    const totFill2 = {color:"111827"};
-    const tblTot2 = [
-      {text:"TOTAL",                                                       options:{fontSize:8,bold:true,color:"FFFFFF",fill:totFill2}},
-      {text:fmtBRL(varOrc),                                               options:{fontSize:8,bold:true,color:"FFFFFF",fill:totFill2,align:"right"}},
-      {text:fmtBRL(varReal),                                              options:{fontSize:8,bold:true,color:"FFFFFF",fill:totFill2,align:"right"}},
-      {text:(varSaving>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(varSaving)),         options:{fontSize:8,bold:true,color:stcVar,fill:totFill2,align:"right"}},
-      {text:(varSavPct>=0?"▲ ":"▼ ")+Math.abs(varSavPct).toFixed(1)+"%",  options:{fontSize:8,bold:true,color:stcVar,fill:totFill2,align:"right"}},
-    ];
-    const rowH2 = Math.max(0.18, 2.8 / (porRodada.length + 1));
-    sl2.addTable([tblHead2,...tblBody2,tblTot2], {
-      x:9.15, y:2.52, w:3.83, colW:[0.55,0.82,0.82,0.82,0.62],
-      border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:rowH2,
-    });
-
-    sl2.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
-      x:0.35,y:7.22,w:12.63,h:0.18,fontSize:8,color:"9CA3AF",fontFace:"Segoe UI",align:"center"
-    });
-
-    // ════════════════════════════════════════════════════════════════
-    // SLIDE 3 — CUSTOS FIXOS
-    // ════════════════════════════════════════════════════════════════
-    const sl3 = pptx.addSlide();
-    sl3.background = {color:"FFFFFF"};
-    sl3.addShape(pptx.ShapeType.rect, {x:0,y:0,w:13.33,h:0.05,fill:{color:"166534"},line:{width:0}});
-
-    sl3.addText("Custos Fixos", {x:0.35,y:0.1,w:12.6,h:0.32,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"});
-    sl3.addText(`Capital estrutural estritamente sob controle até o mês de ${mesLabel}.`, {
-      x:0.35,y:0.42,w:12.6,h:0.22,fontSize:10,color:"6B7280",fontFace:"Segoe UI"
-    });
-    sl3.addShape(pptx.ShapeType.line, {x:0.35,y:0.68,w:12.63,h:0,line:{color:"E5E7EB",width:1}});
-
-    // 4 KPIs fixos
-    const saldoProvReal3 = computedFix.provTotalFix - gastoTotalFix;
-    const kpi3 = [
-      {label:"ORÇAMENTO TOTAL (CAMPEONATO)", val:fmtBRL(orcAnualTotal),  border:"D1D5DB", valColor:"6B7280"},
-      {label:`ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val:fmtBRL(orcTotalFix), border:"D1D5DB", valColor:"111827"},
-      {label:`REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,    val:fmtBRL(gastoTotalFix),border:"D1D5DB", valColor:"111827"},
-      {label:`SALDO ACUMULADO`,                               val:(saldoFix>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(saldoFix)), border:"16A34A", valColor:saldoFix>=0?"16A34A":"DC2626"},
-    ];
-    const k3W=3.18, k3H=0.92, k3Y=0.78;
-    kpi3.forEach(({label,val,border,valColor},i) => {
-      const x = 0.35 + i*(k3W+0.04);
-      sl3.addShape(pptx.ShapeType.rect, {x,y:k3Y,w:k3W,h:k3H,fill:{color:"FFFFFF"},line:{color:border,width:1.5}});
-      sl3.addShape(pptx.ShapeType.rect, {x,y:k3Y,w:k3W,h:0.05,fill:{color:border},line:{width:0}});
-      sl3.addText(label, {x:x+0.1,y:k3Y+0.1,w:k3W-0.2,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"});
-      sl3.addText(val,   {x:x+0.1,y:k3Y+0.34,w:k3W-0.2,h:0.46,fontSize:17,color:valColor,fontFace:"Segoe UI"});
-    });
-
-    // Barra Comparativo Orçado vs Realizado
-    const barTot3 = orcTotalFix || 1;
-    const pctReal3 = gastoTotalFix / barTot3;
-    const bW3=12.63, bH3=0.28, bX3=0.35, bY3=1.88;
-    sl3.addText("Comparativo Orçado vs. Realizado", {x:bX3,y:bY3-0.22,w:bW3,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl3.addShape(pptx.ShapeType.rect, {x:bX3,y:bY3,w:bW3,h:bH3,fill:{color:"D1D5DB"},line:{width:0}});
-    const realW3 = Math.max(0.1, bW3*pctReal3);
-    sl3.addShape(pptx.ShapeType.rect, {x:bX3,y:bY3,w:realW3,h:bH3,fill:{color:"14532D"},line:{width:0}});
-    sl3.addText(`Realizado: ${fmtBRL(gastoTotalFix)}`, {x:bX3+0.1,y:bY3+0.03,w:realW3-0.1,h:bH3-0.06,fontSize:8.5,bold:true,color:"FFFFFF",fontFace:"Segoe UI",valign:"middle"});
-    sl3.addText(`Saldo: ${fmtBRL(orcTotalFix - gastoTotalFix)}`, {x:bX3+realW3+0.05,y:bY3+0.03,w:bW3-realW3-0.1,h:bH3-0.06,fontSize:8.5,color:"374151",fontFace:"Segoe UI",valign:"middle"});
-
-    // Status NFs fixos
-    const provAn3  = computedFix.provAnualTotal || 1;
-    const pctRec3  = computedFix.nfRecFix / provAn3;
-    const bW3nf=12.63, bH3nf=0.22, bY3nf=2.3;
-    sl3.addText("Status NFs", {x:bX3,y:bY3nf-0.2,w:bW3nf,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl3.addShape(pptx.ShapeType.rect, {x:bX3,y:bY3nf,w:bW3nf,h:bH3nf,fill:{color:"E5E7EB"},line:{width:0}});
-    sl3.addShape(pptx.ShapeType.rect, {x:bX3,y:bY3nf,w:Math.max(0.05,bW3nf*pctRec3),h:bH3nf,fill:{color:"16A34A"},line:{width:0}});
-    sl3.addText(`${Math.round(pctRec3*100)}% Recebidas (${fmtBRL(computedFix.nfRecFix)})`, {x:bX3,y:bY3nf+0.26,w:5,h:0.16,fontSize:8,bold:true,color:"16A34A",fontFace:"Segoe UI"});
-    sl3.addText(`${Math.round((1-pctRec3)*100)}% Pendentes (${fmtBRL(computedFix.nfPendFix)})`, {x:bX3+8,y:bY3nf+0.26,w:4.63,h:0.16,fontSize:8,color:"6B7280",fontFace:"Segoe UI",align:"right"});
-
-    // Tabela seções fixos
-    const th3 = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-    const tblHead3 = [th3("SEÇÃO"), th3("ORÇADO ACUM.","right"), th3("REALIZADO","right"), th3("SALDO","right")];
-    const rows3 = computedFix.sections;
-    const tblBody3 = rows3.map((s, i) => {
-      const saldo = s.orcAuto - s.gastoAuto;
-      const fill  = {color: i%2===0?"FFFFFF":"F9FAFB"};
-      const sc    = saldo>=0?"16A34A":"DC2626";
-      return [
-        {text:s.secao,             options:{fontSize:9,bold:true,color:"111827",fill}},
-        {text:fmtBRL(s.orcAuto),   options:{fontSize:9,color:"111827",fill,align:"right"}},
-        {text:fmtBRL(s.gastoAuto), options:{fontSize:9,color:"111827",fill,align:"right"}},
-        {text:(saldo>=0?"+":"")+fmtBRL(saldo), options:{fontSize:9,bold:true,color:sc,fill,align:"right"}},
-      ];
-    });
-    const stcFix  = saldoFix>=0?"A3E635":"FF6B6B";
-    const totFill3 = {color:"111827"};
-    const tblTot3 = [
-      {text:"TOTAL",               options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill3}},
-      {text:fmtBRL(orcTotalFix),   options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill3,align:"right"}},
-      {text:fmtBRL(gastoTotalFix), options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill3,align:"right"}},
-      {text:fmtBRL(saldoFix),      options:{fontSize:9,bold:true,color:stcFix,fill:totFill3,align:"right"}},
-    ];
-    const rowH3 = Math.max(0.22, 3.8 / (rows3.length + 1));
-    sl3.addTable([tblHead3,...tblBody3,tblTot3], {
-      x:0.35, y:2.72, w:12.63, colW:[5.5,2.5,2.5,2.13],
-      border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:rowH3,
-    });
-
-    sl3.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
-      x:0.35,y:7.22,w:12.63,h:0.18,fontSize:8,color:"9CA3AF",fontFace:"Segoe UI",align:"center"
-    });
-
     // ─── Gerar arquivo ───────────────────────────────────────────────────────
     await pptx.writeFile({fileName:`visao_geral_R${rodadaAtual}_${mesLabel.toLowerCase()}_brasileirao2026.pptx`});
     setStatus({msg:`✅ visao_geral_R${rodadaAtual}_${mesLabel.toLowerCase()}.pptx baixado!`, cls:"ok"});
@@ -1235,7 +1062,7 @@ return (
         </div>
         <div>
           <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Visão Geral Orçamentária</h2>
-          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Apresentação completa — 3 slides: Visão Geral + Variáveis + Fixos</p>
+          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Slide único consolidado — variáveis + fixos</p>
         </div>
       </div>
     </div>
@@ -1264,19 +1091,18 @@ return (
     </div>
   </div>
 
-  {/* ── Preview dos 3 slides ──────────────────────────────────────────────── */}
+  {/* ── Preview do slide consolidado ──────────────────────────────────────── */}
   <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
     <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}>
       <span style={secNum}>02</span><span style={secHdr}>Preview dos Dados</span>
     </div>
 
-    {/* Slide 1 preview */}
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Slide 1 — Visão Geral</p>
+    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>KPIs Globais</p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
       {[
-        {label:"Orçado Global",   val:fmtR(varOrc+orcTotalFix),  color:T.text},
-        {label:"Realizado Total", val:fmtR(realTotalGlobal),      color:T.text},
-        {label:"Saving Global",   val:(savingGlobal>=0?"▲ ":"▼ ")+fmtR(Math.abs(savingGlobal)), color:savingGlobal>=0?"#16a34a":"#dc2626"},
+        {label:"Orçamento Total do Campeonato", val:fmtR(ORC_TOTAL_CAMPEONATO_VAR+orcAnualTotal), color:T.textMd},
+        {label:"Realizado (Atual)",             val:fmtR(realTotalGlobal),                        color:T.text},
+        {label:"Saving / Saldo Global",         val:(savingGlobal>=0?"▲ ":"▼ ")+fmtR(Math.abs(savingGlobal)), color:savingGlobal>=0?"#16a34a":"#dc2626"},
       ].map(m=>(
         <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"12px 16px",border:`1px solid ${T.border}`}}>
           <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
@@ -1285,14 +1111,12 @@ return (
       ))}
     </div>
 
-    {/* Slide 2 preview */}
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Slide 2 — Custos Variáveis (até R{rodadaAtual})</p>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Dinâmica Operacional (Variáveis até R{rodadaAtual})</p>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
       {[
-        {label:"Orçado Total",   val:fmtR(ORC_TOTAL_CAMPEONATO_VAR), color:T.textMd},
-        {label:`Orçado R${rodadaAtual}`, val:fmtR(varOrc),            color:T.text},
-        {label:"Realizado",       val:fmtR(varReal),                  color:T.text},
-        {label:"Saving",          val:(varSaving>=0?"▲ ":"▼ ")+fmtR(Math.abs(varSaving)), color:varSaving>=0?"#16a34a":"#dc2626"},
+        {label:"Orçamento do Período", val:fmtR(varOrc),   color:T.text},
+        {label:"Realizado",            val:fmtR(varReal),  color:T.text},
+        {label:"Saldo",                val:(varSaving>=0?"▲ ":"▼ ")+fmtR(Math.abs(varSaving)), color:varSaving>=0?"#16a34a":"#dc2626"},
       ].map(m=>(
         <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
           <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
@@ -1301,14 +1125,12 @@ return (
       ))}
     </div>
 
-    {/* Slide 3 preview */}
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Slide 3 — Custos Fixos (até {mesLabel})</p>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Estrutura Acumulada (Fixos até {mesLabel})</p>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
       {[
-        {label:"Campeonato",       val:fmtR(orcAnualTotal),   color:T.textMd},
-        {label:`Orçado ${mesLabel}`, val:fmtR(orcTotalFix),  color:T.text},
-        {label:"Realizado",         val:fmtR(gastoTotalFix), color:T.text},
-        {label:"Saldo",             val:(saldoFix>=0?"▲ ":"▼ ")+fmtR(Math.abs(saldoFix)), color:saldoFix>=0?"#16a34a":"#dc2626"},
+        {label:`Orçado até ${mesLabel}`,    val:fmtR(orcTotalFix),   color:T.text},
+        {label:`Realizado até ${mesLabel}`, val:fmtR(gastoTotalFix), color:T.text},
+        {label:`Saldo até ${mesLabel}`,     val:(saldoFix>=0?"▲ ":"▼ ")+fmtR(Math.abs(saldoFix)), color:saldoFix>=0?"#16a34a":"#dc2626"},
       ].map(m=>(
         <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
           <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
@@ -1321,11 +1143,11 @@ return (
   {/* ── Rodapé fixo ───────────────────────────────────────────────────────── */}
   <div style={{position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`1px solid ${T.border}`,padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50,boxShadow:"0 -8px 24px -8px rgba(0,0,0,0.3)"}}>
     <div>
-      <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text,fontWeight:700}}>Gerar apresentação completa?</b> 3 slides em um único arquivo PPTX.</p>
+      <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text,fontWeight:700}}>Gerar slide consolidado?</b> Exporta um PPTX com a Visão Geral.</p>
       <p style={{fontSize:11,color:status.cls==="ok"?"#16a34a":status.cls==="err"?"#dc2626":T.textSm,fontWeight:600}}>{status.msg}</p>
     </div>
     <Button T={T} variant="primary" size="lg" icon={FileDown} onClick={gerarPPTX} disabled={loading}>
-      {loading ? "Gerando..." : "Gerar PPTX (3 Slides)"}
+      {loading ? "Gerando..." : "Gerar PPTX"}
     </Button>
   </div>
 </div>

@@ -920,7 +920,7 @@ function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
   const varSaving    = dadosVar?.saving          ?? 0;
   const rodadaAtual  = dadosVar?.rodadaAtual     ?? "—";
   const fixOrcAcum   = dadosFix?.orcAcumulado    ?? 0;
-  const fixGasto     = dadosFix?.gastoAcumulado  ?? 0;
+  const fixGasto     = dadosFix?.provAcumulado   ?? 0; // "Realizado" na VG = provisionado (alinhado com Custos Fixos)
   const fixSaldo     = dadosFix?.saldo           ?? 0;
   const fixOrcAnual  = dadosFix?.orcAnualTotal   ?? 0;
   const mesLabel     = dadosFix?.mesLabel        ?? "—";

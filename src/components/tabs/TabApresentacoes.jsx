@@ -1229,26 +1229,44 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
   const [dadosVar, setDadosVar] = usePersistedState("apres_var_dados", null);
   const [dadosFix, setDadosFix] = usePersistedState("apres_fix_dados", null);
 
-  // Defaults calculados direto dos dados do portal — usados quando o usuário
-  // ainda não abriu os formulários de Variáveis/Fixos.
+  // Lê rodada/mês/overrides persistidos pelos formulários — assim, mesmo sem
+  // abrir Variáveis/Fixos nesta sessão, a Visão Geral reflete a última config.
+  const readPersisted = (key, fallback) => {
+    try { const raw = localStorage.getItem(key); return raw !== null ? JSON.parse(raw) : fallback; }
+    catch { return fallback; }
+  };
+
+  // Defaults calculados direto dos dados do portal + preferências persistidas.
   const defaultDadosVar = useMemo(() => {
-    const rodadasDisp = Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b);
-    const rodadaAtual = rodadasDisp[rodadasDisp.length-1] || 1;
-    const jogosAte    = jogos.filter(j => j.rodada <= rodadaAtual);
-    const rows        = rodadasDisp.filter(r => r <= rodadaAtual).map(r => {
+    const rodadasDisp     = Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b);
+    const ultima          = rodadasDisp[rodadasDisp.length-1] || 1;
+    const rodadaPersist   = readPersisted("apres_var_rodada", ultima);
+    const rodadaAtual     = rodadasDisp.includes(rodadaPersist) ? rodadaPersist : ultima;
+    const ovr             = readPersisted("apres_var_overrides", {}) || {};
+    const nfEspOverride   = readPersisted("apres_var_nfEsp", "");
+    const nfRecOverride   = readPersisted("apres_var_nfRec", "");
+    const rowsAuto        = rodadasDisp.filter(r => r <= rodadaAtual).map(r => {
       const jr = jogos.filter(j => j.rodada === r);
       return {
-        label: `R${r}`,
-        orcado:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
-        realizado: jr.reduce((s, j) => s + subTotal(j.provisionado || {}), 0),
+        rodada: r,
+        label:  `R${r}`,
+        orcadoAuto:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
+        realizadoAuto: jr.reduce((s, j) => s + subTotal(j.provisionado || {}), 0),
       };
     });
+    const rows = rowsAuto.map(r => ({
+      label:     r.label,
+      orcado:    ovr[r.rodada]?.orcado    != null ? parseBR(ovr[r.rodada].orcado)    : r.orcadoAuto,
+      realizado: ovr[r.rodada]?.realizado != null ? parseBR(ovr[r.rodada].realizado) : r.realizadoAuto,
+    }));
     const orcAteRod = rows.reduce((s, r) => s + r.orcado, 0);
     const realizado = rows.reduce((s, r) => s + r.realizado, 0);
     const saving    = orcAteRod - realizado;
     const savPct    = orcAteRod > 0 ? saving / orcAteRod * 100 : 0;
-    const nfEspV    = realizado;
-    const nfRecV    = jogosAte.reduce((s, j) => s + subTotal(j.realizado || {}), 0);
+    const autoNfEsp = realizado;
+    const autoNfRec = jogos.filter(j => j.rodada <= rodadaAtual).reduce((s, j) => s + subTotal(j.realizado || {}), 0);
+    const nfEspV    = nfEspOverride !== "" ? parseBR(nfEspOverride) : autoNfEsp;
+    const nfRecV    = nfRecOverride !== "" ? parseBR(nfRecOverride) : autoNfRec;
     const nfPend    = Math.max(0, nfEspV - nfRecV);
     const pctRec    = nfEspV > 0 ? nfRecV / nfEspV * 100 : 0;
     return {
@@ -1259,24 +1277,31 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
   }, [jogos]);
 
   const defaultDadosFix = useMemo(() => {
-    const mesAtual        = new Date().getMonth();
+    const mesAtual        = readPersisted("apres_fix_mes", new Date().getMonth());
     const mesesDecorridos = mesAtual + 1;
+    const ovr             = readPersisted("apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
       const idsItens  = sec.itens.map(it => it.id);
       const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
       const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
-      const orc       = (orcAnual / 12) * mesesDecorridos;
-      const prov      = (provAnual / 12) * mesesDecorridos;
-      const gasto     = notasMensais
+      const orcAuto   = (orcAnual / 12) * mesesDecorridos;
+      const provAuto  = (provAnual / 12) * mesesDecorridos;
+      const gastoAuto = notasMensais
         .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
         .reduce((s, n) => s + (n.valor || 0), 0);
+      const o = ovr[sec.secao] || {};
+      const orc   = o.orc   != null ? parseBR(o.orc)   : orcAuto;
+      const prov  = o.prov  != null ? parseBR(o.prov)  : provAuto;
+      const gasto = o.gasto != null ? parseBR(o.gasto) : gastoAuto;
       return { secao: sec.secao, orcAnual, provAnual, orc, prov, gasto, saldo: orc - prov };
     });
     const outrosGasto = notasMensais
       .filter(n => !n.servicoId && !VAR_CATS_FIX_DEFAULT.has(n.categoria) && n.mes <= mesAtual)
       .reduce((s, n) => s + (n.valor || 0), 0);
     if (outrosGasto > 0) {
-      sections.push({ secao: "Outros Mensais", orcAnual: 0, provAnual: 0, orc: 0, prov: 0, gasto: outrosGasto, saldo: 0 });
+      const o = ovr["Outros Mensais"] || {};
+      const gasto = o.gasto != null ? parseBR(o.gasto) : outrosGasto;
+      sections.push({ secao: "Outros Mensais", orcAnual: 0, provAnual: 0, orc: 0, prov: 0, gasto, saldo: 0 });
     }
     const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
     const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
@@ -1307,8 +1332,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}
-              dadosVar={dadosVar || defaultDadosVar}
-              dadosFix={dadosFix || defaultDadosFix}/>;
+              dadosVar={defaultDadosVar}
+              dadosFix={defaultDadosFix}/>;
 
   return null;
 }

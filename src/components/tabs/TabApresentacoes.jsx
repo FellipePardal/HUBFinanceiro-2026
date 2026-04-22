@@ -590,7 +590,9 @@ const rows = sectionsView.map(s => {
 const orc   = parseBR(s.orc);
 const prov  = parseBR(s.prov);
 const gasto = parseBR(s.gasto);
-return { secao: s.secao, orc, prov, gasto, saldo: orc - prov };
+// "Outros Mensais" não tem provisionado — saldo compara orçado com gasto real
+const saldo = s.secao === "Outros Mensais" ? orc - gasto : orc - prov;
+return { secao: s.secao, orc, prov, gasto, saldo };
 });
 const orcTotal   = rows.reduce((s, r) => s + r.orc, 0);
 const provTotal  = rows.reduce((s, r) => s + r.prov, 0);
@@ -1384,7 +1386,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const orc   = o.orc   != null ? parseBR(o.orc)   : orcAuto;
       const prov  = o.prov  != null ? parseBR(o.prov)  : provAuto;
       const gasto = o.gasto != null ? parseBR(o.gasto) : gastoAuto;
-      return { secao: sec.secao, orcAnual, provAnual, provAnualAtivos, gastoEncerrados, orc, prov, gasto, saldo: orc - prov };
+      const saldo = sec.secao === "Outros Mensais" ? orc - gasto : orc - prov;
+      return { secao: sec.secao, orcAnual, provAnual, provAnualAtivos, gastoEncerrados, orc, prov, gasto, saldo };
     });
     const outrosGasto = notasMensais
       .filter(n => !n.servicoId && !VAR_CATS_FIX_DEFAULT.has(n.categoria) && n.mes <= mesAtual)

@@ -498,11 +498,27 @@ const sections = servicos.map(sec => {
 const idsItens = sec.itens.map(it => it.id);
 const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
 const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
-const orcAuto   = (orcAnual / 12) * mesesDecorridos;
-// Provisionado mensal por-item conforme flag "tipo":
-//   linear  → (prov / 12) * mesesDecorridos
-//   pontual → prov integral
-//   misto   → (parcelaLinear / 12) * mesesDecorridos + parcelaPontual
+// Orçado e provisionado mensais por-item conforme flag "tipo":
+//   linear  → total / 12 * mesesDecorridos
+//   pontual → total integral no mês de referência
+//   misto   → aplica parcelaLinear/parcelaPontual (valores absolutos do prov)
+//             e, para o orçado, usa a mesma proporção das parcelas
+const orcAuto = sec.itens.reduce((s, it) => {
+  const orc = it.orcado || 0;
+  const tipo = it.tipo || "linear";
+  if (tipo === "pontual") return s + orc;
+  if (tipo === "misto") {
+    const pl = it.parcelaLinear || 0;
+    const pp = it.parcelaPontual || 0;
+    const tot = pl + pp;
+    if (tot > 0) {
+      const rL = pl / tot;
+      return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL);
+    }
+    return s + (orc / 12) * mesesDecorridos;
+  }
+  return s + (orc / 12) * mesesDecorridos;
+}, 0);
 const provAuto  = sec.itens.reduce((s, it) => {
   const prov = it.provisionado || 0;
   const tipo = it.tipo || "linear";
@@ -1298,7 +1314,22 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const idsItens  = sec.itens.map(it => it.id);
       const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
       const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
-      const orcAuto   = (orcAnual / 12) * mesesDecorridos;
+      const orcAuto = sec.itens.reduce((s, it) => {
+        const orc = it.orcado || 0;
+        const tipo = it.tipo || "linear";
+        if (tipo === "pontual") return s + orc;
+        if (tipo === "misto") {
+          const pl = it.parcelaLinear || 0;
+          const pp = it.parcelaPontual || 0;
+          const tot = pl + pp;
+          if (tot > 0) {
+            const rL = pl / tot;
+            return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL);
+          }
+          return s + (orc / 12) * mesesDecorridos;
+        }
+        return s + (orc / 12) * mesesDecorridos;
+      }, 0);
       const provAuto  = sec.itens.reduce((s, it) => {
         const prov = it.provisionado || 0;
         const tipo = it.tipo || "linear";

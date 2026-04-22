@@ -796,7 +796,7 @@ return (
 </div>
 <div>
 <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Custos Fixos</h2>
-<p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Orçado anual ÷ 12 · Acompanhamento acumulado mensal</p>
+<p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Lineares ÷ 12 · Pontuais integrais · Acompanhamento acumulado mensal</p>
 </div>
 </div>
 </div>
@@ -817,13 +817,13 @@ return (
       </div>
       <div style={{marginBottom:16}}>
         <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={orcTotalFmt} style={{...IS_RO}} title={`Anual: ${fmtR(computed.orcAnualTotal)} ÷ 12 × ${mesesDecorridos}`}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
+        <input readOnly value={orcTotalFmt} style={{...IS_RO}} title={`Anual: ${fmtR(computed.orcAnualTotal)} — lineares ÷ 12 × ${mesesDecorridos}; pontuais integrais`}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} · lineares ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"} · pontuais integrais</p>
       </div>
       <div style={{marginBottom:16}}>
         <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Realizado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provTotalAnualAll)} ÷ 12 × ${mesesDecorridos}`}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provTotalAnualAll)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
+        <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provTotalAnualAll)} — lineares ÷ 12 × ${mesesDecorridos}; pontuais integrais`}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provTotalAnualAll)} · lineares ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"} · pontuais integrais</p>
       </div>
     </div>
     <div style={grid3}>

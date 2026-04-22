@@ -467,7 +467,7 @@ return (
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
 const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-function FormFixos({T, onBack, servicos = [], notasMensais = []}) {
+function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
 const [mesAtual, setMesAtual] = useState(() => new Date().getMonth());
@@ -540,6 +540,26 @@ const provTotalAnual = computed.provTotalAnualAll;
 const nfRecV = gastoTotal;
 const nfPend = Math.max(0, provTotalAnual - gastoTotal);
 const pctRec = provTotalAnual > 0 ? nfRecV / provTotalAnual * 100 : 0;
+
+useEffect(() => {
+  if (onDadosCalculados) {
+    onDadosCalculados({
+      orcAnualTotal:  computed.orcAnualTotal,
+      orcAcumulado:   orcTotal,
+      gastoAcumulado: gastoTotal,
+      provAcumulado:  provTotal,
+      saldo:          saldoTotal,
+      provAnual:      provTotalAnual,
+      nfRecV:         nfRecV,
+      nfPend:         nfPend,
+      pctRec:         pctRec,
+      rows:           rows,
+      mesAtual:       mesAtual,
+      mesLabel:       MESES_FIX[mesAtual],
+    });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [orcTotal, gastoTotal, provTotal, saldoTotal, nfRecV, nfPend, pctRec, mesAtual]);
 const canvasRef = useRef(null);
 useDonut(canvasRef, nfRecV, nfPend);
 
@@ -551,130 +571,173 @@ const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"upperc
 const secNum = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
 
 async function gerarPPTX() {
-setLoading(true); setStatus({msg:"Gerando...", cls:""});
-try {
-const orcTotalV    = orcTotal;
-const provTotalV   = provTotal;
-const gastoTotalV  = gastoTotal;
-const saldoTotalV  = saldoTotal;
-const mesLabel     = MESES_FIX[mesAtual];
+  setLoading(true); setStatus({ msg: "Gerando…", cls: "" });
+  try {
+    const mesLabel = MESES_FIX[mesAtual];
+    const pptx = new PptxGenJS();
+    pptx.layout = "LAYOUT_WIDE";
+    const sl = pptx.addSlide();
+    sl.background = { color: "FFFFFF" };
 
-  const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE";
+    // ── Barra verde topo ────────────────────────────────────────────────────
+    sl.addShape(pptx.ShapeType.rect, {
+      x: 0, y: 0, w: 13.33, h: 0.06,
+      fill: { color: "166534" }, line: { width: 0 }
+    });
 
-  const sl = pptx.addSlide();
-  sl.background = {color:"FFFFFF"};
+    // ── Título e Subtítulo ──────────────────────────────────────────────────
+    sl.addText("Custos Fixos", {
+      x: 0.35, y: 0.1, w: 12.6, h: 0.38,
+      fontSize: 22, bold: true, color: "111827", fontFace: "Segoe UI"
+    });
+    sl.addText(`Capital estrutural estritamente sob controle até o mês de ${mesLabel}.`, {
+      x: 0.35, y: 0.5, w: 12.6, h: 0.26,
+      fontSize: 11, color: "374151", fontFace: "Segoe UI"
+    });
+    sl.addShape(pptx.ShapeType.line, {
+      x: 0.35, y: 0.82, w: 12.63, h: 0,
+      line: { color: "E5E7EB", width: 1 }
+    });
 
-  // barra topo
-  sl.addShape(pptx.ShapeType.rect, {x:0,y:0,w:13.33,h:0.05,fill:{color:"3B82F6"},line:{width:0}});
-
-  // título
-  sl.addText("Custos Fixos – Brasileirão 2026", {
-    x:0.3,y:0.08,w:12.7,h:0.38,fontSize:20,bold:true,color:"111827",fontFace:"Segoe UI"
-  });
-  sl.addText(`Serviços Fixos  ·  Orçado ÷ 12 · Acumulado até ${mesLabel}`, {
-    x:0.3,y:0.46,w:8,h:0.2,fontSize:10,color:"9CA3AF",fontFace:"Segoe UI"
-  });
-
-  // caixa orçado total campeonato (canto superior direito)
-  const orcAnualV = computed.orcAnualTotal;
-  const bxW=3.5, bxH=0.56, bxX=13.33-0.3-bxW, bxY=0.1;
-  sl.addShape(pptx.ShapeType.rect, {x:bxX,y:bxY,w:bxW,h:bxH,fill:{color:"EFF6FF"},line:{color:"3B82F6",width:1.5}});
-  sl.addText([
-    {text:"ORÇADO TOTAL CAMPEONATO\n", options:{fontSize:7,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"}},
-    {text:fmtBRL(orcAnualV), options:{fontSize:15,bold:true,color:"1E40AF",fontFace:"Segoe UI"}},
-  ], {x:bxX+0.12,y:bxY+0.04,w:bxW-0.24,h:bxH-0.08,align:"right",valign:"middle"});
-
-  sl.addShape(pptx.ShapeType.line, {x:0.3,y:0.72,w:12.73,h:0,line:{color:"E5E7EB",width:1}});
-
-  // KPIs
-  const saldoProvRealizadoV = provTotalV - gastoTotalV;
-  const kpis = [
-    {label:`ORÇADO ACUM. ATÉ ${mesLabel.toUpperCase()}`, val:fmtBRL(orcTotalV),              border:"D1D5DB", valColor:"111827"},
-    {label:"GASTO ACUMULADO",                             val:fmtBRL(gastoTotalV),             border:"D1D5DB", valColor:"111827"},
-    {label:"PROVISIONADO ACUM.",                          val:fmtBRL(provTotalV),              border:"D1D5DB", valColor:"3B82F6"},
-    {label:`SALDO ATÉ ${mesLabel.toUpperCase()} (PROV − REAL)`, val:(saldoProvRealizadoV>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(saldoProvRealizadoV)), border:"22C55E", valColor:saldoProvRealizadoV>=0?"16A34A":"EF4444"},
-  ];
-  const kW=3.18, kH=0.92, kY=0.82;
-  kpis.forEach(({label,val,border,valColor}, i) => {
-    const x = 0.3 + i*(kW+0.04);
-    sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:kH,fill:{color:"FFFFFF"},line:{color:border,width:1.5}});
-    sl.addShape(pptx.ShapeType.rect, {x,y:kY,w:kW,h:0.05,fill:{color:border},line:{width:0}});
-    sl.addText(label, {x:x+0.1,y:kY+0.1,w:kW-0.2,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.5,fontFace:"Segoe UI"});
-    sl.addText(val,   {x:x+0.1,y:kY+0.34,w:kW-0.2,h:0.46,fontSize:18,color:valColor,fontFace:"Segoe UI"});
-  });
-
-  // gráfico barras por seção (esquerda)
-  const secLabels = rows.map(r => r.secao.length>18 ? r.secao.substring(0,18)+"..." : r.secao);
-  sl.addChart(pptx.ChartType.bar, [
-    {name:"Orçado Acum.",  labels:secLabels, values:rows.map(r=>r.orc)},
-    {name:"Gasto",         labels:secLabels, values:rows.map(r=>r.gasto)},
-    {name:"Provisionado",  labels:secLabels, values:rows.map(r=>r.prov)},
-  ], {
-    x:0.3, y:1.88, w:8.8, h:2.72,
-    barDir:"col", barGrouping:"clustered",
-    chartColors:["D1D5DB","22C55E","3B82F6"],
-    showValue:false,
-    showLegend:true, legendPos:"t", legendFontSize:9,
-    title:"Comparativo Orçado × Gasto × Provisionado", showTitle:true, titleFontSize:11, titleBold:true,
-    valGridLine:{style:"none"},
-  });
-
-  // donut NFs (direita)
-  const provTotalAnualPptx = computed.provTotalAnualAll;
-  const nfRecPptx = gastoTotalV;
-  const nfPendPptx = Math.max(0, provTotalAnualPptx - gastoTotalV);
-  sl.addChart(pptx.ChartType.doughnut, [
-    {name:"NFs", labels:["Recebidas","Pendentes"], values:[nfRecPptx, nfPendPptx]},
-  ], {
-    x:9.3, y:1.88, w:3.73, h:2.72,
-    chartColors:["22C55E","D97706"],
-    holeSize:60,
-    showLabel:false, showPercent:true, dataLabelFontSize:9,
-    showLegend:true, legendPos:"b", legendFontSize:8,
-    title:"NFs vs Provisionado Total", showTitle:true, titleFontSize:11, titleBold:true,
-  });
-
-  // tabela por seção
-  const th = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-  const tblHead = [th("SEÇÃO"), th("ORÇADO ACUM.","right"), th("GASTO","right"), th("PROVISIONADO","right"), th("SALDO","right")];
-
-  const tblBody = rows.map((r, i) => {
-    const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
-    const sc = r.saldo>=0?"16A34A":"DC2626";
-    return [
-      {text:r.secao,         options:{fontSize:8.5,bold:true,color:"111827",fill}},
-      {text:fmtBRL(r.orc),   options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-      {text:fmtBRL(r.gasto), options:{fontSize:8.5,color:"111827",fill,align:"right"}},
-      {text:fmtBRL(r.prov),  options:{fontSize:8.5,color:"3B82F6",fill,align:"right"}},
-      {text:fmtBRL(r.saldo), options:{fontSize:8.5,bold:true,color:sc,fill,align:"right"}},
+    // ── 4 KPI Cards numerados ───────────────────────────────────────────────
+    const kW = 3.1, kH = 1.0, kY = 0.94, kGap = 0.077;
+    const kpis = [
+      { num: "1", label: "ORÇAMENTO TOTAL (CAMPEONATO)",            val: fmtBRL(computed.orcAnualTotal), valColor: "9CA3AF", accent: false },
+      { num: "2", label: `ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val: fmtBRL(orcTotal),        valColor: "111827", accent: false },
+      { num: "3", label: `REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,     val: fmtBRL(gastoTotal),      valColor: "111827", accent: false },
+      {
+        num: "4", label: "SALDO ACUMULADO",
+        val: (saldoTotal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saldoTotal)),
+        valColor: saldoTotal >= 0 ? "16A34A" : "DC2626",
+        accent: true
+      },
     ];
-  });
 
-  const stc = saldoTotalV>=0?"A3E635":"FF6B6B";
-  const tblTot = [
-    {text:"TOTAL",              options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"}}},
-    {text:fmtBRL(orcTotalV),    options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-    {text:fmtBRL(gastoTotalV),  options:{fontSize:8.5,bold:true,color:"FFFFFF",fill:{color:"111827"},align:"right"}},
-    {text:fmtBRL(provTotalV),   options:{fontSize:8.5,bold:true,color:"93C5FD",fill:{color:"111827"},align:"right"}},
-    {text:fmtBRL(saldoTotalV),  options:{fontSize:8.5,bold:true,color:stc,fill:{color:"111827"},align:"right"}},
-  ];
+    kpis.forEach(({ num, label, val, valColor, accent }, i) => {
+      const x = 0.35 + i * (kW + kGap);
+      sl.addShape(pptx.ShapeType.rect, {
+        x, y: kY, w: kW, h: kH,
+        fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+      });
+      if (accent) {
+        sl.addShape(pptx.ShapeType.rect, {
+          x, y: kY, w: 0.06, h: kH,
+          fill: { color: saldoTotal >= 0 ? "16A34A" : "DC2626" }, line: { width: 0 }
+        });
+      }
+      sl.addText(num, {
+        x: x + 0.12, y: kY + 0.09, w: 0.2, h: 0.16,
+        fontSize: 8, color: "9CA3AF", fontFace: "Segoe UI"
+      });
+      sl.addText(label, {
+        x: x + 0.12, y: kY + 0.28, w: kW - 0.22, h: 0.18,
+        fontSize: 7.5, bold: true, color: "6B7280", charSpacing: 1.2, fontFace: "Segoe UI"
+      });
+      sl.addText(val, {
+        x: x + 0.12, y: kY + 0.5, w: kW - 0.22, h: 0.4,
+        fontSize: 16, color: valColor, fontFace: "Segoe UI"
+      });
+    });
 
-  const rowH = Math.max(0.18, 2.6 / (rows.length + 1));
-  sl.addTable([tblHead, ...tblBody, tblTot], {
-    x:0.3, y:4.72, w:12.73, colW:[4.0,2.2,2.2,2.2,2.13],
-    border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH,
-  });
+    // ── Barra Comparativo Orçado vs Realizado ───────────────────────────────
+    sl.addText("Comparativo Orçado vs. Realizado", {
+      x: 0.35, y: 2.06, w: 12.63, h: 0.22,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
 
-  const fileMes = mesLabel.toLowerCase();
-  await pptx.writeFile({fileName:`custos_fixos_${fileMes}_brasileirao2026.pptx`});
-  setStatus({msg:`✅ custos_fixos_${fileMes}.pptx baixado!`, cls:"ok"});
-} catch(e) {
-  setStatus({msg:"❌ Erro: "+e.message, cls:"err"});
-  console.error(e);
-}
-setLoading(false);
+    const bW = 12.63, bH = 0.42, bX = 0.35, bY = 2.32;
+    const orcBase  = orcTotal || 1;
+    const pctReal  = Math.min(1, gastoTotal / orcBase);
+    const realW    = Math.max(0.3, bW * pctReal);
+    const saldoW   = bW - realW;
 
+    sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: bW, h: bH, fill: { color: "D1D5DB" }, line: { width: 0 } });
+    sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: realW, h: bH, fill: { color: "14532D" }, line: { width: 0 } });
+
+    sl.addText(`Realizado: ${fmtBRL(gastoTotal)}`, {
+      x: bX + 0.1, y: bY + 0.02, w: realW - 0.15, h: bH - 0.04,
+      fontSize: 9, bold: true, color: "FFFFFF", valign: "middle", fontFace: "Segoe UI"
+    });
+    sl.addText(`Saldo: ${fmtBRL(orcTotal - gastoTotal)}`, {
+      x: bX + realW + 0.1, y: bY + 0.02, w: saldoW - 0.15, h: bH - 0.04,
+      fontSize: 9, color: "374151", valign: "middle", fontFace: "Segoe UI"
+    });
+
+    // ── Barra Status NFs ────────────────────────────────────────────────────
+    sl.addText("Status NFs", {
+      x: 0.35, y: 2.86, w: 12.63, h: 0.22,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
+
+    const bW3 = 12.63, bH3 = 0.26, bX3 = 0.35, bY3 = 3.12;
+    const pctRec3 = Math.min(1, pctRec / 100);
+
+    sl.addShape(pptx.ShapeType.rect, { x: bX3, y: bY3, w: bW3, h: bH3, fill: { color: "D1D5DB" }, line: { width: 0 } });
+    sl.addShape(pptx.ShapeType.rect, { x: bX3, y: bY3, w: Math.max(0.05, bW3 * pctRec3), h: bH3, fill: { color: "16A34A" }, line: { width: 0 } });
+
+    sl.addText(`${Math.round(pctRec)}% Recebidas (${fmtBRL(nfRecV)})`, {
+      x: bX3, y: bY3 + 0.3, w: 5, h: 0.18,
+      fontSize: 8, bold: true, color: "16A34A", fontFace: "Segoe UI"
+    });
+    sl.addText(`${Math.round(100 - pctRec)}% Pendentes (${fmtBRL(nfPend)})`, {
+      x: bX3 + 7.63, y: bY3 + 0.3, w: 5, h: 0.18,
+      fontSize: 8, color: "6B7280", fontFace: "Segoe UI", align: "right"
+    });
+
+    // ── Tabela por Seção ────────────────────────────────────────────────────
+    const th = (txt, align = "left") => ({
+      text: txt,
+      options: { bold: true, fontSize: 9, color: "FFFFFF", fill: { color: "111827" }, align }
+    });
+
+    const tblBody = rows.map((r, i) => {
+      const fill = { color: i % 2 === 0 ? "FFFFFF" : "F9FAFB" };
+      const sc   = r.saldo >= 0 ? "16A34A" : "DC2626";
+      return [
+        { text: r.secao,          options: { fontSize: 9, bold: true, color: "374151", fill } },
+        { text: fmtBRL(r.orc),    options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(r.gasto),  options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(r.saldo),  options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+      ];
+    });
+
+    const stcTot  = saldoTotal >= 0 ? "A3E635" : "FF6B6B";
+    const totFill = { color: "111827" };
+    const tblTot  = [
+      { text: "TOTAL",              options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill } },
+      { text: fmtBRL(orcTotal),     options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: fmtBRL(gastoTotal),   options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: fmtBRL(saldoTotal),   options: { fontSize: 9, bold: true, color: stcTot, fill: totFill, align: "right" } },
+    ];
+
+    const rowH = Math.max(0.26, 3.5 / (rows.length + 2));
+    sl.addTable(
+      [
+        [th("SEÇÃO"), th("ORÇADO ACUM.", "right"), th("REALIZADO", "right"), th("SALDO", "right")],
+        ...tblBody,
+        tblTot,
+      ],
+      {
+        x: 0.35, y: 3.55, w: 12.63,
+        colW: [5.8, 2.4, 2.4, 2.03],
+        border: { type: "solid", color: "E5E7EB", pt: 0.5 },
+        rowH,
+      }
+    );
+
+    // ── Rodapé ──────────────────────────────────────────────────────────────
+    sl.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
+      x: 0.35, y: 7.28, w: 12.63, h: 0.16,
+      fontSize: 7.5, color: "9CA3AF", align: "center", fontFace: "Segoe UI"
+    });
+
+    await pptx.writeFile({ fileName: `custos_fixos_${mesLabel.toLowerCase()}_brasileirao2026.pptx` });
+    setStatus({ msg: `✅ custos_fixos_${mesLabel.toLowerCase()}.pptx baixado!`, cls: "ok" });
+  } catch (e) {
+    setStatus({ msg: "❌ Erro: " + e.message, cls: "err" });
+    console.error(e);
+  }
+  setLoading(false);
 }
 
 return (

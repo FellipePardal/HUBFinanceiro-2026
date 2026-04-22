@@ -610,14 +610,19 @@ const nfRecV = gastoAtivo;
 const nfPend = Math.max(0, provAtivoBase - gastoAtivo);
 const pctRec = provAtivoBase > 0 ? nfRecV / provAtivoBase * 100 : 0;
 
+// Realizado da Visão Geral segue a mesma regra da tabela do slide:
+// Outros Mensais usa gasto (prov=0), demais usam prov.
+const realizadoVG = rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
+const saldoVG     = orcTotal - realizadoVG;
+
 useEffect(() => {
   if (onDadosCalculados) {
     onDadosCalculados({
       orcAnualTotal:  computed.orcAnualTotal,
       orcAcumulado:   orcTotal,
       gastoAcumulado: gastoTotal,
-      provAcumulado:  provTotal,
-      saldo:          saldoTotal,
+      provAcumulado:  realizadoVG,
+      saldo:          saldoVG,
       provAnual:      provTotalAnual,
       nfRecV:         nfRecV,
       nfPend:         nfPend,
@@ -628,7 +633,7 @@ useEffect(() => {
     });
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [orcTotal, gastoTotal, provTotal, saldoTotal, nfRecV, nfPend, pctRec, mesAtual]);
+}, [orcTotal, gastoTotal, realizadoVG, saldoVG, nfRecV, nfPend, pctRec, mesAtual]);
 const canvasRef = useRef(null);
 useDonut(canvasRef, nfRecV, nfPend);
 
@@ -1404,7 +1409,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
     const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
     const orcAcumulado   = sections.reduce((s, x) => s + x.orc, 0);
-    const provAcumulado  = sections.reduce((s, x) => s + x.prov, 0);
+    // Realizado da Visão Geral: Outros Mensais usa gasto (prov=0); demais usam prov.
+    const provAcumulado  = sections.reduce((s, x) => s + (x.secao === "Outros Mensais" ? x.gasto : x.prov), 0);
     const gastoAcumulado = sections.reduce((s, x) => s + x.gasto, 0);
     const saldo          = orcAcumulado - provAcumulado;
     // Pendente de NF exclui serviços encerrados

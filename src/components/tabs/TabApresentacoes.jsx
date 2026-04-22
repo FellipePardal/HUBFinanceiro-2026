@@ -762,21 +762,25 @@ async function gerarPPTX() {
     const tblBody = rows.map((r, i) => {
       const fill = { color: i % 2 === 0 ? "FFFFFF" : "F9FAFB" };
       const sc   = r.saldo >= 0 ? "16A34A" : "DC2626";
+      // Coluna REALIZADO = base do saldo: Outros Mensais usa gasto (prov=0),
+      // demais seções usam provisionado mensal.
+      const realizadoVal = r.secao === "Outros Mensais" ? r.gasto : r.prov;
       return [
-        { text: r.secao,          options: { fontSize: 9, bold: true, color: "374151", fill } },
-        { text: fmtBRL(r.orc),    options: { fontSize: 9, color: "374151", fill, align: "right" } },
-        { text: fmtBRL(r.gasto),  options: { fontSize: 9, color: "374151", fill, align: "right" } },
-        { text: fmtBRL(r.saldo),  options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+        { text: r.secao,                options: { fontSize: 9, bold: true, color: "374151", fill } },
+        { text: fmtBRL(r.orc),          options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(realizadoVal),   options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(r.saldo),        options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
       ];
     });
 
     const stcTot  = saldoTotal >= 0 ? "A3E635" : "FF6B6B";
     const totFill = { color: "111827" };
+    const realizadoTot = rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
     const tblTot  = [
-      { text: "TOTAL",              options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill } },
-      { text: fmtBRL(orcTotal),     options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
-      { text: fmtBRL(gastoTotal),   options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
-      { text: fmtBRL(saldoTotal),   options: { fontSize: 9, bold: true, color: stcTot, fill: totFill, align: "right" } },
+      { text: "TOTAL",                 options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill } },
+      { text: fmtBRL(orcTotal),        options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: fmtBRL(realizadoTot),    options: { fontSize: 9, bold: true, color: "FFFFFF", fill: totFill, align: "right" } },
+      { text: fmtBRL(saldoTotal),      options: { fontSize: 9, bold: true, color: stcTot, fill: totFill, align: "right" } },
     ];
 
     const rowH = Math.max(0.26, 3.5 / (rows.length + 2));

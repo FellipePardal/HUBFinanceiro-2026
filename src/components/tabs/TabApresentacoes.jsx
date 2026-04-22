@@ -7,6 +7,21 @@ import { BarChart3, Lock, ArrowRight, ArrowLeft, FileDown, LayoutGrid } from "lu
 
 const fmtBRL = v => "R$ " + Number(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
 
+// Estado persistido em localStorage
+function usePersistedState(key, initial) {
+  const [val, setVal] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) return JSON.parse(raw);
+    } catch {}
+    return typeof initial === "function" ? initial() : initial;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  }, [key, val]);
+  return [val, setVal];
+}
+
 // ─── HOOK DONUT ───────────────────────────────────────────────────────────────
 function useDonut(canvasRef, rec, pend) {
 useEffect(() => {
@@ -75,7 +90,7 @@ const rodadasDisp = useMemo(() =>
 Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b),
 [jogos]);
 
-const [rodadaAtual, setRodadaAtual] = useState(() => rodadasDisp[rodadasDisp.length-1] || 1);
+const [rodadaAtual, setRodadaAtual] = usePersistedState("apres_var_rodada", () => rodadasDisp[rodadasDisp.length-1] || 1);
 useEffect(() => {
 if (rodadasDisp.length && !rodadasDisp.includes(rodadaAtual)) {
 setRodadaAtual(rodadasDisp[rodadasDisp.length-1]);
@@ -103,13 +118,13 @@ return { orcAteRod, realAteRod, provAteRod, rodadasAuto };
 }, [jogos, rodadaAtual, rodadasDisp]);
 
 // Overrides por linha (rodada → {orcado?, realizado?})
-const [overrides, setOverrides] = useState({});
+const [overrides, setOverrides] = usePersistedState("apres_var_overrides", {});
 const setRodadaField = (rodada, field, val) =>
 setOverrides(prev => ({...prev, [rodada]: {...prev[rodada], [field]: val}}));
 
 // Overrides do bloco "Notas Fiscais" — vazio = usar valor automático da tabela
-const [nfEspOverride, setNfEspOverride] = useState("");
-const [nfRecOverride, setNfRecOverride] = useState("");
+const [nfEspOverride, setNfEspOverride] = usePersistedState("apres_var_nfEsp", "");
+const [nfRecOverride, setNfRecOverride] = usePersistedState("apres_var_nfRec", "");
 const resetOverrides = () => { setOverrides({}); setNfEspOverride(""); setNfRecOverride(""); };
 
 // View da tabela aplicando overrides
@@ -470,7 +485,7 @@ const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho"
 function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
-const [mesAtual, setMesAtual] = useState(() => new Date().getMonth());
+const [mesAtual, setMesAtual] = usePersistedState("apres_fix_mes", () => new Date().getMonth());
 
 // Categorias variáveis (excluídas dos "Outros Mensais" fixos)
 const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
@@ -508,7 +523,7 @@ return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll };
 }, [servicos, notasMensais, mesAtual, mesesDecorridos]);
 
 // Overrides por seção (secao → {orc?, gasto?})
-const [overrides, setOverrides] = useState({});
+const [overrides, setOverrides] = usePersistedState("apres_fix_overrides", {});
 const setSecField = (secao, field, val) =>
 setOverrides(prev => ({...prev, [secao]: {...prev[secao], [field]: val}}));
 const resetOverrides = () => setOverrides({});

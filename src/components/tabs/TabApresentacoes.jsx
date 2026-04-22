@@ -619,7 +619,7 @@ async function gerarPPTX() {
     const kpis = [
       { num: "1", label: "ORÇAMENTO TOTAL (CAMPEONATO)",            val: fmtBRL(computed.orcAnualTotal), valColor: "9CA3AF", accent: false },
       { num: "2", label: `ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val: fmtBRL(orcTotal),        valColor: "111827", accent: false },
-      { num: "3", label: `REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,     val: fmtBRL(gastoTotal),      valColor: "111827", accent: false },
+      { num: "3", label: `PROVISIONADO (ATÉ ${mesLabel.toUpperCase()})`,  val: fmtBRL(provTotal),       valColor: "111827", accent: false },
       {
         num: "4", label: "SALDO ACUMULADO",
         val: (saldoTotal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saldoTotal)),
@@ -654,27 +654,27 @@ async function gerarPPTX() {
       });
     });
 
-    // ── Barra Comparativo Orçado vs Realizado ───────────────────────────────
-    sl.addText("Comparativo Orçado vs. Realizado", {
+    // ── Barra Comparativo Orçado vs Provisionado ───────────────────────────
+    sl.addText("Comparativo Orçado vs. Provisionado", {
       x: 0.35, y: 2.06, w: 12.63, h: 0.22,
       fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
     });
 
     const bW = 12.63, bH = 0.42, bX = 0.35, bY = 2.32;
     const orcBase  = orcTotal || 1;
-    const pctReal  = Math.min(1, gastoTotal / orcBase);
-    const realW    = Math.max(0.3, bW * pctReal);
-    const saldoW   = bW - realW;
+    const pctProv  = Math.min(1, provTotal / orcBase);
+    const provW    = Math.max(0.3, bW * pctProv);
+    const saldoW   = bW - provW;
 
     sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: bW, h: bH, fill: { color: "D1D5DB" }, line: { width: 0 } });
-    sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: realW, h: bH, fill: { color: "14532D" }, line: { width: 0 } });
+    sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: provW, h: bH, fill: { color: "14532D" }, line: { width: 0 } });
 
-    sl.addText(`Realizado: ${fmtBRL(gastoTotal)}`, {
-      x: bX + 0.1, y: bY + 0.02, w: realW - 0.15, h: bH - 0.04,
+    sl.addText(`Provisionado: ${fmtBRL(provTotal)}`, {
+      x: bX + 0.1, y: bY + 0.02, w: provW - 0.15, h: bH - 0.04,
       fontSize: 9, bold: true, color: "FFFFFF", valign: "middle", fontFace: "Segoe UI"
     });
     sl.addText(`Saldo: ${fmtBRL(saldoTotal)}`, {
-      x: bX + realW + 0.1, y: bY + 0.02, w: saldoW - 0.15, h: bH - 0.04,
+      x: bX + provW + 0.1, y: bY + 0.02, w: saldoW - 0.15, h: bH - 0.04,
       fontSize: 9, color: "374151", valign: "middle", fontFace: "Segoe UI"
     });
 

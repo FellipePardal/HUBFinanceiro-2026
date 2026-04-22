@@ -843,93 +843,201 @@ async function gerarPPTX() {
     // ════════════════════════════════════════════════════════════════
     const sl1 = pptx.addSlide();
     sl1.background = {color:"FFFFFF"};
-    sl1.addShape(pptx.ShapeType.rect, {x:0,y:0,w:13.33,h:0.05,fill:{color:"166534"},line:{width:0}});
 
+    // Elemento 1 — Barra verde no topo
+    sl1.addShape(pptx.ShapeType.rect, {
+      x: 0, y: 0, w: 13.33, h: 0.06,
+      fill: { color: "166534" },
+      line: { width: 0 }
+    });
+
+    // Elemento 2 — Título principal
     sl1.addText("Visão Geral Orçamentária", {
-      x:0.35,y:0.1,w:12.6,h:0.42,fontSize:24,bold:true,color:"111827",fontFace:"Segoe UI"
+      x: 0.35, y: 0.12, w: 12.6, h: 0.5,
+      fontSize: 28, bold: true,
+      color: "111827",
+      fontFace: "Segoe UI"
     });
-    sl1.addShape(pptx.ShapeType.line, {x:0.35,y:0.6,w:12.63,h:0,line:{color:"E5E7EB",width:1}});
 
-    // 3 KPIs topo
+    // Elemento 3 — Linha divisória horizontal
+    sl1.addShape(pptx.ShapeType.line, {
+      x: 0.35, y: 0.72, w: 12.63, h: 0,
+      line: { color: "E5E7EB", width: 1 }
+    });
+
+    // Elemento 4 — 3 KPI Cards em linha
     const orcCampeonato = ORC_TOTAL_CAMPEONATO_VAR + computedFix.orcAnualTotal;
-    const kpi1 = [
-      {label:"ORÇAMENTO TOTAL DO CAMPEONATO", val:fmtBRL(orcCampeonato),                                    border:"D1D5DB", valColor:"6B7280"},
-      {label:"REALIZADO (ATUAL)",              val:fmtBRL(realTotalGlobal),                                  border:"D1D5DB", valColor:"111827"},
-      {label:"SAVING / SALDO GLOBAL",          val:(savingGlobal>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(savingGlobal)), border:"16A34A", valColor:savingGlobal>=0?"16A34A":"DC2626"},
+    const kpiCards = [
+      {
+        label: "ORÇAMENTO TOTAL DO CAMPEONATO",
+        val: fmtBRL(orcCampeonato),
+        valColor: "9CA3AF",
+        bold: false
+      },
+      {
+        label: "REALIZADO (ATUAL)",
+        val: fmtBRL(realTotalGlobal),
+        valColor: "111827",
+        bold: false
+      },
+      {
+        label: "SAVING / SALDO GLOBAL",
+        val: (savingGlobal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(savingGlobal)),
+        valColor: savingGlobal >= 0 ? "16A34A" : "DC2626",
+        bold: true,
+        accentBorder: true
+      },
     ];
-    const k1W=4.2, k1H=1.05, k1Y=0.72;
-    kpi1.forEach(({label,val,border,valColor},i) => {
-      const x = 0.35 + i*(k1W+0.09);
-      sl1.addShape(pptx.ShapeType.rect, {x,y:k1Y,w:k1W,h:k1H,fill:{color:"F9FAFB"},line:{color:border,width:1.5}});
-      sl1.addText(label, {x:x+0.14,y:k1Y+0.1,w:k1W-0.28,h:0.2,fontSize:7.5,bold:true,color:"6B7280",charSpacing:1.2,fontFace:"Segoe UI"});
-      sl1.addText(val,   {x:x+0.14,y:k1Y+0.36,w:k1W-0.28,h:0.56,fontSize:20,bold:i===2,color:valColor,fontFace:"Segoe UI"});
+
+    const kW = 4.14, kH = 1.1, kY = 0.85, kGap = 0.105;
+    kpiCards.forEach(({ label, val, valColor, bold, accentBorder }, i) => {
+      const x = 0.35 + i * (kW + kGap);
+      sl1.addShape(pptx.ShapeType.rect, {
+        x, y: kY, w: kW, h: kH,
+        fill: { color: "F3F4F6" },
+        line: { color: "E5E7EB", width: 0.75 }
+      });
+      if (accentBorder) {
+        sl1.addShape(pptx.ShapeType.rect, {
+          x, y: kY, w: 0.06, h: kH,
+          fill: { color: "16A34A" },
+          line: { width: 0 }
+        });
+      }
+      sl1.addText(label, {
+        x: x + 0.18, y: kY + 0.12, w: kW - 0.28, h: 0.2,
+        fontSize: 7.5, bold: true, color: "6B7280",
+        charSpacing: 1.5, fontFace: "Segoe UI"
+      });
+      sl1.addText(val, {
+        x: x + 0.18, y: kY + 0.38, w: kW - 0.28, h: 0.58,
+        fontSize: bold ? 26 : 22,
+        bold,
+        color: valColor,
+        fontFace: "Segoe UI"
+      });
     });
 
-    // Síntese dos Pilares — header
+    // Elemento 5 — Título "Síntese dos Pilares"
     sl1.addText("Síntese dos Pilares", {
-      x:0.35,y:1.88,w:12.63,h:0.24,fontSize:11,color:"6B7280",align:"center",fontFace:"Segoe UI"
+      x: 0.35, y: 2.1, w: 12.63, h: 0.26,
+      fontSize: 12, color: "374151",
+      align: "center", fontFace: "Segoe UI"
     });
 
-    // Pilar Esquerdo — Variáveis
-    const p1x=0.35, p1w=6.1, p1y=2.18, p1h=1.2;
-    sl1.addShape(pptx.ShapeType.rect, {x:p1x,y:p1y,w:p1w,h:p1h,fill:{color:"F9FAFB"},line:{color:"E5E7EB",width:1}});
-    sl1.addText("Dinâmica Operacional (Custos Variáveis)", {x:p1x+0.15,y:p1y+0.1,w:p1w-0.3,h:0.22,fontSize:10,bold:true,color:"111827",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Orçamento do Período: ${fmtBRL(varOrc)}`, {x:p1x+0.15,y:p1y+0.36,w:p1w-0.3,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Realizado: ${fmtBRL(varReal)}`,           {x:p1x+0.15,y:p1y+0.56,w:p1w-0.3,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Saldo: ${fmtBRL(varSaving)}`,             {x:p1x+0.15,y:p1y+0.76,w:p1w-0.3,h:0.22,fontSize:11,bold:true,color:varSaving>=0?"16A34A":"DC2626",fontFace:"Segoe UI",align:"center"});
+    // Elemento 6 — Dois Pilares lado a lado
+    const pY = 2.44, pH = 1.32;
 
-    // Divisor vertical
-    sl1.addShape(pptx.ShapeType.line, {x:6.67,y:p1y+0.08,w:0,h:p1h-0.16,line:{color:"E5E7EB",width:1}});
+    // Pilar Esquerdo — Dinâmica Operacional (Custos Variáveis)
+    sl1.addShape(pptx.ShapeType.rect, {
+      x: 0.35, y: pY, w: 5.9, h: pH,
+      fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+    });
+    sl1.addText("Dinâmica Operacional (Custos Variáveis)", {
+      x: 0.55, y: pY + 0.1, w: 5.5, h: 0.24,
+      fontSize: 11, bold: true, color: "111827",
+      align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Orçamento do Período: " + fmtBRL(varOrc), {
+      x: 0.55, y: pY + 0.38, w: 5.5, h: 0.2,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Realizado: " + fmtBRL(varReal), {
+      x: 0.55, y: pY + 0.6, w: 5.5, h: 0.2,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Saldo: " + fmtBRL(varSaving), {
+      x: 0.55, y: pY + 0.84, w: 5.5, h: 0.26,
+      fontSize: 12, bold: true,
+      color: varSaving >= 0 ? "16A34A" : "DC2626",
+      align: "center", fontFace: "Segoe UI"
+    });
 
-    // Pilar Direito — Fixos
-    const p2x=6.88, p2w=6.1;
-    sl1.addShape(pptx.ShapeType.rect, {x:p2x,y:p1y,w:p2w,h:p1h,fill:{color:"F9FAFB"},line:{color:"E5E7EB",width:1}});
-    sl1.addText("Estrutura Acumulada (Custos Fixos)", {x:p2x+0.15,y:p1y+0.1,w:p2w-0.3,h:0.22,fontSize:10,bold:true,color:"111827",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Orçado até ${mesLabel}: ${fmtBRL(orcTotalFix)}`,    {x:p2x+0.15,y:p1y+0.36,w:p2w-0.3,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Realizado até ${mesLabel}: ${fmtBRL(gastoTotalFix)}`,{x:p2x+0.15,y:p1y+0.56,w:p2w-0.3,h:0.18,fontSize:9,color:"6B7280",fontFace:"Segoe UI",align:"center"});
-    sl1.addText(`Saldo até ${mesLabel}: ${fmtBRL(saldoFix)}`,         {x:p2x+0.15,y:p1y+0.76,w:p2w-0.3,h:0.22,fontSize:11,bold:true,color:saldoFix>=0?"16A34A":"DC2626",fontFace:"Segoe UI",align:"center"});
+    // Linha divisória vertical central
+    sl1.addShape(pptx.ShapeType.line, {
+      x: 6.665, y: pY + 0.08, w: 0, h: pH - 0.16,
+      line: { color: "E5E7EB", width: 1 }
+    });
 
-    // Tabela de Blocos
-    const th1 = (txt, align="left") => ({text:txt, options:{bold:true,fontSize:8.5,color:"FFFFFF",fill:{color:"1F2937"},align}});
-    const tblHead1 = [th1("BLOCO"), th1("ORÇADO (Período)","right"), th1("REALIZADO","right"), th1("SAVING / SALDO (R$)","right"), th1("%","right")];
+    // Pilar Direito — Estrutura Acumulada (Custos Fixos)
+    sl1.addShape(pptx.ShapeType.rect, {
+      x: 6.78, y: pY, w: 5.9, h: pH,
+      fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+    });
+    sl1.addText("Estrutura Acumulada (Custos Fixos)", {
+      x: 6.98, y: pY + 0.1, w: 5.5, h: 0.24,
+      fontSize: 11, bold: true, color: "111827",
+      align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Orçado até " + mesLabel + ": " + fmtBRL(orcTotalFix), {
+      x: 6.98, y: pY + 0.38, w: 5.5, h: 0.2,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Realizado até " + mesLabel + ": " + fmtBRL(gastoTotalFix), {
+      x: 6.98, y: pY + 0.6, w: 5.5, h: 0.2,
+      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+    });
+    sl1.addText("Saldo até " + mesLabel + ": " + fmtBRL(saldoFix), {
+      x: 6.98, y: pY + 0.84, w: 5.5, h: 0.26,
+      fontSize: 12, bold: true,
+      color: saldoFix >= 0 ? "16A34A" : "DC2626",
+      align: "center", fontFace: "Segoe UI"
+    });
 
-    const blocoVar  = { orc: varOrc,    real: varReal,       sav: varSaving,   pct: varSavPct };
-    const blocoFix  = { orc: orcTotalFix, real: gastoTotalFix, sav: saldoFix,  pct: orcTotalFix>0 ? saldoFix/orcTotalFix*100 : 0 };
-    const blocoTot  = { orc: varOrc+orcTotalFix, real: varReal+gastoTotalFix, sav: savingGlobal, pct: savingGlobalPct };
+    // Elemento 7 — Tabela de Blocos
+    const thS = (txt, align = "left") => ({
+      text: txt,
+      options: { bold: true, fontSize: 9, color: "FFFFFF", fill: { color: "111827" }, align }
+    });
 
-    const mkRow1 = (label, b, i) => {
-      const fill = {color: i%2===0?"FFFFFF":"F9FAFB"};
-      const sc = b.sav>=0?"16A34A":"DC2626";
+    const mkBlocoRow = (label, orc, real, sav, pct, rowIdx) => {
+      const fill = { color: rowIdx % 2 === 0 ? "FFFFFF" : "F9FAFB" };
+      const sc = sav >= 0 ? "16A34A" : "DC2626";
+      const icon = sav >= 0 ? "▲ " : "▼ ";
       return [
-        {text:label,                                                      options:{fontSize:9,color:"111827",fill}},
-        {text:fmtBRL(b.orc),                                             options:{fontSize:9,color:"111827",fill,align:"right"}},
-        {text:fmtBRL(b.real),                                            options:{fontSize:9,color:"111827",fill,align:"right"}},
-        {text:(b.sav>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(b.sav)),             options:{fontSize:9,bold:true,color:sc,fill,align:"right"}},
-        {text:(b.pct>=0?"▲ ":"▼ ")+Math.abs(b.pct).toFixed(1)+"%",      options:{fontSize:9,bold:true,color:sc,fill,align:"right"}},
+        { text: label,                                   options: { fontSize: 9, color: "374151", fill } },
+        { text: fmtBRL(orc),                             options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: fmtBRL(real),                            options: { fontSize: 9, color: "374151", fill, align: "right" } },
+        { text: icon + fmtBRL(Math.abs(sav)),            options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+        { text: icon + Math.abs(pct).toFixed(1) + "%",   options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
       ];
     };
-    const totFill1 = {color:"111827"};
-    const stcG = savingGlobal>=0?"A3E635":"FF6B6B";
+
+    const savVarPct    = varOrc > 0 ? varSaving / varOrc * 100 : 0;
+    const savFixPct    = orcTotalFix > 0 ? saldoFix / orcTotalFix * 100 : 0;
+    const orcGlobal    = varOrc + orcTotalFix;
+    const realGlobal   = varReal + gastoTotalFix;
+    const savGlobal    = orcGlobal - realGlobal;
+    const savGlobalPct = orcGlobal > 0 ? savGlobal / orcGlobal * 100 : 0;
+
+    const fillTot = { color: "F3F4F6" };
+    const scTot = savGlobal >= 0 ? "16A34A" : "DC2626";
+    const iconTot = savGlobal >= 0 ? "▲ " : "▼ ";
     const tblTot1 = [
-      {text:"TOTAL",                                                      options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill1}},
-      {text:fmtBRL(blocoTot.orc),                                        options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill1,align:"right"}},
-      {text:fmtBRL(blocoTot.real),                                       options:{fontSize:9,bold:true,color:"FFFFFF",fill:totFill1,align:"right"}},
-      {text:(savingGlobal>=0?"▲ ":"▼ ")+fmtBRL(Math.abs(savingGlobal)),  options:{fontSize:9,bold:true,color:stcG,fill:totFill1,align:"right"}},
-      {text:(savingGlobalPct>=0?"▲ ":"▼ ")+Math.abs(savingGlobalPct).toFixed(1)+"%", options:{fontSize:9,bold:true,color:stcG,fill:totFill1,align:"right"}},
+      { text: "TOTAL",                                            options: { fontSize: 9, bold: true, color: "111827", fill: fillTot } },
+      { text: fmtBRL(orcGlobal),                                  options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
+      { text: fmtBRL(realGlobal),                                 options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
+      { text: iconTot + fmtBRL(Math.abs(savGlobal)),              options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
+      { text: iconTot + Math.abs(savGlobalPct).toFixed(1) + "%",  options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
     ];
+
     sl1.addTable([
-      tblHead1,
-      mkRow1("1  Serviços Variáveis (R1–R"+rodadaAtual+")", blocoVar, 0),
-      mkRow1("2  Custos Fixos (até "+mesLabel+")",           blocoFix, 1),
+      [thS("BLOCO"), thS("ORÇADO (Período)", "right"), thS("REALIZADO", "right"), thS("SAVING / SALDO (R$)", "right"), thS("%", "right")],
+      mkBlocoRow("1  Serviços Variáveis (R1–R" + rodadaAtual + ")", varOrc, varReal, varSaving, savVarPct, 0),
+      mkBlocoRow("2  Custos Fixos (até " + mesLabel + ")",           orcTotalFix, gastoTotalFix, saldoFix, savFixPct, 1),
       tblTot1,
     ], {
-      x:0.35, y:3.52, w:12.63, colW:[4.5,2.5,2.5,2.5,0.63],
-      border:{type:"solid",color:"E5E7EB",pt:0.5}, rowH:0.38,
+      x: 0.35, y: 3.9, w: 12.63,
+      colW: [4.6, 2.4, 2.4, 2.4, 0.83],
+      border: { type: "solid", color: "E5E7EB", pt: 0.5 },
+      rowH: 0.42,
     });
 
-    // rodapé slide 1
+    // Elemento 8 — Rodapé
     sl1.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
-      x:0.35,y:7.22,w:12.63,h:0.18,fontSize:8,color:"9CA3AF",fontFace:"Segoe UI",align:"center"
+      x: 0.35, y: 7.28, w: 12.63, h: 0.16,
+      fontSize: 7.5, color: "9CA3AF",
+      align: "center", fontFace: "Segoe UI"
     });
 
     // ════════════════════════════════════════════════════════════════

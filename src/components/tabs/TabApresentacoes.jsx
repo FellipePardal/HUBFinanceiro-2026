@@ -787,9 +787,9 @@ return (
         <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
       </div>
       <div style={{marginBottom:0}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Provisionado − Realizado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={fmtNum(provTotal - gastoTotal)} style={{...IS_RO, color: (provTotal - gastoTotal) >= 0 ? "#a3e635" : "#ef4444"}}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(provTotal)} (prov.) − {fmtR(gastoTotal)} (real.) = {(provTotal - gastoTotal) >= 0 ? "▲" : "▼"} {fmtR(Math.abs(provTotal - gastoTotal))}</p>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − Provisionado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+        <input readOnly value={fmtNum(saldoTotal)} style={{...IS_RO, color: saldoTotal >= 0 ? "#a3e635" : "#ef4444"}}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotal)} (orç.) − {fmtR(provTotal)} (prov.) = {saldoTotal >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotal))}</p>
       </div>
     </div>
   </div>

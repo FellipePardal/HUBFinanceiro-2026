@@ -43,7 +43,7 @@ ctx.beginPath(); ctx.arc(cx,cy,ri,0,Math.PI*2); ctx.fillStyle="#1e293b"; ctx.fil
 function SeletorTipo({T, onSelect}) {
 const opts = [
 {key:"variaveis",  icon:BarChart3,  label:"Custos Variáveis",        desc:"Acompanhamento por rodada — orçado × realizado, saving acumulado e notas fiscais.", color:T.brand,   grad:"linear-gradient(135deg,#047857 0%,#10b981 100%)"},
-{key:"fixos",      icon:Lock,       label:"Custos Fixos",            desc:"Serviços fixos do campeonato — orçado × gasto × provisionado por categoria.",        color:T.info,    grad:"linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)"},
+{key:"fixos",      icon:Lock,       label:"Custos Fixos",            desc:"Serviços fixos do campeonato — orçado × gasto × realizado por categoria.",           color:T.info,    grad:"linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)"},
 {key:"visaogeral", icon:LayoutGrid, label:"Visão Geral Orçamentária", desc:"Slide único consolidado — KPIs globais, síntese dos pilares (variáveis + fixos) e tabela de blocos.",  color:"#7c3aed", grad:"linear-gradient(135deg,#5b21b6 0%,#7c3aed 100%)"},
 ];
 return (
@@ -619,7 +619,7 @@ async function gerarPPTX() {
     const kpis = [
       { num: "1", label: "ORÇAMENTO TOTAL (CAMPEONATO)",            val: fmtBRL(computed.orcAnualTotal), valColor: "9CA3AF", accent: false },
       { num: "2", label: `ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val: fmtBRL(orcTotal),        valColor: "111827", accent: false },
-      { num: "3", label: `PROVISIONADO (ATÉ ${mesLabel.toUpperCase()})`,  val: fmtBRL(provTotal),       valColor: "111827", accent: false },
+      { num: "3", label: `REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,     val: fmtBRL(provTotal),       valColor: "111827", accent: false },
       {
         num: "4", label: "SALDO ACUMULADO",
         val: (saldoTotal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saldoTotal)),
@@ -654,8 +654,8 @@ async function gerarPPTX() {
       });
     });
 
-    // ── Barra Comparativo Orçado vs Provisionado ───────────────────────────
-    sl.addText("Comparativo Orçado vs. Provisionado", {
+    // ── Barra Comparativo Orçado vs Realizado ──────────────────────────────
+    sl.addText("Comparativo Orçado vs. Realizado", {
       x: 0.35, y: 2.06, w: 12.63, h: 0.22,
       fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
     });
@@ -669,7 +669,7 @@ async function gerarPPTX() {
     sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: bW, h: bH, fill: { color: "D1D5DB" }, line: { width: 0 } });
     sl.addShape(pptx.ShapeType.rect, { x: bX, y: bY, w: provW, h: bH, fill: { color: "14532D" }, line: { width: 0 } });
 
-    sl.addText(`Provisionado: ${fmtBRL(provTotal)}`, {
+    sl.addText(`Realizado: ${fmtBRL(provTotal)}`, {
       x: bX + 0.1, y: bY + 0.02, w: provW - 0.15, h: bH - 0.04,
       fontSize: 9, bold: true, color: "FFFFFF", valign: "middle", fontFace: "Segoe UI"
     });
@@ -791,7 +791,7 @@ return (
         <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
       </div>
       <div style={{marginBottom:16}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Provisionado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Realizado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
         <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provTotalAnualAll)} ÷ 12 × ${mesesDecorridos}`}/>
         <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provTotalAnualAll)} ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"}</p>
       </div>
@@ -802,9 +802,9 @@ return (
         <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
       </div>
       <div style={{marginBottom:0}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − Provisionado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − Realizado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
         <input readOnly value={fmtNum(saldoTotal)} style={{...IS_RO, color: saldoTotal >= 0 ? "#a3e635" : "#ef4444"}}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotal)} (orç.) − {fmtR(provTotal)} (prov.) = {saldoTotal >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotal))}</p>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotal)} (orç.) − {fmtR(provTotal)} (real.) = {saldoTotal >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotal))}</p>
       </div>
     </div>
   </div>
@@ -817,7 +817,7 @@ return (
     <div style={{overflowX:"auto"}}>
       <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
         <thead><tr style={{background:T.bg}}>
-          {["Seção","Orçado Acum. (R$)","Gasto (R$)","Provisionado (R$)","Saldo (R$)"].map((h,i) => (
+          {["Seção","Orçado Acum. (R$)","Gasto (R$)","Realizado (R$)","Saldo (R$)"].map((h,i) => (
             <th key={h} style={{padding:"10px 12px",textAlign:i===0?"left":"right",color:T.textSm,fontSize:11,borderBottom:`1px solid ${T.border}`}}>{h}</th>
           ))}
         </tr></thead>
@@ -861,8 +861,8 @@ return (
   </div>
 
   <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-    <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais vs Provisionado Total</span></div>
-    <p style={{fontSize:12,color:T.textMd,marginBottom:18}}>Provisionado total: <b style={{color:"#3b82f6"}}>{fmtRs(provTotalAnual)}</b> · NFs recebidas: <b style={{color:"#22c55e"}}>{fmtRs(nfRecV)}</b> · Pendente: <b style={{color:"#d97706"}}>{fmtRs(nfPend)}</b></p>
+    <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}><span style={secNum}>03</span><span style={secHdr}>Notas Fiscais vs Realizado Total</span></div>
+    <p style={{fontSize:12,color:T.textMd,marginBottom:18}}>Realizado total: <b style={{color:"#3b82f6"}}>{fmtRs(provTotalAnual)}</b> · NFs recebidas: <b style={{color:"#22c55e"}}>{fmtRs(nfRecV)}</b> · Pendente: <b style={{color:"#d97706"}}>{fmtRs(nfPend)}</b></p>
     <div style={{display:"flex",gap:32,alignItems:"flex-start",flexWrap:"wrap"}}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
         <div style={{position:"relative",width:110,height:110}}>

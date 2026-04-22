@@ -500,41 +500,52 @@ const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
 const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
 // Orçado e provisionado mensais por-item conforme flag "tipo":
 //   linear  → total / 12 * mesesDecorridos
-//   pontual → total integral no mês de referência
-//   misto   → aplica parcelaLinear/parcelaPontual (valores absolutos do prov)
-//             e, para o orçado, usa a mesma proporção das parcelas
+//   pontual → total integral a partir do mês alocado
+//   misto   → parte linear /12 + parte pontual a partir do mês alocado
+// Encerrados: provisionado congela em realAoEncerrar (independente do tipo)
 const orcAuto = sec.itens.reduce((s, it) => {
   const orc = it.orcado || 0;
   const tipo = it.tipo || "linear";
-  if (tipo === "pontual") return s + orc;
+  const mesAloc = it.mesAlocacao || 0;
+  if (tipo === "pontual") return s + (mesAtual >= mesAloc ? orc : 0);
   if (tipo === "misto") {
     const pl = it.parcelaLinear || 0;
     const pp = it.parcelaPontual || 0;
     const tot = pl + pp;
     if (tot > 0) {
       const rL = pl / tot;
-      return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL);
+      return s + (orc * rL / 12) * mesesDecorridos + (mesAtual >= mesAloc ? orc * (1 - rL) : 0);
     }
     return s + (orc / 12) * mesesDecorridos;
   }
   return s + (orc / 12) * mesesDecorridos;
 }, 0);
 const provAuto  = sec.itens.reduce((s, it) => {
+  if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
   const prov = it.provisionado || 0;
   const tipo = it.tipo || "linear";
-  if (tipo === "pontual") return s + prov;
+  const mesAloc = it.mesAlocacao || 0;
+  if (tipo === "pontual") return s + (mesAtual >= mesAloc ? prov : 0);
   if (tipo === "misto") {
     const pl = it.parcelaLinear || 0;
     const pp = it.parcelaPontual || 0;
-    return s + (pl / 12) * mesesDecorridos + pp;
+    return s + (pl / 12) * mesesDecorridos + (mesAtual >= mesAloc ? pp : 0);
   }
   return s + (prov / 12) * mesesDecorridos;
 }, 0);
 const provTotalAnual = provAnual;
+// prov anual apenas de itens ativos (encerrados saem da expectativa de NFs)
+const provAnualAtivos = sec.itens
+  .filter(it => it.status !== "encerrado")
+  .reduce((s, it) => s + (it.provisionado || 0), 0);
+const idsEncerrados = sec.itens.filter(it => it.status === "encerrado").map(it => it.id);
 const gastoAuto = notasMensais
 .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
 .reduce((s, n) => s + (n.valor || 0), 0);
-return { secao: sec.secao, orcAnual, orcAuto, provAuto, provTotalAnual, gastoAuto };
+const gastoEncerrados = notasMensais
+.filter(n => n.servicoId && idsEncerrados.includes(n.servicoId) && n.mes <= mesAtual)
+.reduce((s, n) => s + (n.valor || 0), 0);
+return { secao: sec.secao, orcAnual, orcAuto, provAuto, provTotalAnual, provAnualAtivos, gastoAuto, gastoEncerrados };
 });
 
 // "Outros Mensais": NFs sem servicoId e sem categoria variável mapeada
@@ -542,13 +553,15 @@ const outrosGasto = notasMensais
   .filter(n => !n.servicoId && !VAR_CATS_FIX.has(n.categoria) && n.mes <= mesAtual)
   .reduce((s, n) => s + (n.valor || 0), 0);
 if (outrosGasto > 0) {
-  sections.push({ secao: "Outros Mensais", orcAnual: 0, orcAuto: 0, provAuto: 0, provTotalAnual: 0, gastoAuto: outrosGasto });
+  sections.push({ secao: "Outros Mensais", orcAnual: 0, orcAuto: 0, provAuto: 0, provTotalAnual: 0, provAnualAtivos: 0, gastoAuto: outrosGasto, gastoEncerrados: 0 });
 }
 
-const orcAnualTotal     = sections.reduce((s, x) => s + x.orcAnual, 0);
-const provTotalAnualAll = sections.reduce((s, x) => s + x.provTotalAnual, 0);
-const orcTotalAuto      = sections.reduce((s, x) => s + x.orcAuto, 0);
-return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll };
+const orcAnualTotal         = sections.reduce((s, x) => s + x.orcAnual, 0);
+const provTotalAnualAll     = sections.reduce((s, x) => s + x.provTotalAnual, 0);
+const provTotalAnualAtivos  = sections.reduce((s, x) => s + (x.provAnualAtivos ?? x.provTotalAnual), 0);
+const gastoEncerradosTotal  = sections.reduce((s, x) => s + (x.gastoEncerrados || 0), 0);
+const orcTotalAuto          = sections.reduce((s, x) => s + x.orcAuto, 0);
+return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll, provTotalAnualAtivos, gastoEncerradosTotal };
 
 }, [servicos, notasMensais, mesAtual, mesesDecorridos]);
 
@@ -581,10 +594,13 @@ return { rows, orcTotal, provTotal, gastoTotal, saldoTotal };
 }, [sectionsView]);
 
 const { rows, orcTotal, provTotal, gastoTotal, saldoTotal } = parsed;
-const provTotalAnual = computed.provTotalAnualAll;
-const nfRecV = gastoTotal;
-const nfPend = Math.max(0, provTotalAnual - gastoTotal);
-const pctRec = provTotalAnual > 0 ? nfRecV / provTotalAnual * 100 : 0;
+const provTotalAnual    = computed.provTotalAnualAll;
+// Pendente de NF ignora serviços encerrados: exclui do prov anual e desconta seu gasto.
+const provAtivoBase     = computed.provTotalAnualAtivos;
+const gastoAtivo        = Math.max(0, gastoTotal - (computed.gastoEncerradosTotal || 0));
+const nfRecV = gastoAtivo;
+const nfPend = Math.max(0, provAtivoBase - gastoAtivo);
+const pctRec = provAtivoBase > 0 ? nfRecV / provAtivoBase * 100 : 0;
 
 useEffect(() => {
   if (onDadosCalculados) {
@@ -1312,43 +1328,53 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const ovr             = readPersisted("apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
       const idsItens  = sec.itens.map(it => it.id);
+      const idsEncerrados = sec.itens.filter(it => it.status === "encerrado").map(it => it.id);
       const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
       const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
+      const provAnualAtivos = sec.itens
+        .filter(it => it.status !== "encerrado")
+        .reduce((s, it) => s + (it.provisionado || 0), 0);
       const orcAuto = sec.itens.reduce((s, it) => {
         const orc = it.orcado || 0;
         const tipo = it.tipo || "linear";
-        if (tipo === "pontual") return s + orc;
+        const mesAloc = it.mesAlocacao || 0;
+        if (tipo === "pontual") return s + (mesAtual >= mesAloc ? orc : 0);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
           const pp = it.parcelaPontual || 0;
           const tot = pl + pp;
           if (tot > 0) {
             const rL = pl / tot;
-            return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL);
+            return s + (orc * rL / 12) * mesesDecorridos + (mesAtual >= mesAloc ? orc * (1 - rL) : 0);
           }
           return s + (orc / 12) * mesesDecorridos;
         }
         return s + (orc / 12) * mesesDecorridos;
       }, 0);
       const provAuto  = sec.itens.reduce((s, it) => {
+        if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
         const prov = it.provisionado || 0;
         const tipo = it.tipo || "linear";
-        if (tipo === "pontual") return s + prov;
+        const mesAloc = it.mesAlocacao || 0;
+        if (tipo === "pontual") return s + (mesAtual >= mesAloc ? prov : 0);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
           const pp = it.parcelaPontual || 0;
-          return s + (pl / 12) * mesesDecorridos + pp;
+          return s + (pl / 12) * mesesDecorridos + (mesAtual >= mesAloc ? pp : 0);
         }
         return s + (prov / 12) * mesesDecorridos;
       }, 0);
       const gastoAuto = notasMensais
         .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
         .reduce((s, n) => s + (n.valor || 0), 0);
+      const gastoEncerrados = notasMensais
+        .filter(n => n.servicoId && idsEncerrados.includes(n.servicoId) && n.mes <= mesAtual)
+        .reduce((s, n) => s + (n.valor || 0), 0);
       const o = ovr[sec.secao] || {};
       const orc   = o.orc   != null ? parseBR(o.orc)   : orcAuto;
       const prov  = o.prov  != null ? parseBR(o.prov)  : provAuto;
       const gasto = o.gasto != null ? parseBR(o.gasto) : gastoAuto;
-      return { secao: sec.secao, orcAnual, provAnual, orc, prov, gasto, saldo: orc - prov };
+      return { secao: sec.secao, orcAnual, provAnual, provAnualAtivos, gastoEncerrados, orc, prov, gasto, saldo: orc - prov };
     });
     const outrosGasto = notasMensais
       .filter(n => !n.servicoId && !VAR_CATS_FIX_DEFAULT.has(n.categoria) && n.mes <= mesAtual)
@@ -1364,9 +1390,13 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const provAcumulado  = sections.reduce((s, x) => s + x.prov, 0);
     const gastoAcumulado = sections.reduce((s, x) => s + x.gasto, 0);
     const saldo          = orcAcumulado - provAcumulado;
-    const nfRecV         = gastoAcumulado;
-    const nfPend         = Math.max(0, provAnualTotal - gastoAcumulado);
-    const pctRec         = provAnualTotal > 0 ? nfRecV / provAnualTotal * 100 : 0;
+    // Pendente de NF exclui serviços encerrados
+    const provAnualAtivosTotal = sections.reduce((s, x) => s + (x.provAnualAtivos ?? x.provAnual ?? 0), 0);
+    const gastoEncerradosTot   = sections.reduce((s, x) => s + (x.gastoEncerrados || 0), 0);
+    const gastoAtivo           = Math.max(0, gastoAcumulado - gastoEncerradosTot);
+    const nfRecV         = gastoAtivo;
+    const nfPend         = Math.max(0, provAnualAtivosTotal - gastoAtivo);
+    const pctRec         = provAnualAtivosTotal > 0 ? nfRecV / provAnualAtivosTotal * 100 : 0;
     return {
       orcAnualTotal, orcAcumulado, gastoAcumulado, provAcumulado,
       saldo, provAnual: provAnualTotal,

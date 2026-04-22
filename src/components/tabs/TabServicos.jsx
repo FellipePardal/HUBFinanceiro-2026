@@ -3,7 +3,9 @@ import { SECAO_COLORS, iSty, RADIUS } from "../../constants";
 import { fmt } from "../../utils";
 import { KPI } from "../shared";
 import { Card, PanelTitle, Button, Progress, tableStyles } from "../ui";
-import { Plus, Pencil, Trash2, Check, X, Wallet, TrendingUp, PiggyBank, Activity } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, Wallet, TrendingUp, PiggyBank, Activity, Lock } from "lucide-react";
+
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
 export default function TabServicos({servicos, setServicos, T}) {
   const [editing, setEditing] = useState(null);
@@ -21,7 +23,7 @@ export default function TabServicos({servicos, setServicos, T}) {
     setEditing(null); setDraft(null);
   };
   const addItem    = secao => {
-    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:"", tipo:"linear", parcelaLinear:0, parcelaPontual:0};
+    const n = {id:Date.now(), nome:"Novo serviço", orcado:0, provisionado:0, realizado:0, obs:"", tipo:"linear", parcelaLinear:0, parcelaPontual:0, mesAlocacao:0, status:"ativo", realAoEncerrar:0};
     setServicos(ss => ss.map(s => s.secao===secao ? {...s, itens:[...s.itens, n]} : s));
   };
   const deleteItem = (secao, id) =>
@@ -93,9 +95,42 @@ export default function TabServicos({servicos, setServicos, T}) {
                                   <label>Pontual: <input value={draft.parcelaPontual ?? 0} onChange={e=>setDraft(d=>({...d,parcelaPontual:parseFloat(e.target.value)||0}))} style={{...IS,width:90,textAlign:"right",marginLeft:4}}/></label>
                                 </div>
                               )}
+                              {(tipo==="pontual" || tipo==="misto") && (
+                                <>
+                                  <label style={{fontSize:10,color:T.textSm}}>Mês:
+                                    <select value={draft.mesAlocacao ?? 0} onChange={e=>setDraft(d=>({...d,mesAlocacao:parseInt(e.target.value)}))} style={{...IS,width:110,marginLeft:4}}>
+                                      {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
+                                    </select>
+                                  </label>
+                                  <label style={{fontSize:10,color:T.textSm}}>Status:
+                                    <select
+                                      value={draft.status || "ativo"}
+                                      onChange={e=>{
+                                        const st = e.target.value;
+                                        setDraft(d => st === "encerrado"
+                                          ? {...d, status: "encerrado", realAoEncerrar: d.realizado || 0}
+                                          : {...d, status: "ativo", realAoEncerrar: 0});
+                                      }}
+                                      style={{...IS,width:110,marginLeft:4}}>
+                                      <option value="ativo">Ativo</option>
+                                      <option value="encerrado">Encerrado</option>
+                                    </select>
+                                  </label>
+                                </>
+                              )}
                             </div>
                           ) : (
-                            <span style={{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:tipo==="linear"?T.textMd:tipo==="pontual"?T.warning:T.info}}>{tipo}</span>
+                            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                              <span style={{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:tipo==="linear"?T.textMd:tipo==="pontual"?T.warning:T.info}}>{tipo}</span>
+                              {(tipo==="pontual" || tipo==="misto") && row.status === "encerrado" && (
+                                <span style={{fontSize:10,fontWeight:700,color:T.brand,display:"flex",alignItems:"center",gap:3}}>
+                                  <Check size={10}/> ENCERRADO
+                                </span>
+                              )}
+                              {(tipo==="pontual" || tipo==="misto") && (
+                                <span style={{fontSize:10,color:T.textSm}}>{MESES[row.mesAlocacao || 0]}</span>
+                              )}
+                            </div>
                           )}
                         </td>
                         {["orcado","provisionado","realizado"].map(k => {

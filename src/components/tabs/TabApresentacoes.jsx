@@ -890,414 +890,319 @@ return (
 
 
 // ─── FORM VISÃO GERAL ─────────────────────────────────────────────────────────
-const ORC_TOTAL_CAMPEONATO_VAR = 10078880; // Orçado total variáveis campeonato
-const MESES_FIX_VG = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const ORC_TOTAL_VAR_CAMPEONATO = 10078880; // fixo — orçado total variáveis
 
-function FormVisaoGeral({T, onBack, jogos = [], servicos = [], notasMensais = []}) {
-const [status,   setStatus]  = useState({msg:"Pronto para gerar", cls:""});
-const [loading,  setLoading] = useState(false);
-const [mesAtual, setMesAtual] = useState(() => new Date().getMonth());
+function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
+  const [status,  setStatus]  = useState({ msg: "Pronto para gerar", cls: "" });
+  const [loading, setLoading] = useState(false);
 
-const VAR_CATS_FIX_VG = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
-const mesesDecorridos = mesAtual + 1;
+  const secHdr = { fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: T.text, marginBottom: 12 };
+  const secNum = { fontSize: 10, color: T.textSm, fontWeight: 700, marginRight: 8 };
 
-// ── Dados Variáveis ──────────────────────────────────────────────────────────
-const rodadasDisp = useMemo(() =>
-  Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b),
-[jogos]);
-const [rodadaAtual, setRodadaAtual] = useState(() => rodadasDisp[rodadasDisp.length-1] || 1);
-useEffect(() => {
-  if (rodadasDisp.length && !rodadasDisp.includes(rodadaAtual))
-    setRodadaAtual(rodadasDisp[rodadasDisp.length-1]);
-}, [rodadasDisp]); // eslint-disable-line
+  // Valores consolidados dos dois slides
+  const varOrc       = dadosVar?.orcAteRod      ?? 0;
+  const varReal      = dadosVar?.realizado       ?? 0;
+  const varSaving    = dadosVar?.saving          ?? 0;
+  const rodadaAtual  = dadosVar?.rodadaAtual     ?? "—";
+  const fixOrcAcum   = dadosFix?.orcAcumulado    ?? 0;
+  const fixGasto     = dadosFix?.gastoAcumulado  ?? 0;
+  const fixSaldo     = dadosFix?.saldo           ?? 0;
+  const fixOrcAnual  = dadosFix?.orcAnualTotal   ?? 0;
+  const mesLabel     = dadosFix?.mesLabel        ?? "—";
 
-const computedVar = useMemo(() => {
-  const jogosAte = jogos.filter(j => j.rodada <= rodadaAtual);
-  const orcAte   = jogosAte.reduce((s, j) => s + subTotal(j.orcado || {}), 0);
-  const realAte  = jogosAte.reduce((s, j) => s + subTotal(j.realizado || {}), 0);
-  const rodadasAte = rodadasDisp.filter(r => r <= rodadaAtual);
-  const porRodada = rodadasAte.map(r => {
-    const jr = jogos.filter(j => j.rodada === r);
-    return {
-      label: `R${r}`,
-      orcado:    jr.reduce((s, j) => s + subTotal(j.orcado || {}), 0),
-      realizado: jr.reduce((s, j) => s + subTotal(j.provisionado || {}), 0),
-    };
-  });
-  const totOrc  = porRodada.reduce((s, r) => s + r.orcado, 0);
-  const totReal = porRodada.reduce((s, r) => s + r.realizado, 0);
-  const saving  = totOrc - totReal;
-  const savPct  = totOrc > 0 ? saving / totOrc * 100 : 0;
-  const nfEspV  = totReal;
-  const nfRecV  = realAte;
-  const nfPend  = Math.max(0, nfEspV - nfRecV);
-  const pctRec  = nfEspV > 0 ? nfRecV / nfEspV * 100 : 0;
-  return { porRodada, totOrc, totReal, saving, savPct, nfEspV, nfRecV, nfPend, pctRec, orcAte, realAte };
-}, [jogos, rodadaAtual, rodadasDisp]);
+  const orcTotalCampeonato = ORC_TOTAL_VAR_CAMPEONATO + fixOrcAnual;
+  const realTotalGlobal    = varReal + fixGasto;
+  const orcTotalPeriodo    = varOrc + fixOrcAcum;
+  const savingGlobal       = orcTotalPeriodo - realTotalGlobal;
+  const savingGlobalPct    = orcTotalPeriodo > 0 ? savingGlobal / orcTotalPeriodo * 100 : 0;
 
-// ── Dados Fixos ──────────────────────────────────────────────────────────────
-const computedFix = useMemo(() => {
-  const sections = servicos.map(sec => {
-    const idsItens   = sec.itens.map(it => it.id);
-    const orcAnual   = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
-    const provAnual  = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
-    const orcAuto    = (orcAnual / 12) * mesesDecorridos;
-    const provAuto   = (provAnual / 12) * mesesDecorridos;
-    const gastoAuto  = notasMensais
-      .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
-      .reduce((s, n) => s + (n.valor || 0), 0);
-    return { secao: sec.secao, orcAnual, orcAuto, provAuto, gastoAuto, provAnual };
-  });
-  const outrosGasto = notasMensais
-    .filter(n => !n.servicoId && !VAR_CATS_FIX_VG.has(n.categoria) && n.mes <= mesAtual)
-    .reduce((s, n) => s + (n.valor || 0), 0);
-  if (outrosGasto > 0)
-    sections.push({ secao: "Outros Mensais", orcAnual: 0, orcAuto: 0, provAuto: 0, gastoAuto: outrosGasto, provAnual: 0 });
-  const orcTotalFix    = sections.reduce((s, x) => s + x.orcAuto, 0);
-  const gastoTotalFix  = sections.reduce((s, x) => s + x.gastoAuto, 0);
-  const provTotalFix   = sections.reduce((s, x) => s + x.provAuto, 0);
-  const saldoFix       = orcTotalFix - provTotalFix;
-  const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
-  const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
-  const nfRecFix       = gastoTotalFix;
-  const nfPendFix      = Math.max(0, provAnualTotal - gastoTotalFix);
-  const pctRecFix      = provAnualTotal > 0 ? nfRecFix / provAnualTotal * 100 : 0;
-  return { sections, orcTotalFix, gastoTotalFix, provTotalFix, saldoFix, orcAnualTotal, provAnualTotal, nfRecFix, nfPendFix, pctRecFix };
-}, [servicos, notasMensais, mesAtual, mesesDecorridos]);
+  const dadosOk = dadosVar && dadosFix;
 
-// ── Preview resumido ─────────────────────────────────────────────────────────
-const { totOrc: varOrc, totReal: varReal, saving: varSaving, savPct: varSavPct, porRodada } = computedVar;
-const { orcTotalFix, gastoTotalFix, saldoFix, orcAnualTotal } = computedFix;
-const orcTotalGlobal  = varOrc + orcTotalFix;
-const realTotalGlobal = varReal + gastoTotalFix;
-const savingGlobal    = orcTotalGlobal - realTotalGlobal;
-const savingGlobalPct = orcTotalGlobal > 0 ? savingGlobal / orcTotalGlobal * 100 : 0;
-const mesLabel        = MESES_FIX_VG[mesAtual];
+  async function gerarPPTX() {
+    if (!dadosOk) {
+      setStatus({ msg: "⚠️ Abra e configure os slides de Variáveis e Fixos antes de gerar.", cls: "err" });
+      return;
+    }
+    setLoading(true); setStatus({ msg: "Gerando…", cls: "" });
+    try {
+      const pptx = new PptxGenJS();
+      pptx.layout = "LAYOUT_WIDE";
+      const sl = pptx.addSlide();
+      sl.background = { color: "FFFFFF" };
 
-const IS    = {...iSty(T), width:"100%"};
-const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:T.text,marginBottom:12};
-const secNum  = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
-
-async function gerarPPTX() {
-  setLoading(true); setStatus({msg:"Gerando...", cls:""});
-  try {
-    const pptx = new PptxGenJS();
-    pptx.layout = "LAYOUT_WIDE";
-
-    // ════════════════════════════════════════════════════════════════
-    // SLIDE 1 — VISÃO GERAL ORÇAMENTÁRIA
-    // ════════════════════════════════════════════════════════════════
-    const sl1 = pptx.addSlide();
-    sl1.background = {color:"FFFFFF"};
-
-    // Elemento 1 — Barra verde no topo
-    sl1.addShape(pptx.ShapeType.rect, {
-      x: 0, y: 0, w: 13.33, h: 0.06,
-      fill: { color: "166534" },
-      line: { width: 0 }
-    });
-
-    // Elemento 2 — Título principal
-    sl1.addText("Visão Geral Orçamentária", {
-      x: 0.35, y: 0.12, w: 12.6, h: 0.5,
-      fontSize: 28, bold: true,
-      color: "111827",
-      fontFace: "Segoe UI"
-    });
-
-    // Elemento 3 — Linha divisória horizontal
-    sl1.addShape(pptx.ShapeType.line, {
-      x: 0.35, y: 0.72, w: 12.63, h: 0,
-      line: { color: "E5E7EB", width: 1 }
-    });
-
-    // Elemento 4 — 3 KPI Cards em linha
-    const orcCampeonato = ORC_TOTAL_CAMPEONATO_VAR + computedFix.orcAnualTotal;
-    const kpiCards = [
-      {
-        label: "ORÇAMENTO TOTAL DO CAMPEONATO",
-        val: fmtBRL(orcCampeonato),
-        valColor: "9CA3AF",
-        bold: false
-      },
-      {
-        label: "REALIZADO (ATUAL)",
-        val: fmtBRL(realTotalGlobal),
-        valColor: "111827",
-        bold: false
-      },
-      {
-        label: "SAVING / SALDO GLOBAL",
-        val: (savingGlobal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(savingGlobal)),
-        valColor: savingGlobal >= 0 ? "16A34A" : "DC2626",
-        bold: true,
-        accentBorder: true
-      },
-    ];
-
-    const kW = 4.14, kH = 1.1, kY = 0.85, kGap = 0.105;
-    kpiCards.forEach(({ label, val, valColor, bold, accentBorder }, i) => {
-      const x = 0.35 + i * (kW + kGap);
-      sl1.addShape(pptx.ShapeType.rect, {
-        x, y: kY, w: kW, h: kH,
-        fill: { color: "F3F4F6" },
-        line: { color: "E5E7EB", width: 0.75 }
+      // ── Barra verde topo ──────────────────────────────────────────────────
+      sl.addShape(pptx.ShapeType.rect, {
+        x: 0, y: 0, w: 13.33, h: 0.06,
+        fill: { color: "166534" }, line: { width: 0 }
       });
-      if (accentBorder) {
-        sl1.addShape(pptx.ShapeType.rect, {
-          x, y: kY, w: 0.06, h: kH,
-          fill: { color: "16A34A" },
-          line: { width: 0 }
-        });
-      }
-      sl1.addText(label, {
-        x: x + 0.18, y: kY + 0.12, w: kW - 0.28, h: 0.2,
-        fontSize: 7.5, bold: true, color: "6B7280",
-        charSpacing: 1.5, fontFace: "Segoe UI"
+
+      // ── Título ────────────────────────────────────────────────────────────
+      sl.addText("Visão Geral Orçamentária", {
+        x: 0.35, y: 0.12, w: 12.6, h: 0.5,
+        fontSize: 28, bold: true, color: "111827", fontFace: "Segoe UI"
       });
-      sl1.addText(val, {
-        x: x + 0.18, y: kY + 0.38, w: kW - 0.28, h: 0.58,
-        fontSize: bold ? 26 : 22,
-        bold,
-        color: valColor,
-        fontFace: "Segoe UI"
+      sl.addShape(pptx.ShapeType.line, {
+        x: 0.35, y: 0.72, w: 12.63, h: 0,
+        line: { color: "E5E7EB", width: 1 }
       });
-    });
 
-    // Elemento 5 — Título "Síntese dos Pilares"
-    sl1.addText("Síntese dos Pilares", {
-      x: 0.35, y: 2.1, w: 12.63, h: 0.26,
-      fontSize: 12, color: "374151",
-      align: "center", fontFace: "Segoe UI"
-    });
-
-    // Elemento 6 — Dois Pilares lado a lado
-    const pY = 2.44, pH = 1.32;
-
-    // Pilar Esquerdo — Dinâmica Operacional (Custos Variáveis)
-    sl1.addShape(pptx.ShapeType.rect, {
-      x: 0.35, y: pY, w: 5.9, h: pH,
-      fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
-    });
-    sl1.addText("Dinâmica Operacional (Custos Variáveis)", {
-      x: 0.55, y: pY + 0.1, w: 5.5, h: 0.24,
-      fontSize: 11, bold: true, color: "111827",
-      align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Orçamento do Período: " + fmtBRL(varOrc), {
-      x: 0.55, y: pY + 0.38, w: 5.5, h: 0.2,
-      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Realizado: " + fmtBRL(varReal), {
-      x: 0.55, y: pY + 0.6, w: 5.5, h: 0.2,
-      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Saldo: " + fmtBRL(varSaving), {
-      x: 0.55, y: pY + 0.84, w: 5.5, h: 0.26,
-      fontSize: 12, bold: true,
-      color: varSaving >= 0 ? "16A34A" : "DC2626",
-      align: "center", fontFace: "Segoe UI"
-    });
-
-    // Linha divisória vertical central
-    sl1.addShape(pptx.ShapeType.line, {
-      x: 6.665, y: pY + 0.08, w: 0, h: pH - 0.16,
-      line: { color: "E5E7EB", width: 1 }
-    });
-
-    // Pilar Direito — Estrutura Acumulada (Custos Fixos)
-    sl1.addShape(pptx.ShapeType.rect, {
-      x: 6.78, y: pY, w: 5.9, h: pH,
-      fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
-    });
-    sl1.addText("Estrutura Acumulada (Custos Fixos)", {
-      x: 6.98, y: pY + 0.1, w: 5.5, h: 0.24,
-      fontSize: 11, bold: true, color: "111827",
-      align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Orçado até " + mesLabel + ": " + fmtBRL(orcTotalFix), {
-      x: 6.98, y: pY + 0.38, w: 5.5, h: 0.2,
-      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Realizado até " + mesLabel + ": " + fmtBRL(gastoTotalFix), {
-      x: 6.98, y: pY + 0.6, w: 5.5, h: 0.2,
-      fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
-    });
-    sl1.addText("Saldo até " + mesLabel + ": " + fmtBRL(saldoFix), {
-      x: 6.98, y: pY + 0.84, w: 5.5, h: 0.26,
-      fontSize: 12, bold: true,
-      color: saldoFix >= 0 ? "16A34A" : "DC2626",
-      align: "center", fontFace: "Segoe UI"
-    });
-
-    // Elemento 7 — Tabela de Blocos
-    const thS = (txt, align = "left") => ({
-      text: txt,
-      options: { bold: true, fontSize: 9, color: "FFFFFF", fill: { color: "111827" }, align }
-    });
-
-    const mkBlocoRow = (label, orc, real, sav, pct, rowIdx) => {
-      const fill = { color: rowIdx % 2 === 0 ? "FFFFFF" : "F9FAFB" };
-      const sc = sav >= 0 ? "16A34A" : "DC2626";
-      const icon = sav >= 0 ? "▲ " : "▼ ";
-      return [
-        { text: label,                                   options: { fontSize: 9, color: "374151", fill } },
-        { text: fmtBRL(orc),                             options: { fontSize: 9, color: "374151", fill, align: "right" } },
-        { text: fmtBRL(real),                            options: { fontSize: 9, color: "374151", fill, align: "right" } },
-        { text: icon + fmtBRL(Math.abs(sav)),            options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
-        { text: icon + Math.abs(pct).toFixed(1) + "%",   options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+      // ── 3 KPI Cards ───────────────────────────────────────────────────────
+      const kW = 4.14, kH = 1.1, kY = 0.85, kGap = 0.105;
+      const kpis = [
+        {
+          label: "ORÇAMENTO TOTAL DO CAMPEONATO",
+          val: fmtBRL(orcTotalCampeonato),
+          valColor: "9CA3AF",
+          accent: false,
+        },
+        {
+          label: "REALIZADO (ATUAL)",
+          val: fmtBRL(realTotalGlobal),
+          valColor: "111827",
+          accent: false,
+        },
+        {
+          label: "SAVING / SALDO GLOBAL",
+          val: (savingGlobal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(savingGlobal)),
+          valColor: savingGlobal >= 0 ? "16A34A" : "DC2626",
+          accent: true,
+          bold: true,
+        },
       ];
-    };
 
-    const savVarPct    = varOrc > 0 ? varSaving / varOrc * 100 : 0;
-    const savFixPct    = orcTotalFix > 0 ? saldoFix / orcTotalFix * 100 : 0;
-    const orcGlobal    = varOrc + orcTotalFix;
-    const realGlobal   = varReal + gastoTotalFix;
-    const savGlobal    = orcGlobal - realGlobal;
-    const savGlobalPct = orcGlobal > 0 ? savGlobal / orcGlobal * 100 : 0;
+      kpis.forEach(({ label, val, valColor, accent, bold }, i) => {
+        const x = 0.35 + i * (kW + kGap);
+        sl.addShape(pptx.ShapeType.rect, {
+          x, y: kY, w: kW, h: kH,
+          fill: { color: "F3F4F6" }, line: { color: "E5E7EB", width: 0.75 }
+        });
+        if (accent) {
+          sl.addShape(pptx.ShapeType.rect, {
+            x, y: kY, w: 0.06, h: kH,
+            fill: { color: savingGlobal >= 0 ? "16A34A" : "DC2626" }, line: { width: 0 }
+          });
+        }
+        sl.addText(label, {
+          x: x + 0.18, y: kY + 0.12, w: kW - 0.28, h: 0.2,
+          fontSize: 7.5, bold: true, color: "6B7280", charSpacing: 1.5, fontFace: "Segoe UI"
+        });
+        sl.addText(val, {
+          x: x + 0.18, y: kY + 0.38, w: kW - 0.28, h: 0.58,
+          fontSize: bold ? 26 : 22, bold: !!bold, color: valColor, fontFace: "Segoe UI"
+        });
+      });
 
-    const fillTot = { color: "F3F4F6" };
-    const scTot = savGlobal >= 0 ? "16A34A" : "DC2626";
-    const iconTot = savGlobal >= 0 ? "▲ " : "▼ ";
-    const tblTot1 = [
-      { text: "TOTAL",                                            options: { fontSize: 9, bold: true, color: "111827", fill: fillTot } },
-      { text: fmtBRL(orcGlobal),                                  options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
-      { text: fmtBRL(realGlobal),                                 options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
-      { text: iconTot + fmtBRL(Math.abs(savGlobal)),              options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
-      { text: iconTot + Math.abs(savGlobalPct).toFixed(1) + "%",  options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
-    ];
+      // ── Síntese dos Pilares ───────────────────────────────────────────────
+      sl.addText("Síntese dos Pilares", {
+        x: 0.35, y: 2.1, w: 12.63, h: 0.26,
+        fontSize: 12, color: "374151", align: "center", fontFace: "Segoe UI"
+      });
 
-    sl1.addTable([
-      [thS("BLOCO"), thS("ORÇADO (Período)", "right"), thS("REALIZADO", "right"), thS("SAVING / SALDO (R$)", "right"), thS("%", "right")],
-      mkBlocoRow("1  Serviços Variáveis (R1–R" + rodadaAtual + ")", varOrc, varReal, varSaving, savVarPct, 0),
-      mkBlocoRow("2  Custos Fixos (até " + mesLabel + ")",           orcTotalFix, gastoTotalFix, saldoFix, savFixPct, 1),
-      tblTot1,
-    ], {
-      x: 0.35, y: 3.9, w: 12.63,
-      colW: [4.6, 2.4, 2.4, 2.4, 0.83],
-      border: { type: "solid", color: "E5E7EB", pt: 0.5 },
-      rowH: 0.42,
-    });
+      const pY = 2.44, pH = 1.32;
 
-    // Elemento 8 — Rodapé
-    sl1.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
-      x: 0.35, y: 7.28, w: 12.63, h: 0.16,
-      fontSize: 7.5, color: "9CA3AF",
-      align: "center", fontFace: "Segoe UI"
-    });
+      // Pilar Esquerdo — Variáveis
+      sl.addShape(pptx.ShapeType.rect, {
+        x: 0.35, y: pY, w: 5.9, h: pH,
+        fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+      });
+      sl.addText("Dinâmica Operacional (Custos Variáveis)", {
+        x: 0.55, y: pY + 0.1, w: 5.5, h: 0.24,
+        fontSize: 11, bold: true, color: "111827", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Orçamento do Período: ${fmtBRL(varOrc)}`, {
+        x: 0.55, y: pY + 0.38, w: 5.5, h: 0.2,
+        fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Realizado: ${fmtBRL(varReal)}`, {
+        x: 0.55, y: pY + 0.6, w: 5.5, h: 0.2,
+        fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Saldo: ${fmtBRL(varSaving)}`, {
+        x: 0.55, y: pY + 0.84, w: 5.5, h: 0.26,
+        fontSize: 12, bold: true,
+        color: varSaving >= 0 ? "16A34A" : "DC2626",
+        align: "center", fontFace: "Segoe UI"
+      });
 
-    // ─── Gerar arquivo ───────────────────────────────────────────────────────
-    await pptx.writeFile({fileName:`visao_geral_R${rodadaAtual}_${mesLabel.toLowerCase()}_brasileirao2026.pptx`});
-    setStatus({msg:`✅ visao_geral_R${rodadaAtual}_${mesLabel.toLowerCase()}.pptx baixado!`, cls:"ok"});
-  } catch(e) {
-    setStatus({msg:"❌ Erro: "+e.message, cls:"err"});
-    console.error(e);
+      // Linha divisória vertical
+      sl.addShape(pptx.ShapeType.line, {
+        x: 6.665, y: pY + 0.08, w: 0, h: pH - 0.16,
+        line: { color: "E5E7EB", width: 1 }
+      });
+
+      // Pilar Direito — Fixos
+      sl.addShape(pptx.ShapeType.rect, {
+        x: 6.78, y: pY, w: 5.9, h: pH,
+        fill: { color: "FFFFFF" }, line: { color: "E5E7EB", width: 0.75 }
+      });
+      sl.addText("Estrutura Acumulada (Custos Fixos)", {
+        x: 6.98, y: pY + 0.1, w: 5.5, h: 0.24,
+        fontSize: 11, bold: true, color: "111827", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Orçado até ${mesLabel}: ${fmtBRL(fixOrcAcum)}`, {
+        x: 6.98, y: pY + 0.38, w: 5.5, h: 0.2,
+        fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Realizado até ${mesLabel}: ${fmtBRL(fixGasto)}`, {
+        x: 6.98, y: pY + 0.6, w: 5.5, h: 0.2,
+        fontSize: 10, color: "6B7280", align: "center", fontFace: "Segoe UI"
+      });
+      sl.addText(`Saldo até ${mesLabel}: ${fmtBRL(fixSaldo)}`, {
+        x: 6.98, y: pY + 0.84, w: 5.5, h: 0.26,
+        fontSize: 12, bold: true,
+        color: fixSaldo >= 0 ? "16A34A" : "DC2626",
+        align: "center", fontFace: "Segoe UI"
+      });
+
+      // ── Tabela de Blocos ──────────────────────────────────────────────────
+      const th = (txt, align = "left") => ({
+        text: txt,
+        options: { bold: true, fontSize: 9, color: "FFFFFF", fill: { color: "111827" }, align }
+      });
+
+      const mkRow = (label, orc, real, sav, pct, idx) => {
+        const fill = { color: idx % 2 === 0 ? "FFFFFF" : "F9FAFB" };
+        const sc   = sav >= 0 ? "16A34A" : "DC2626";
+        const icon = sav >= 0 ? "▲ " : "▼ ";
+        return [
+          { text: label,                                       options: { fontSize: 9, color: "374151", fill } },
+          { text: fmtBRL(orc),                                options: { fontSize: 9, color: "374151", fill, align: "right" } },
+          { text: fmtBRL(real),                               options: { fontSize: 9, color: "374151", fill, align: "right" } },
+          { text: icon + fmtBRL(Math.abs(sav)),               options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+          { text: icon + Math.abs(pct).toFixed(1) + "%",      options: { fontSize: 9, bold: true, color: sc, fill, align: "right" } },
+        ];
+      };
+
+      const savVarPct = varOrc > 0 ? varSaving / varOrc * 100 : 0;
+      const savFixPct = fixOrcAcum > 0 ? fixSaldo / fixOrcAcum * 100 : 0;
+      const fillTot   = { color: "F3F4F6" };
+      const scTot     = savingGlobal >= 0 ? "16A34A" : "DC2626";
+      const iconTot   = savingGlobal >= 0 ? "▲ " : "▼ ";
+
+      const tblTot = [
+        { text: "TOTAL",                                         options: { fontSize: 9, bold: true, color: "111827", fill: fillTot } },
+        { text: fmtBRL(orcTotalPeriodo),                        options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
+        { text: fmtBRL(realTotalGlobal),                        options: { fontSize: 9, bold: true, color: "111827", fill: fillTot, align: "right" } },
+        { text: iconTot + fmtBRL(Math.abs(savingGlobal)),       options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
+        { text: iconTot + Math.abs(savingGlobalPct).toFixed(1) + "%", options: { fontSize: 9, bold: true, color: scTot, fill: fillTot, align: "right" } },
+      ];
+
+      sl.addTable([
+        [th("BLOCO"), th("ORÇADO (Período)", "right"), th("REALIZADO", "right"), th("SAVING / SALDO (R$)", "right"), th("%", "right")],
+        mkRow(`1  Serviços Variáveis (R1–R${rodadaAtual})`, varOrc,    varReal,  varSaving, savVarPct, 0),
+        mkRow(`2  Custos Fixos (até ${mesLabel})`,           fixOrcAcum, fixGasto, fixSaldo,  savFixPct, 1),
+        tblTot,
+      ], {
+        x: 0.35, y: 3.9, w: 12.63,
+        colW: [4.6, 2.4, 2.4, 2.4, 0.83],
+        border: { type: "solid", color: "E5E7EB", pt: 0.5 },
+        rowH: 0.42,
+      });
+
+      // ── Rodapé ────────────────────────────────────────────────────────────
+      sl.addText("Acompanhamento Orçamentário – Brasileirão 2026", {
+        x: 0.35, y: 7.28, w: 12.63, h: 0.16,
+        fontSize: 7.5, color: "9CA3AF", align: "center", fontFace: "Segoe UI"
+      });
+
+      await pptx.writeFile({ fileName: `visao_geral_brasileirao2026.pptx` });
+      setStatus({ msg: "✅ visao_geral_brasileirao2026.pptx baixado!", cls: "ok" });
+    } catch (e) {
+      setStatus({ msg: "❌ Erro: " + e.message, cls: "err" });
+      console.error(e);
+    }
+    setLoading(false);
   }
-  setLoading(false);
-}
 
-return (
-<div style={{paddingBottom:80}}>
-  {/* ── Cabeçalho ─────────────────────────────────────────────────────────── */}
-  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
-    <div style={{display:"flex",alignItems:"center",gap:14}}>
-      <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{width:40,height:40,borderRadius:12,background:"rgba(124,58,237,0.12)",border:"1px solid rgba(124,58,237,0.28)",color:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <LayoutGrid size={18} strokeWidth={2.25}/>
+  return (
+    <div style={{ paddingBottom: 80 }}>
+
+      {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+        <Button T={T} variant="secondary" size="md" icon={ArrowLeft} onClick={onBack}>Voltar</Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.28)", color: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <LayoutGrid size={18} strokeWidth={2.25} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, color: T.text, fontWeight: 800, letterSpacing: "-0.02em" }}>Visão Geral Orçamentária</h2>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: T.textMd }}>Consolida os dados de Variáveis + Fixos em 1 slide</p>
+          </div>
         </div>
+      </div>
+
+      {/* ── Aviso se dados ausentes ─────────────────────────────────────────── */}
+      {!dadosOk && (
+        <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 10, padding: "14px 20px", marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: "#92400e", fontWeight: 700, margin: "0 0 4px" }}>⚠️ Dados incompletos</p>
+          <p style={{ fontSize: 12, color: "#92400e", margin: 0 }}>
+            Para gerar a Visão Geral, primeiro abra e configure os slides de{" "}
+            {!dadosVar && <b>Custos Variáveis</b>}
+            {!dadosVar && !dadosFix && " e "}
+            {!dadosFix && <b>Custos Fixos</b>}.
+            Os dados são sincronizados automaticamente ao abrir cada formulário.
+          </p>
+        </div>
+      )}
+
+      {/* ── Preview dos valores consolidados ────────────────────────────────── */}
+      {dadosOk && (
+        <div style={{ background: T.card, borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 18 }}>
+            <span style={secNum}>01</span><span style={secHdr}>Resumo Consolidado</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+            {[
+              { label: "Orçamento Total Campeonato", val: fmtR(orcTotalCampeonato), color: T.textMd },
+              { label: "Realizado Total",            val: fmtR(realTotalGlobal),    color: T.text },
+              { label: "Saving / Saldo Global",      val: (savingGlobal >= 0 ? "▲ " : "▼ ") + fmtR(Math.abs(savingGlobal)), color: savingGlobal >= 0 ? "#16a34a" : "#dc2626" },
+            ].map(m => (
+              <div key={m.label} style={{ background: T.bg, borderRadius: 8, padding: "12px 16px", border: `1px solid ${T.border}` }}>
+                <p style={{ fontSize: 10, color: T.textSm, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>{m.label}</p>
+                <p style={{ fontSize: 18, fontWeight: 700, color: m.color, margin: 0 }}>{m.val}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: T.bg, borderRadius: 8, padding: "12px 16px", border: `1px solid ${T.border}` }}>
+              <p style={{ fontSize: 10, color: T.textSm, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Variáveis — até R{rodadaAtual}</p>
+              <p style={{ fontSize: 12, color: T.textMd, margin: "0 0 2px" }}>Orçado: <b style={{ color: T.text }}>{fmtR(varOrc)}</b></p>
+              <p style={{ fontSize: 12, color: T.textMd, margin: "0 0 2px" }}>Realizado: <b style={{ color: T.text }}>{fmtR(varReal)}</b></p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: varSaving >= 0 ? "#16a34a" : "#dc2626", margin: "4px 0 0" }}>
+                Saldo: {varSaving >= 0 ? "▲ " : "▼ "}{fmtR(Math.abs(varSaving))}
+              </p>
+            </div>
+            <div style={{ background: T.bg, borderRadius: 8, padding: "12px 16px", border: `1px solid ${T.border}` }}>
+              <p style={{ fontSize: 10, color: T.textSm, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Fixos — até {mesLabel}</p>
+              <p style={{ fontSize: 12, color: T.textMd, margin: "0 0 2px" }}>Orçado: <b style={{ color: T.text }}>{fmtR(fixOrcAcum)}</b></p>
+              <p style={{ fontSize: 12, color: T.textMd, margin: "0 0 2px" }}>Realizado: <b style={{ color: T.text }}>{fmtR(fixGasto)}</b></p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: fixSaldo >= 0 ? "#16a34a" : "#dc2626", margin: "4px 0 0" }}>
+                Saldo: {fixSaldo >= 0 ? "▲ " : "▼ "}{fmtR(Math.abs(fixSaldo))}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rodapé fixo ─────────────────────────────────────────────────────── */}
+      <div style={{ position: "sticky", bottom: 0, background: T.surface || T.card, borderTop: `1px solid ${T.border}`, padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 50, boxShadow: "0 -8px 24px -8px rgba(0,0,0,0.3)" }}>
         <div>
-          <h2 style={{margin:0,fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Visão Geral Orçamentária</h2>
-          <p style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}>Slide único consolidado — variáveis + fixos</p>
+          <p style={{ fontSize: 12, color: T.textMd, marginBottom: 2 }}>
+            <b style={{ color: T.text, fontWeight: 700 }}>
+              {dadosOk ? "Tudo pronto! " : "Aguardando dados dos outros slides. "}
+            </b>
+            {dadosOk ? "Clique para gerar o PPTX da Visão Geral." : "Abra Variáveis e Fixos primeiro."}
+          </p>
+          <p style={{ fontSize: 11, color: status.cls === "ok" ? "#16a34a" : status.cls === "err" ? "#dc2626" : T.textSm, fontWeight: 600 }}>
+            {status.msg}
+          </p>
         </div>
+        <Button T={T} variant="primary" size="lg" icon={FileDown} onClick={gerarPPTX} disabled={loading || !dadosOk}>
+          {loading ? "Gerando..." : "Gerar PPTX"}
+        </Button>
       </div>
     </div>
-  </div>
-
-  {/* ── Configuração ──────────────────────────────────────────────────────── */}
-  <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-    <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}>
-      <span style={secNum}>01</span><span style={secHdr}>Configuração Base</span>
-    </div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
-      <div>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada Atual (Custos Variáveis) *</label>
-        <select value={rodadaAtual} onChange={e=>setRodadaAtual(parseInt(e.target.value))} style={{...IS}}>
-          {rodadasDisp.length === 0
-            ? <option value={1}>—</option>
-            : rodadasDisp.map(r => <option key={r} value={r}>Rodada {r}</option>)}
-        </select>
-      </div>
-      <div>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Mês de Referência (Custos Fixos) *</label>
-        <select value={mesAtual} onChange={e=>setMesAtual(parseInt(e.target.value))} style={{...IS}}>
-          {MESES_FIX_VG.map((m,i) => <option key={i} value={i}>{m}</option>)}
-        </select>
-      </div>
-    </div>
-  </div>
-
-  {/* ── Preview do slide consolidado ──────────────────────────────────────── */}
-  <div style={{background:T.card,borderRadius:12,padding:"20px 24px",marginBottom:20}}>
-    <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:18}}>
-      <span style={secNum}>02</span><span style={secHdr}>Preview dos Dados</span>
-    </div>
-
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>KPIs Globais</p>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
-      {[
-        {label:"Orçamento Total do Campeonato", val:fmtR(ORC_TOTAL_CAMPEONATO_VAR+orcAnualTotal), color:T.textMd},
-        {label:"Realizado (Atual)",             val:fmtR(realTotalGlobal),                        color:T.text},
-        {label:"Saving / Saldo Global",         val:(savingGlobal>=0?"▲ ":"▼ ")+fmtR(Math.abs(savingGlobal)), color:savingGlobal>=0?"#16a34a":"#dc2626"},
-      ].map(m=>(
-        <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"12px 16px",border:`1px solid ${T.border}`}}>
-          <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
-          <p style={{fontSize:18,fontWeight:700,color:m.color,margin:0}}>{m.val}</p>
-        </div>
-      ))}
-    </div>
-
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Dinâmica Operacional (Variáveis até R{rodadaAtual})</p>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
-      {[
-        {label:"Orçamento do Período", val:fmtR(varOrc),   color:T.text},
-        {label:"Realizado",            val:fmtR(varReal),  color:T.text},
-        {label:"Saldo",                val:(varSaving>=0?"▲ ":"▼ ")+fmtR(Math.abs(varSaving)), color:varSaving>=0?"#16a34a":"#dc2626"},
-      ].map(m=>(
-        <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
-          <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
-          <p style={{fontSize:15,fontWeight:700,color:m.color,margin:0}}>{m.val}</p>
-        </div>
-      ))}
-    </div>
-
-    <p style={{fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>Estrutura Acumulada (Fixos até {mesLabel})</p>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
-      {[
-        {label:`Orçado até ${mesLabel}`,    val:fmtR(orcTotalFix),   color:T.text},
-        {label:`Realizado até ${mesLabel}`, val:fmtR(gastoTotalFix), color:T.text},
-        {label:`Saldo até ${mesLabel}`,     val:(saldoFix>=0?"▲ ":"▼ ")+fmtR(Math.abs(saldoFix)), color:saldoFix>=0?"#16a34a":"#dc2626"},
-      ].map(m=>(
-        <div key={m.label} style={{background:T.bg,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
-          <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{m.label}</p>
-          <p style={{fontSize:15,fontWeight:700,color:m.color,margin:0}}>{m.val}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-
-  {/* ── Rodapé fixo ───────────────────────────────────────────────────────── */}
-  <div style={{position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`1px solid ${T.border}`,padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:50,boxShadow:"0 -8px 24px -8px rgba(0,0,0,0.3)"}}>
-    <div>
-      <p style={{fontSize:12,color:T.textMd,marginBottom:2}}><b style={{color:T.text,fontWeight:700}}>Gerar slide consolidado?</b> Exporta um PPTX com a Visão Geral.</p>
-      <p style={{fontSize:11,color:status.cls==="ok"?"#16a34a":status.cls==="err"?"#dc2626":T.textSm,fontWeight:600}}>{status.msg}</p>
-    </div>
-    <Button T={T} variant="primary" size="lg" icon={FileDown} onClick={gerarPPTX} disabled={loading}>
-      {loading ? "Gerando..." : "Gerar PPTX"}
-    </Button>
-  </div>
-</div>
-);
+  );
 }
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
@@ -1318,7 +1223,6 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}
-              jogos={jogos} servicos={servicos} notasMensais={notasMensais}
               dadosVar={dadosVar} dadosFix={dadosFix}/>;
 
   return null;

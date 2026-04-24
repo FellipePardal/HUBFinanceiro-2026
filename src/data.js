@@ -3,8 +3,8 @@ import { CATS } from "./constants";
 // ─── DEFAULTS DE CUSTO POR CENÁRIO ────────────────────────────────────────────
 const PESSOAL     = {coord_um:1000,prod_um:0,prod_campo:400,monitoracao:0,supervisor1:800,supervisor2:800,dtv:800,vmix:500,audio:800};
 const B1_SUL      = {outros_log:0,transporte:6000,uber:1000,hospedagem:2450,diaria:550,...PESSOAL,supervisor2:1700,um_b1:85000,um_b2:0,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:15000,goalcam:4000,minidrone:2500,infra:6776,extra:0};
-const B2_SUDESTE  = {outros_log:0,transporte:5000,uber:1000,hospedagem:1450,diaria:550,...PESSOAL,um_b1:0,um_b2:50000,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
-const B2_SUL      = {outros_log:0,transporte:10010,uber:1200,hospedagem:3150,diaria:640,...PESSOAL,um_b1:0,um_b2:50000,geradores:6000,sng:7920,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:3500,grua:9000,dslr:10500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
+const B2_SUDESTE  = {outros_log:0,transporte:5000,uber:1000,hospedagem:1450,diaria:550,...PESSOAL,supervisor2:1300,um_b1:0,um_b2:50000,geradores:4500,sng:6600,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:2500,grua:4500,dslr:8500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
+const B2_SUL      = {outros_log:0,transporte:10010,uber:1200,hospedagem:3150,diaria:640,...PESSOAL,supervisor2:1300,um_b1:0,um_b2:50000,geradores:6000,sng:7920,sng_extra:0,seg_espacial:4500,seg_extra:0,drone:3500,grua:9000,dslr:10500,carrinho:0,especial:0,goalcam:0,minidrone:0,infra:6776,extra:0};
 
 export const allSubKeys = () => { const r={}; CATS.forEach(c=>c.subs.forEach(s=>{r[s.key]=0;})); return r; };
 export const getDefaults = (cat, regiao="sudeste") => { if(cat==="B1") return {...B1_SUL}; if(regiao==="sul") return {...B2_SUL}; return {...B2_SUDESTE}; };

@@ -84,8 +84,8 @@ export const SECAO_COLORS = { "Pessoal":"#3b82f6", "Transmissão":"#22c55e", "Se
 // ─── CENÁRIOS ─────────────────────────────────────────────────────────────────
 export const CENARIO_INFO = {
   b1:   { label:"B1 Sudeste", color:"#22c55e", total:160376, cat:"B1", regiao:"sudeste" },
-  b2s:  { label:"B2 Sudeste", color:"#3b82f6", total:100976, cat:"B2", regiao:"sudeste" },
-  b2sul:{ label:"B2 Sul",     color:"#f59e0b", total:118296, cat:"B2", regiao:"sul"     },
+  b2s:  { label:"B2 Sudeste", color:"#3b82f6", total:101476, cat:"B2", regiao:"sudeste" },
+  b2sul:{ label:"B2 Sul",     color:"#f59e0b", total:118796, cat:"B2", regiao:"sul"     },
 };
 
 // ─── CAMPEONATOS ──────────────────────────────────────────────────────────────

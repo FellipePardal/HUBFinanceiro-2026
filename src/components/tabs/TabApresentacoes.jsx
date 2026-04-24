@@ -78,7 +78,7 @@ return (
 }
 
 // ─── FORM VARIÁVEIS ───────────────────────────────────────────────────────────
-const ORC_GLOBAL_FIXO = 10078880; // Orçado total variáveis do campeonato (travado)
+const ORC_GLOBAL_FIXO = 10130480; // Orçado total variáveis do campeonato (travado)
 
 function FormVariaveis({T, onBack, jogos = [], onDadosCalculados}) {
 const [status,      setStatus]      = useState({msg:"Pronto para gerar",cls:""});
@@ -968,7 +968,7 @@ return (
 
 
 // ─── FORM VISÃO GERAL ─────────────────────────────────────────────────────────
-const ORC_TOTAL_VAR_CAMPEONATO = 10078880; // fixo — orçado total variáveis
+const ORC_TOTAL_VAR_CAMPEONATO = 10130480; // fixo — orçado total variáveis
 
 function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
   const [status,  setStatus]  = useState({ msg: "Pronto para gerar", cls: "" });

@@ -64,10 +64,13 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
       ]);
       if (j) {
-        // Migração: se todos os jogos persistidos são placeholders (mandante "A definir"),
-        // substitui pela tabela oficial publicada pela FPF (R1–R7 + mata-mata).
-        const todosPlaceholder = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
-        if (todosPlaceholder) {
+        // Migrações idempotentes do seed:
+        //   v1: todos placeholders ("A definir") → carrega tabela oficial.
+        //   v2: jogos sem codigo_orcamento (seed antigo da v1) → substitui pelo
+        //       seed com orçado por bloco (logística/pessoal/operação) e nova fase Play In.
+        const todosPlaceholder  = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
+        const semCodigoOrc      = Array.isArray(j) && j.length > 0 && !j.some(x => x && x.codigo_orcamento);
+        if (todosPlaceholder || semCodigoOrc) {
           setJogosRaw(PAULISTAO_JOGOS_INIT);
           setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
         } else {

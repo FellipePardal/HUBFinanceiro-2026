@@ -21,41 +21,75 @@ export const getFase = key => FASES_PAULISTAO.find(f => f.key === key) || FASES_
 export const ordemFase = key => (FASES_PAULISTAO.find(f => f.key === key)?.ordem) || 99;
 
 // Cria placeholder/jogo do Paulistão
-export const makeJogoPaulistao = ({ id, fase="grupos", grupo="A", rodada=1, cidade="A definir", data="A definir", hora="A definir", mandante="A definir", visitante="A definir", detentor="A definir" }) => {
+export const makeJogoPaulistao = ({ id, fase="grupos", grupo="-", rodada=1, cidade="A definir", estadio="A definir", dia="", data="A definir", hora="A definir", mandante="A definir", visitante="A definir", detentor="A definir" }) => {
   const defs = getPaulistaoDefaults();
   return {
     id, fase, grupo, rodada,
     categoria:"PAU",
-    cidade, data, hora, mandante, visitante, detentor,
+    cidade, estadio, dia, data, hora, mandante, visitante, detentor,
     orcado: { ...defs },
     provisionado: { ...allSubKeysPaulistao() },
     realizado: { ...allSubKeysPaulistao() },
   };
 };
 
-// ─── SEED PADRÃO ──────────────────────────────────────────────────────────────
-// Estrutura típica do Paulistão Feminino: 16 times divididos em 4 grupos (A-D).
-// Fase de Grupos: 12 rodadas (cada time joga 12 partidas — turno único entre todos).
-// Mata-mata: 8 jogos oitavas (jogo único) + 4 quartas + 2 semis + 1 final (jogo único ou ida/volta).
-// Aqui criamos placeholders ajustáveis. A definição real virá do operador.
+// ─── SEED PADRÃO — Paulistão Feminino 2026 (formato 8 times) ──────────────────
+// Times: Palmeiras, Mirassol, Ferroviária, Santos, Corinthians, São Paulo, RB Bragantino, Taubaté.
+// Fase de Grupos: 7 rodadas turno único (parciais publicadas até R7 — restantes a divulgar).
+// Mata-mata: Quartas (4 jogos = 2 confrontos ida/volta) → Semi (4 jogos) → Final (2 jogos).
+export const PAULISTAO_GRUPOS = ["-"];
 
-const PLACEHOLDERS_GRUPOS_QTDE = 12; // rodadas iniciais sem jogos definidos
-export const PAULISTAO_GRUPOS = ["A","B","C","D"];
+export const PAULISTAO_JOGOS_INIT = [
+  // R1
+  makeJogoPaulistao({ id:1001, fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"18:00", mandante:"Palmeiras",   visitante:"Mirassol",     cidade:"Barueri",     estadio:"Arena Barueri",            detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1002, fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"20:00", mandante:"Ferroviária", visitante:"Santos",       cidade:"Araraquara",  estadio:"Fonte Luminosa",            detentor:"Record News / HBO Max / CazeTV" }),
+  makeJogoPaulistao({ id:1003, fase:"grupos", rodada:1, dia:"quinta-feira", data:"07/05/2026", hora:"21:30", mandante:"Corinthians", visitante:"São Paulo",    cidade:"São Paulo",   estadio:"Alfredo Schürig",           detentor:"SporTV" }),
 
-const placeholdersGrupos = Array.from({ length: PLACEHOLDERS_GRUPOS_QTDE * 4 }, (_, i) => {
-  const rodada = Math.floor(i/4) + 1;
-  const grupo  = PAULISTAO_GRUPOS[i % 4];
-  return makeJogoPaulistao({ id: 1000 + i, fase:"grupos", grupo, rodada });
-});
+  // R2
+  makeJogoPaulistao({ id:1004, fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"16:00", mandante:"Mirassol",      visitante:"Ferroviária", cidade:"Bálsamo",    estadio:"Manuel Francisco Ferreira", detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1005, fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"17:30", mandante:"RB Bragantino", visitante:"Corinthians", cidade:"Rio Claro",  estadio:"Benito Agnelo Castellano",  detentor:"Record / HBO Max" }),
+  makeJogoPaulistao({ id:1006, fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"19:30", mandante:"Santos",        visitante:"Palmeiras",   cidade:"Santos",     estadio:"Vila Belmiro",              detentor:"Record News / HBO Max / CazeTV" }),
+  makeJogoPaulistao({ id:1007, fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"21:00", mandante:"São Paulo",     visitante:"Taubaté",     cidade:"Cotia",      estadio:"Marcelo Portugal Gouvêa",   detentor:"SporTV" }),
 
-const placeholdersMata = [
-  ...Array.from({ length:8 }, (_,i) => makeJogoPaulistao({ id: 2000+i, fase:"oitavas", grupo:"-", rodada:1 })),
-  ...Array.from({ length:4 }, (_,i) => makeJogoPaulistao({ id: 3000+i, fase:"quartas", grupo:"-", rodada:1 })),
-  ...Array.from({ length:2 }, (_,i) => makeJogoPaulistao({ id: 4000+i, fase:"semi",    grupo:"-", rodada:1 })),
-  makeJogoPaulistao({ id: 5000, fase:"final", grupo:"-", rodada:1 }),
+  // R3
+  makeJogoPaulistao({ id:1008, fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"18:00", mandante:"Ferroviária", visitante:"Palmeiras",    cidade:"Araraquara", estadio:"Fonte Luminosa",            detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1009, fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"19:30", mandante:"Corinthians", visitante:"Santos",       cidade:"São Paulo",  estadio:"Alfredo Schürig",           detentor:"Record News / HBO Max / CazeTV" }),
+  makeJogoPaulistao({ id:1010, fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"21:00", mandante:"São Paulo",   visitante:"RB Bragantino",cidade:"Cotia",      estadio:"Marcelo Portugal Gouvêa",   detentor:"SporTV" }),
+
+  // R4
+  makeJogoPaulistao({ id:1011, fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Corinthians", visitante:"Ferroviária",  cidade:"São Paulo",  estadio:"Alfredo Schürig",           detentor:"Record News / HBO Max / CazeTV" }),
+  makeJogoPaulistao({ id:1012, fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Palmeiras",   visitante:"São Paulo",    cidade:"Barueri",    estadio:"Arena Barueri",             detentor:"SporTV" }),
+
+  // R5
+  makeJogoPaulistao({ id:1013, fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"RB Bragantino", visitante:"Santos",     cidade:"Rio Claro",  estadio:"Benito Agnelo Castellano",  detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1014, fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"Palmeiras",     visitante:"Corinthians",cidade:"Barueri",    estadio:"Arena Barueri",             detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1015, fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"São Paulo",     visitante:"Mirassol",   cidade:"Cotia",      estadio:"Marcelo Portugal Gouvêa",   detentor:"Record News / HBO Max / CazeTV" }),
+
+  // R6
+  makeJogoPaulistao({ id:1016, fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Taubaté",   visitante:"Palmeiras",   cidade:"Taubaté",    estadio:"Estádio Joaquim de Morais Filho", detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1017, fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Mirassol",  visitante:"Corinthians", cidade:"Bálsamo",    estadio:"Manuel Francisco Ferreira",       detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1018, fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"São Paulo", visitante:"Santos",      cidade:"Cotia",      estadio:"Marcelo Portugal Gouvêa",         detentor:"Record News / HBO Max / CazeTV" }),
+
+  // R7
+  makeJogoPaulistao({ id:1019, fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Corinthians", visitante:"Taubaté",      cidade:"São Paulo",  estadio:"Alfredo Schürig", detentor:"SporTV" }),
+  makeJogoPaulistao({ id:1020, fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Palmeiras",   visitante:"RB Bragantino",cidade:"Barueri",    estadio:"Arena Barueri",   detentor:"Record News / HBO Max / CazeTV" }),
+
+  // Quartas (chamada de "2ª Fase" pela FPF) — 2 confrontos ida/volta
+  makeJogoPaulistao({ id:3001, fase:"quartas", rodada:1, dia:"quarta-feira", data:"18/11/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:3002, fase:"quartas", rodada:1, dia:"quarta-feira", data:"18/11/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:3003, fase:"quartas", rodada:2, dia:"domingo",      data:"22/11/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:3004, fase:"quartas", rodada:2, dia:"domingo",      data:"22/11/2026", hora:"20:00" }),
+
+  // Semifinal — 2 confrontos ida/volta
+  makeJogoPaulistao({ id:4001, fase:"semi", rodada:1, dia:"quarta-feira", data:"09/12/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:4002, fase:"semi", rodada:1, dia:"quarta-feira", data:"09/12/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:4003, fase:"semi", rodada:2, dia:"domingo",      data:"13/12/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:4004, fase:"semi", rodada:2, dia:"domingo",      data:"13/12/2026", hora:"20:00" }),
+
+  // Final — 1 confronto ida/volta
+  makeJogoPaulistao({ id:5001, fase:"final", rodada:1, dia:"quarta-feira", data:"16/12/2026", hora:"20:00" }),
+  makeJogoPaulistao({ id:5002, fase:"final", rodada:2, dia:"domingo",      data:"20/12/2026", hora:"20:00" }),
 ];
-
-export const PAULISTAO_JOGOS_INIT = [...placeholdersGrupos, ...placeholdersMata];
 
 // ─── SERVIÇOS FIXOS — Orçamento Feminino 2026 v4 (total R$ 238.000) ───────────
 // Fonte: planilha "Fixos Sinal Inter - Orçado". Distribuição mensal (mai-dez)

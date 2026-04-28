@@ -21,9 +21,11 @@ export default function TabJogosPaulistao({
     return acc;
   }, {});
 
+  const temGrupos = jogos.some(j => j.grupo && j.grupo !== "-");
+
   const filtrados = (showPlaceholder ? jogos : jogos.filter(j => j.mandante !== "A definir"))
     .filter(j => filtroFase === "Todas" || j.fase === filtroFase)
-    .filter(j => filtroGrupo === "Todos" || j.grupo === filtroGrupo)
+    .filter(j => !temGrupos || filtroGrupo === "Todos" || j.grupo === filtroGrupo)
     .sort((a,b) => ordemFase(a.fase) - ordemFase(b.fase) || a.rodada - b.rodada || a.id - b.id);
 
   const StatBox = ({ label, value, total, color }) => (
@@ -58,12 +60,14 @@ export default function TabJogosPaulistao({
               {f.short}
             </Chip>
           ))}
-          <div style={{width:1,height:24,background:T.border,margin:"0 6px"}}/>
-          {["Todos","A","B","C","D"].map(g => (
-            <Chip key={g} active={filtroGrupo===g} onClick={()=>setFiltroGrupo(g)} T={T} color={T.info}>
-              {g==="Todos" ? "Todos grupos" : `Grupo ${g}`}
-            </Chip>
-          ))}
+          {temGrupos && (<>
+            <div style={{width:1,height:24,background:T.border,margin:"0 6px"}}/>
+            {["Todos","A","B","C","D"].map(g => (
+              <Chip key={g} active={filtroGrupo===g} onClick={()=>setFiltroGrupo(g)} T={T} color={T.info}>
+                {g==="Todos" ? "Todos grupos" : `Grupo ${g}`}
+              </Chip>
+            ))}
+          </>)}
           <Chip active={showPlaceholder} onClick={()=>setShowPlaceholder(p=>!p)} T={T} color="#a855f7">
             {showPlaceholder ? "Ocultar a divulgar" : "Ver a divulgar"}
           </Chip>
@@ -79,7 +83,7 @@ export default function TabJogosPaulistao({
           <table style={{...TS.table, minWidth:920}}>
             <thead>
               <tr style={TS.thead}>
-                {["Jogo","Fase","Grupo","Rd","Cidade","Data","Detentor","Orçado","Provisionado","Realizado","Saving",""].map(h => (
+                {["Jogo","Fase",...(temGrupos?["Grupo"]:[]),"Rd","Cidade","Data","Detentor","Orçado","Provisionado","Realizado","Saving",""].map(h => (
                   <th key={h} style={{...TS.th, ...((h==="Orçado"||h==="Provisionado"||h==="Realizado"||h==="Saving")?TS.thRight:TS.thLeft)}}>{h}</th>
                 ))}
               </tr>
@@ -95,7 +99,7 @@ export default function TabJogosPaulistao({
                       {isDef ? <span style={{color:T.textSm,fontStyle:"italic"}}>A divulgar</span> : `${j.mandante} × ${j.visitante}`}
                     </td>
                     <td style={TS.td}><Pill label={fase.short} color={fase.color}/></td>
-                    <td style={{...TS.td, color:T.textMd, fontSize:12}}>{j.grupo}</td>
+                    {temGrupos && <td style={{...TS.td, color:T.textMd, fontSize:12}}>{j.grupo}</td>}
                     <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{j.rodada}</td>
                     <td style={{...TS.td, color:T.textMd, fontSize:12, whiteSpace:"nowrap"}}>{j.cidade}</td>
                     <td style={{...TS.td, color:T.textMd, fontSize:12, whiteSpace:"nowrap"}}>{j.data}</td>

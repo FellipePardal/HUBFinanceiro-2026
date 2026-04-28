@@ -67,7 +67,7 @@ export const FONT    = { ui:"'Inter', system-ui, -apple-system, sans-serif", num
 // ─── LISTAS ───────────────────────────────────────────────────────────────────
 export const DETENTORES = ["CazeTV/Record/Premiere","Amazon","A definir"];
 export const CIDADES    = ["Rio de Janeiro","São Paulo","Curitiba","Belo Horizonte","Porto Alegre","Chapecó","Mirassol","Outro"];
-export const TIMES      = ["Fluminense","Botafogo","Flamengo","Vasco","Corinthians","Palmeiras","São Paulo","Athletico PR","Grêmio","Internacional","Cruzeiro","Atlético MG","Chapecoense","Santos","Vitória","Mirassol","Coritiba","Outro"];
+export const TIMES      = ["Fluminense","Botafogo","Flamengo","Vasco","Corinthians","Palmeiras","São Paulo","Athletico PR","Grêmio","Internacional","Cruzeiro","Atlético MG","Chapecoense","Santos","Vitória","Mirassol","Coritiba","Ferroviária","RB Bragantino","Taubaté","Outro"];
 
 // ─── CATEGORIAS DE CUSTO ──────────────────────────────────────────────────────
 export const CATS = [

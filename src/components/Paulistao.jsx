@@ -63,8 +63,29 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
       ]);
-      if (j) setJogosRaw(j);          else setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
-      if (s) setServicosRaw(s);       else setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
+      if (j) {
+        // Migração: se todos os jogos persistidos são placeholders (mandante "A definir"),
+        // substitui pela tabela oficial publicada pela FPF (R1–R7 + mata-mata).
+        const todosPlaceholder = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
+        if (todosPlaceholder) {
+          setJogosRaw(PAULISTAO_JOGOS_INIT);
+          setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
+        } else {
+          setJogosRaw(j);
+        }
+      } else setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
+      // Serviços fixos: migra seed antigo (sem "Festa de Encerramento" e sem orçado)
+      // para o orçamento aprovado v4 (R$ 238k). Não mexe se o operador já customizou.
+      if (s) {
+        const temFesta  = Array.isArray(s) && s.some(sec => Array.isArray(sec.itens) && sec.itens.some(i => /festa de encerramento/i.test(i.nome||"")));
+        const totalOrc  = Array.isArray(s) ? s.reduce((t,sec)=>t+(sec.itens||[]).reduce((u,i)=>u+(i.orcado||0),0),0) : 0;
+        if (!temFesta && totalOrc === 0) {
+          setServicosRaw(PAULISTAO_SERVICOS_INIT);
+          setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
+        } else {
+          setServicosRaw(s);
+        }
+      } else setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
       if (n) setNotasRaw(n);          else setSupabaseState(K.notas, []);
       if (f) setFornecedoresRaw(f);   else setSupabaseState(K.fornecedores, FORNECEDORES_INIT);
       if (nm) setNotasMensaisRaw(nm); else setSupabaseState(K.notas_mensais, []);

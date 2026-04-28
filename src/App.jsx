@@ -317,6 +317,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const totalReal = RESUMO_CATS.reduce((s,c) => s+c.realizado, 0);
   const pctGasto  = totalOrc ? ((totalReal/totalOrc)*100).toFixed(1) : 0;
 
+  const divulgados  = jogosCalc.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada || a.id - b.id);
+  const aDivulgar   = jogos.filter(j => j.mandante === "A definir");
+  const rodadasList = ["Todas", ...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)];
+
   // ─── PROJETADO ATÉ FIM DO CAMPEONATO ────────────────────────────────────────
   // Plano pré-campeonato: 34 B1 sudeste + 18 B2 sudeste + 24 B2 sul = 76 jogos
   const PLANO_JOGOS = { b1:34, b2s:18, b2sul:24 };
@@ -333,10 +337,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
     return s + restante * CENARIO_INFO[k].total;
   }, 0);
   const totalProjetado = totalProv + orcRestanteJogos;
-
-  const divulgados  = jogosCalc.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada || a.id - b.id);
-  const aDivulgar   = jogos.filter(j => j.mandante === "A definir");
-  const rodadasList = ["Todas", ...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)];
 
   const filtrados = (showPlaceholder ? jogosCalc : divulgados).filter(j =>
     (filtroRod==="Todas" || j.rodada===parseInt(filtroRod)) &&

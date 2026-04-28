@@ -90,9 +90,24 @@ export const CENARIO_INFO = {
 
 // ─── CAMPEONATOS ──────────────────────────────────────────────────────────────
 export const CAMPEONATOS = [
-  { id:"brasileirao-2026", nome:"Brasileirão Série A", edicao:"2026", status:"Em andamento", statusColor:"#22c55e", cor:"#166534", corGrad:"linear-gradient(135deg,#166534,#15803d)", icon:"🇧🇷", rodadas:38, descricao:"Campeonato Brasileiro — FFU Transmissões" },
-  { id:"estaduais-2026",   nome:"Campeonatos Estaduais", edicao:"2026", status:"Planejamento", statusColor:"#f59e0b", cor:"#92400e", corGrad:"linear-gradient(135deg,#78350f,#92400e)", icon:"🏆", rodadas:null, descricao:"Estaduais — em estruturação", emBreve:true },
+  { id:"brasileirao-2026", nome:"Brasileirão Série A", edicao:"2026", status:"Em andamento", statusColor:"#22c55e", cor:"#166534", corGrad:"linear-gradient(135deg,#166534,#15803d)", icon:"🇧🇷", rodadas:38, descricao:"Campeonato Brasileiro — Livemode Transmissões" },
+  { id:"paulistao-feminino-2026", nome:"Paulistão Feminino", edicao:"2026", status:"Em andamento", statusColor:"#ec4899", cor:"#9d174d", corGrad:"linear-gradient(135deg,#9d174d,#be185d)", icon:"⚽", fases:5, descricao:"Estadual Paulista Feminino — fase de grupos + mata-mata" },
 ];
+
+// ─── PAULISTÃO FEMININO ───────────────────────────────────────────────────────
+// Fases do campeonato (ordem importa: índice = ordem de exibição/sort)
+export const FASES_PAULISTAO = [
+  { key:"grupos",   label:"Fase de Grupos",   short:"Grupos",  color:"#3b82f6", ordem:1 },
+  { key:"oitavas",  label:"Oitavas de Final", short:"Oitavas", color:"#8b5cf6", ordem:2 },
+  { key:"quartas",  label:"Quartas de Final", short:"Quartas", color:"#f59e0b", ordem:3 },
+  { key:"semi",     label:"Semifinal",        short:"Semi",    color:"#ef4444", ordem:4 },
+  { key:"final",    label:"Final",            short:"Final",   color:"#10b981", ordem:5 },
+];
+
+// Cenário operacional do Paulistão Feminino — valor unificado por jogo (ajustar quando vier orçamento real)
+export const PAULISTAO_CENARIO_INFO = {
+  paulistao: { label:"Paulistão Feminino", color:"#ec4899", total:80000, cat:"PAU", regiao:"sudeste" },
+};
 
 // ─── APRESENTAÇÕES ────────────────────────────────────────────────────────────
 export const ORC_PADRAO  = [306440, 206427, 331103, 206347];

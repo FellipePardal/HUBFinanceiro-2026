@@ -760,6 +760,7 @@ import FormularioPublico from "./components/FormularioPublico";
 import EnvioPublico from "./components/EnvioPublico";
 import HubFornecedores from "./components/HubFornecedores";
 import TabelaPrecoPublica from "./components/TabelaPrecoPublica";
+import Paulistao from "./components/Paulistao";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
@@ -790,6 +791,7 @@ export default function App() {
   if (!authed) return <LoginGate onAuth={() => setAuthed(true)} T={T}/>;
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  if(pagina==="paulistao-feminino-2026") return <Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   if(pagina==="hub-fornecedores") return <HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   return <Home onEnter={setPagina} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>
 }

@@ -99,7 +99,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
           gap: 16,
           marginBottom: 40,
         }}>
-          <Stat T={T} label="Campeonatos Ativos" value="1" sub="de 2 planejados" color={T.brand} icon={Trophy} />
+          <Stat T={T} label="Campeonatos Ativos" value="2" sub="Brasileirão + Paulistão Feminino" color={T.brand} icon={Trophy} />
           <Stat T={T} label="Temporada"          value="2026" sub="Janeiro – Dezembro" color={T.info} icon={Calendar} />
           <Stat T={T} label="Detentores"         value="3" sub="CazeTV · Record · Amazon" color="#a855f7" icon={Building2} />
         </div>
@@ -214,6 +214,25 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
                     <div>
                       <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Detentores</p>
                       <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>CazeTV · Record · Amazon</p>
+                    </div>
+                  </div>
+                )}
+                {camp.id === "paulistao-feminino-2026" && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 18,
+                    paddingBottom: 18,
+                    borderBottom: `1px solid ${T.border}`,
+                  }}>
+                    <div>
+                      <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Fases</p>
+                      <p className="num" style={{ color: T.text, fontSize: 16, fontWeight: 700, margin: 0 }}>{camp.fases}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>Formato</p>
+                      <p style={{ color: T.text, fontSize: 12, fontWeight: 600, margin: 0 }}>Grupos + Mata-mata</p>
                     </div>
                   </div>
                 )}

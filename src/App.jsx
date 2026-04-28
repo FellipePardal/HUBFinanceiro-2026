@@ -511,26 +511,51 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
               </div>
             </div>
 
-            <div style={{
-              display:"flex", alignItems:"center", gap:12,
-              padding:"10px 18px",
-              background: T.surfaceAlt || T.bg,
-              border: `1px solid ${T.border}`,
-              borderRadius: RADIUS.lg,
-            }}>
-              <Activity size={16} color={T.brand || "#10b981"} strokeWidth={2.25}/>
-              <div style={{ textAlign:"right" }}>
-                <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
-                <p className="num" style={{
-                  fontSize:22,
-                  fontWeight:800,
-                  color: pctGasto>80 ? (T.danger||"#ef4444") : (T.brand||"#10b981"),
-                  margin:0,
-                  filter:ocultar?"blur(8px)":"none",
-                  transition:"filter 0.2s",
-                  letterSpacing:"-0.02em",
-                  lineHeight:1,
-                }}>{pctGasto}%</p>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{
+                display:"flex", alignItems:"center", gap:12,
+                padding:"10px 18px",
+                background: T.surfaceAlt || T.bg,
+                border: `1px solid ${T.border}`,
+                borderRadius: RADIUS.lg,
+              }}>
+                <Wallet size={16} color="#a855f7" strokeWidth={2.25}/>
+                <div style={{ textAlign:"right" }}>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Orçado total campeonato</p>
+                  <p className="num" style={{
+                    fontSize:22,
+                    fontWeight:800,
+                    color:"#a855f7",
+                    margin:0,
+                    filter:ocultar?"blur(8px)":"none",
+                    transition:"filter 0.2s",
+                    letterSpacing:"-0.02em",
+                    lineHeight:1,
+                  }}>{fmt(11540692)}</p>
+                </div>
+              </div>
+
+              <div style={{
+                display:"flex", alignItems:"center", gap:12,
+                padding:"10px 18px",
+                background: T.surfaceAlt || T.bg,
+                border: `1px solid ${T.border}`,
+                borderRadius: RADIUS.lg,
+              }}>
+                <Activity size={16} color={T.brand || "#10b981"} strokeWidth={2.25}/>
+                <div style={{ textAlign:"right" }}>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
+                  <p className="num" style={{
+                    fontSize:22,
+                    fontWeight:800,
+                    color: pctGasto>80 ? (T.danger||"#ef4444") : (T.brand||"#10b981"),
+                    margin:0,
+                    filter:ocultar?"blur(8px)":"none",
+                    transition:"filter 0.2s",
+                    letterSpacing:"-0.02em",
+                    lineHeight:1,
+                  }}>{pctGasto}%</p>
+                </div>
               </div>
             </div>
           </div>

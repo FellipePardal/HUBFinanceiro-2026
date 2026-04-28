@@ -617,7 +617,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
               <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
                 <thead>
                   <tr style={{background:T.surfaceAlt||T.bg}}>
-                    {["Categoria","Tipo","Orçado","Provisionado","Realizado","Saldo","% Exec.","Progresso"].map(h => (
+                    {["Categoria","Tipo","Orçado","Provisionado","Realizado","% Exec.","Progresso"].map(h => (
                       <th key={h} style={{
                         padding:"11px 16px",
                         textAlign:h==="Categoria"||h==="Tipo"?"left":"right",
@@ -643,7 +643,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
-                        <td className="num" style={{padding:"13px 16px",textAlign:"right",fontWeight:700,color:saldo<0?(T.danger||"#ef4444"):(T.brand||"#10b981"),whiteSpace:"nowrap",fontSize:13}}>{fmt(saldo)}</td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.text,fontSize:13}}>{pct.toFixed(1)}%</td>
                         <td style={{padding:"13px 20px",minWidth:120}}>
                           <Progress value={pct} T={T}/>
@@ -656,7 +655,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.brand||"#10b981",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc)}</td>
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalProv)}</td>
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalReal)}</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:(totalOrc-totalReal)>=0?(T.brand||"#10b981"):(T.danger||"#ef4444"),whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc-totalReal)}</td>
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.text,fontSize:14,fontWeight:700}}>{pctGasto}%</td>
                     <td/>
                   </tr>

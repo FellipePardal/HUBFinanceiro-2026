@@ -598,7 +598,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
             <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}           sub="Jogos + serviços fixos"                                           color={T.brand}   icon={Wallet}     />
             <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info}    icon={PiggyBank}  />
             <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color={T.warning} icon={TrendingUp} />
-            <Stat T={T} label="Saldo Disponível"   value={fmt(totalOrc-totalReal)} sub="Orçado − Realizado"                                               color={(totalOrc-totalReal)>=0 ? T.brand : T.danger} icon={Activity}/>
             <Stat T={T} label="Projetado"          value={fmt(totalProjetado)}     sub={`Provisionado + ${(PLANO_JOGOS.b1+PLANO_JOGOS.b2s+PLANO_JOGOS.b2sul)-divulgados.length} jogos a divulgar`} color="#a855f7"  icon={Target}     />
           </div>
           <Card T={T}>

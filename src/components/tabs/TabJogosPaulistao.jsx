@@ -3,20 +3,23 @@ import { fmtK, subTotal } from "../../utils";
 import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
 import { Search, Pencil, Trash2, Plus } from "lucide-react";
 import { FASES_PAULISTAO } from "../../constants";
-import { getFase, ordemFase } from "../../data/paulistao";
 
 export default function TabJogosPaulistao({
   jogos, filtroFase, setFiltroFase, filtroGrupo, setFiltroGrupo,
   showPlaceholder, setShowPlaceholder,
   setMicroJogoId, setTab, setNovo, onDelete, onEdit, T,
+  fases = FASES_PAULISTAO,
 }) {
   const TS = tableStyles(T);
+  const FASES = fases;
+  const getFase   = (key) => FASES.find(f => f.key === key) || FASES[0] || { key, short:key, color:"#888", ordem:99 };
+  const ordemFase = (key) => FASES.find(f => f.key === key)?.ordem || 99;
 
-  const consumidos = FASES_PAULISTAO.reduce((acc, f) => {
+  const consumidos = FASES.reduce((acc, f) => {
     acc[f.key] = jogos.filter(j => j.fase === f.key && j.mandante !== "A definir").length;
     return acc;
   }, {});
-  const totaisFase = FASES_PAULISTAO.reduce((acc, f) => {
+  const totaisFase = FASES.reduce((acc, f) => {
     acc[f.key] = jogos.filter(j => j.fase === f.key).length;
     return acc;
   }, {});
@@ -47,7 +50,7 @@ export default function TabJogosPaulistao({
   return (
     <>
       <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
-        {FASES_PAULISTAO.map(f => (
+        {FASES.map(f => (
           <StatBox key={f.key} label={f.short} value={consumidos[f.key]||0} total={totaisFase[f.key]||0} color={f.color}/>
         ))}
       </div>
@@ -55,7 +58,7 @@ export default function TabJogosPaulistao({
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           <Chip active={filtroFase==="Todas"} onClick={()=>setFiltroFase("Todas")} T={T}>Todas as fases</Chip>
-          {FASES_PAULISTAO.map(f => (
+          {FASES.map(f => (
             <Chip key={f.key} active={filtroFase===f.key} onClick={()=>setFiltroFase(f.key)} T={T} color={f.color}>
               {f.short}
             </Chip>

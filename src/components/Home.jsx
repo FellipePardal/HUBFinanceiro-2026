@@ -3,9 +3,11 @@ import { Card, Stat, Button, Badge } from "./ui";
 import {
   Radio, Trophy, Calendar, Building2, Sun, Moon,
   ArrowRight, Lock, Activity, BarChart3, Handshake, Globe2,
+  Plus, Trash2,
 } from "lucide-react";
 
-export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
+export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, customCampeonatos = [], onCriarCampeonato, onExcluirCampeonato }) {
+  const totalAtivos = CAMPEONATOS.filter(c => !c.emBreve).length + customCampeonatos.filter(c => c.status === "Em andamento").length;
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text }}>
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
@@ -99,7 +101,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
           gap: 16,
           marginBottom: 40,
         }}>
-          <Stat T={T} label="Campeonatos Ativos" value="2" sub="Brasileirão + Paulistão Feminino" color={T.brand} icon={Trophy} />
+          <Stat T={T} label="Campeonatos Ativos" value={String(totalAtivos)} sub={`${CAMPEONATOS.length + customCampeonatos.length} cadastrados`} color={T.brand} icon={Trophy} />
           <Stat T={T} label="Temporada"          value="2026" sub="Janeiro – Dezembro" color={T.info} icon={Calendar} />
           <Stat T={T} label="Detentores"         value="3" sub="CazeTV · Record · Amazon" color="#a855f7" icon={Building2} />
         </div>
@@ -120,9 +122,12 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
               letterSpacing: "-0.01em",
             }}>Campeonatos</h3>
             <p style={{ color: T.textSm, fontSize: 12, margin: "2px 0 0" }}>
-              {CAMPEONATOS.length} projetos cadastrados
+              {CAMPEONATOS.length + customCampeonatos.length} projetos cadastrados
             </p>
           </div>
+          <Button T={T} variant="primary" size="sm" icon={Plus} onClick={onCriarCampeonato}>
+            Novo campeonato
+          </Button>
         </div>
 
         {/* Cards de campeonatos */}
@@ -255,6 +260,87 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode }) {
               </div>
             </Card>
           ))}
+
+          {/* ── Custom (criados via "Novo campeonato") ─────────────────────── */}
+          {customCampeonatos.map(camp => (
+            <Card key={camp.id} T={T} hoverable style={{ cursor: "pointer", position:"relative" }}>
+              <div style={{
+                background: camp.corGrad || `linear-gradient(135deg, ${camp.cor||"#ec4899"}, ${(camp.cor||"#ec4899")}cc)`,
+                padding: "22px 24px 20px",
+                position: "relative",
+                overflow: "hidden",
+              }}>
+                <div style={{ position:"absolute", top:-40, right:-40, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 60%)", pointerEvents:"none" }}/>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", position:"relative", gap:12 }}>
+                  <div style={{ minWidth:0 }}>
+                    <span style={{ fontSize: 32, lineHeight: 1, display:"block", marginBottom:12 }}>{camp.icon || "🏆"}</span>
+                    <h4 style={{ margin:"0 0 4px", fontSize:18, fontWeight:700, color:"#fff", letterSpacing:"-0.015em" }}>{camp.nome}</h4>
+                    <p style={{ margin:0, fontSize:12, color:"rgba(255,255,255,0.72)" }}>{camp.edicao} · {camp.descricao}</p>
+                  </div>
+                  <span style={{
+                    background: (camp.statusColor || "#22c55e") + "22",
+                    color: "#fff",
+                    border: `1px solid ${(camp.statusColor || "#22c55e")}88`,
+                    borderRadius: RADIUS.pill,
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing:"0.04em",
+                    textTransform:"uppercase",
+                    whiteSpace:"nowrap",
+                  }}>{camp.status}</span>
+                </div>
+              </div>
+              <div style={{ padding:"18px 24px 22px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:18, paddingBottom:18, borderBottom:`1px solid ${T.border}` }}>
+                  <div>
+                    <p style={{ color:T.textSm, fontSize:10, margin:"0 0 4px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Fases</p>
+                    <p className="num" style={{ color:T.text, fontSize:16, fontWeight:700, margin:0 }}>{camp.fases?.length || 0}</p>
+                  </div>
+                  <div>
+                    <p style={{ color:T.textSm, fontSize:10, margin:"0 0 4px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Personalizado</p>
+                    <p style={{ color:T.text, fontSize:12, fontWeight:600, margin:0 }}>HUB Custom</p>
+                  </div>
+                </div>
+                <div style={{display:"flex", gap:8}}>
+                  <Button T={T} variant="primary" size="md" fullWidth icon={ArrowRight} onClick={()=>onEnter(`custom:${camp.id}`)}>
+                    Abrir campeonato
+                  </Button>
+                  <Button T={T} variant="danger" size="md" icon={Trash2} onClick={()=>{
+                    if (window.confirm(`Excluir o campeonato "${camp.nome}"? Os dados (jogos, notas, logística) ficam no Supabase mas o campeonato some do portal.`)) {
+                      onExcluirCampeonato && onExcluirCampeonato(camp.id);
+                    }
+                  }}/>
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {/* ── Card "+ Criar novo" ───────────────────────────────────────── */}
+          <Card T={T} hoverable style={{
+            cursor:"pointer",
+            border: `1px dashed ${T.border}`,
+            background: "transparent",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            minHeight: 280,
+          }} onClick={onCriarCampeonato}>
+            <div style={{ textAlign:"center", padding:24 }}>
+              <div style={{
+                width:56, height:56, borderRadius:14,
+                background: T.brandSoft || "rgba(16,185,129,0.10)",
+                border:`1px dashed ${T.brand || "#10b981"}`,
+                color: T.brand || "#10b981",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                margin:"0 auto 14px",
+              }}>
+                <Plus size={26} strokeWidth={2.25}/>
+              </div>
+              <p style={{margin:"0 0 4px", fontSize:14, fontWeight:700, color:T.text}}>Criar novo campeonato</p>
+              <p style={{margin:0, fontSize:11, color:T.textSm, maxWidth:220}}>Cole um JSON no formato padrão e o campeonato é criado com todas as funcionalidades do HUB.</p>
+            </div>
+          </Card>
         </div>
 
         {/* ── Módulos Transversais ────────────────────────────────── */}

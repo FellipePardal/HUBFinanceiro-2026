@@ -761,13 +761,59 @@ import EnvioPublico from "./components/EnvioPublico";
 import HubFornecedores from "./components/HubFornecedores";
 import TabelaPrecoPublica from "./components/TabelaPrecoPublica";
 import Paulistao from "./components/Paulistao";
+import CampeonatoCustom from "./components/CampeonatoCustom";
+import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
+import { REGISTRY_KEY } from "./data/customCampeonato";
+import { getState as getStateSb, setState as setStateSb } from "./lib/supabase";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
   const [pagina,   setPagina]   = useState("home");
   const [hubFiltro, setHubFiltro] = useState("todos"); // filtro pré-aplicado ao abrir o Hub de Fornecedores
   const [authed,   setAuthed]   = useState(() => lsGet(LS_AUTH, false));
+  const [customCampeonatos, setCustomCampeonatos] = useState([]);
+  const [showNovoCampModal, setShowNovoCampModal] = useState(false);
   const T = darkMode ? DARK : LIGHT;
+
+  // Carrega o registry de campeonatos custom uma vez ao logar.
+  useEffect(() => {
+    if (!authed) return;
+    let mounted = true;
+    getStateSb(REGISTRY_KEY).then(arr => {
+      if (mounted && Array.isArray(arr)) setCustomCampeonatos(arr);
+    });
+    return () => { mounted = false; };
+  }, [authed]);
+
+  const criarCampeonato = async ({ config, jogos, servicos }) => {
+    // 1) Persiste estado inicial dos buckets do novo campeonato
+    await Promise.all([
+      setStateSb(`${config.id}_jogos`, jogos),
+      setStateSb(`${config.id}_servicos`, servicos || []),
+      setStateSb(`${config.id}_notas`, []),
+      setStateSb(`${config.id}_notas_mensais`, []),
+      setStateSb(`${config.id}_envios`, []),
+      setStateSb(`${config.id}_livemode`, []),
+      setStateSb(`${config.id}_notas_livemode`, []),
+      setStateSb(`${config.id}_logistica`, []),
+      setStateSb(`${config.id}_eventos_log`, []),
+      setStateSb(`${config.id}_fornecedores_jogo`, {}),
+    ]);
+    // 2) Atualiza o registry global
+    const next = [...customCampeonatos.filter(c => c.id !== config.id), config];
+    setCustomCampeonatos(next);
+    await setStateSb(REGISTRY_KEY, next);
+    // 3) Fecha modal e navega
+    setShowNovoCampModal(false);
+    setPagina(`custom:${config.id}`);
+  };
+
+  const excluirCampeonato = async (id) => {
+    const next = customCampeonatos.filter(c => c.id !== id);
+    setCustomCampeonatos(next);
+    await setStateSb(REGISTRY_KEY, next);
+    // Os dados (`${id}_*`) ficam no Supabase para auditoria; podem ser limpos pelo painel.
+  };
 
   const toggleDark = v => {
     const next = typeof v === "function" ? v(darkMode) : v;
@@ -792,6 +838,32 @@ export default function App() {
 
   if(pagina==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
   if(pagina==="paulistao-feminino-2026") return <Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  if(pagina?.startsWith("custom:")) {
+    const id = pagina.slice(7);
+    const config = customCampeonatos.find(c => c.id === id);
+    if (config) return <CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+    // Config não encontrado (ex: registry ainda carregando após reload). Volta ao home.
+    setPagina("home");
+    return null;
+  }
   if(pagina==="hub-fornecedores") return <HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
-  return <Home onEnter={setPagina} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>
+  return (
+    <>
+      <Home
+        onEnter={setPagina}
+        onOpenHub={abrirHubFornecedores}
+        T={T} darkMode={darkMode} setDarkMode={toggleDark}
+        customCampeonatos={customCampeonatos}
+        onCriarCampeonato={()=>setShowNovoCampModal(true)}
+        onExcluirCampeonato={excluirCampeonato}
+      />
+      {showNovoCampModal && (
+        <NovoCampeonatoModal
+          T={T}
+          onClose={()=>setShowNovoCampModal(false)}
+          onSave={criarCampeonato}
+        />
+      )}
+    </>
+  );
 }

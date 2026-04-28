@@ -23,18 +23,19 @@ const dialogStyle = (T, max=480) => ({
   boxShadow:T.shadow||"0 20px 40px rgba(0,0,0,0.4)",
 });
 
-export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T }) {
+export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES_PAULISTAO, titulo = "Paulistão Feminino" }) {
+  const faseInicial = fases?.[0]?.key || "grupos";
   const [form, setForm] = useState(jogo ? {
     mandante:  jogo.mandante,
     visitante: jogo.visitante,
-    fase:      jogo.fase || "grupos",
+    fase:      jogo.fase || faseInicial,
     grupo:     jogo.grupo || "A",
     rodada:    String(jogo.rodada || 1),
     cidade:    jogo.cidade,
     data:      jogo.data,
     hora:      jogo.hora,
     detentor:  jogo.detentor,
-  } : { mandante:TIMES[0], visitante:TIMES[0], fase:"grupos", grupo:"A", rodada:"1", cidade:CIDADES[0], data:"", hora:"", detentor:"A definir" });
+  } : { mandante:TIMES[0], visitante:TIMES[0], fase:faseInicial, grupo:"A", rodada:"1", cidade:CIDADES[0], data:"", hora:"", detentor:"A definir" });
 
   const set = (k,v) => setForm(f => ({...f,[k]:v}));
   const IS  = iSty(T);
@@ -69,13 +70,13 @@ export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T }) {
     });
   };
 
-  const fasesOpts = FASES_PAULISTAO.map(f => ({ value:f.key, label:f.label }));
+  const fasesOpts = (fases || FASES_PAULISTAO).map(f => ({ value:f.key, label:f.label }));
 
   return (
     <div style={overlayStyle}>
       <div style={dialogStyle(T, 520)}>
         <h3 style={{margin:"0 0 20px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>
-          {isEdit ? "Editar Jogo" : "Novo Jogo · Paulistão Feminino"}
+          {isEdit ? "Editar Jogo" : `Novo Jogo · ${titulo}`}
         </h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           {field("Fase","fase",fasesOpts)}

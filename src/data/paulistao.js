@@ -57,18 +57,30 @@ const placeholdersMata = [
 
 export const PAULISTAO_JOGOS_INIT = [...placeholdersGrupos, ...placeholdersMata];
 
-// ─── SERVIÇOS FIXOS — base mínima, operador edita ─────────────────────────────
+// ─── SERVIÇOS FIXOS — Orçamento Feminino 2026 v4 (total R$ 238.000) ───────────
+// Fonte: planilha "Fixos Sinal Inter - Orçado". Distribuição mensal (mai-dez)
+// gravada em `mensal` para referência da equipe; não afeta o cálculo do orçado.
 export const PAULISTAO_SERVICOS_INIT = [
   { secao:"Pessoal", itens:[
-    { id:1, nome:"Coordenador Sinal Internacional", orcado:0, provisionado:0, realizado:0, obs:"" },
-    { id:2, nome:"Produtor Campo/Detentores",        orcado:0, provisionado:0, realizado:0, obs:"" },
+    { id:1, nome:"Coordenador Sinal Internacional", orcado:24000, provisionado:0, realizado:0,
+      obs:"R$ 2k/semana · rodadas: mai 3, jul 2, ago 2, nov 2, dez 4",
+      mensal:{ mai:6000, jun:0, jul:4000, ago:4000, set:0, out:0, nov:4000, dez:6000 } },
+    { id:2, nome:"Editor de Vídeos",                 orcado:11000, provisionado:0, realizado:0,
+      obs:"R$ 1k/semana",
+      mensal:{ mai:3000, jun:0, jul:2000, ago:2000, set:0, out:0, nov:2000, dez:2000 } },
+    { id:3, nome:"Editor de Vídeos 2",               orcado:7000,  provisionado:0, realizado:0,
+      obs:"R$ 1k/semana",
+      mensal:{ mai:3000, jun:0, jul:2000, ago:2000, set:0, out:0, nov:0, dez:0 } },
+    { id:4, nome:"Desenvolvimento/Suporte Operacional VMIX", orcado:20000, provisionado:0, realizado:0,
+      obs:"Redução conforme volume de jogos",
+      mensal:{ mai:4000, jun:0, jul:0, ago:4000, set:2000, out:2000, nov:4000, dez:4000 } },
+    { id:5, nome:"Desenvolvimento Cadê o Jogo",      orcado:0,     provisionado:0, realizado:0, obs:"" },
   ]},
   { secao:"Transmissão", itens:[
-    { id:6, nome:"Recepção Fibra para MMs", orcado:0, provisionado:0, realizado:0, obs:"" },
-  ]},
-  { secao:"Serviços Complementares", itens:[
-    { id:7,  nome:"Estatísticas",       orcado:0, provisionado:0, realizado:0, obs:"" },
-    { id:8,  nome:"Grafismo",            orcado:0, provisionado:0, realizado:0, obs:"" },
-    { id:9,  nome:"Vinheta + Trilha",   orcado:0, provisionado:0, realizado:0, obs:"" },
+    { id:6, nome:"Estatísticas (Opta/Footstats)",         orcado:41000, provisionado:0, realizado:0, obs:"Aumento em relação a 2025" },
+    { id:7, nome:"Ingest/Edição (WSC)",                   orcado:40000, provisionado:0, realizado:0, obs:"Custo FPF — confirmado" },
+    { id:8, nome:"Media Day + Vinheta",                   orcado:60000, provisionado:0, realizado:0, obs:"" },
+    { id:9, nome:"Espumas (produção + transporte)",       orcado:5000,  provisionado:0, realizado:0, obs:"" },
+    { id:10,nome:"Festa de Encerramento",                  orcado:30000, provisionado:0, realizado:0, obs:"" },
   ]},
 ];

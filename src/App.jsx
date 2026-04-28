@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS } from "./constants";
+import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
 import { KPI, Pill, CustomTooltip } from "./components/shared";
@@ -7,7 +7,7 @@ import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./compon
 import {
   LayoutDashboard, FileText, Users, ClipboardList,
   ArrowLeft, Eye, EyeOff, Sun, Moon, Lock,
-  Wallet, TrendingUp, Activity, PiggyBank, Truck,
+  Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
 import Home             from "./components/Home";
 import TabJogos         from "./components/tabs/TabJogos";
@@ -317,6 +317,23 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const totalReal = RESUMO_CATS.reduce((s,c) => s+c.realizado, 0);
   const pctGasto  = totalOrc ? ((totalReal/totalOrc)*100).toFixed(1) : 0;
 
+  // ─── PROJETADO ATÉ FIM DO CAMPEONATO ────────────────────────────────────────
+  // Plano pré-campeonato: 34 B1 sudeste + 18 B2 sudeste + 24 B2 sul = 76 jogos
+  const PLANO_JOGOS = { b1:34, b2s:18, b2sul:24 };
+  const CIDADES_SUL = ["Porto Alegre","Curitiba","Chapecó","Chapeco","Criciúma","Criciuma","Florianópolis","Florianopolis"];
+  const cenarioDoJogo = j => {
+    if (j.categoria === "B1") return "b1";
+    const isSul = j.regiao ? String(j.regiao).toLowerCase()==="sul" : CIDADES_SUL.includes(j.cidade);
+    return isSul ? "b2sul" : "b2s";
+  };
+  const divulgadosCount = { b1:0, b2s:0, b2sul:0 };
+  divulgados.forEach(j => { divulgadosCount[cenarioDoJogo(j)]++; });
+  const orcRestanteJogos = Object.keys(PLANO_JOGOS).reduce((s,k) => {
+    const restante = Math.max(0, PLANO_JOGOS[k] - divulgadosCount[k]);
+    return s + restante * CENARIO_INFO[k].total;
+  }, 0);
+  const totalProjetado = totalProv + orcRestanteJogos;
+
   const divulgados  = jogosCalc.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada || a.id - b.id);
   const aDivulgar   = jogos.filter(j => j.mandante === "A definir");
   const rodadasList = ["Todas", ...Array.from(new Set(divulgados.map(j=>j.rodada))).sort((a,b)=>a-b).map(String)];
@@ -557,6 +574,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
             <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info}    icon={PiggyBank}  />
             <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color={T.warning} icon={TrendingUp} />
             <Stat T={T} label="Saldo Disponível"   value={fmt(totalOrc-totalReal)} sub="Orçado − Realizado"                                               color={(totalOrc-totalReal)>=0 ? T.brand : T.danger} icon={Activity}/>
+            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)}     sub={`Provisionado + ${(PLANO_JOGOS.b1+PLANO_JOGOS.b2s+PLANO_JOGOS.b2sul)-divulgados.length} jogos a divulgar`} color="#a855f7"  icon={Target}     />
           </div>
           <Card T={T}>
             <SectionHeader

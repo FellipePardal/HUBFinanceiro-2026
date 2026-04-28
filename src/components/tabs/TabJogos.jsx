@@ -3,6 +3,15 @@ import { fmtK, subTotal } from "../../utils";
 import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
 import { Search, Pencil, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 
+const PLANO_JOGOS = { b1:34, b2s:18, b2sul:24 };
+const TOTAL_PLANO = PLANO_JOGOS.b1 + PLANO_JOGOS.b2s + PLANO_JOGOS.b2sul;
+const CIDADES_SUL = ["Porto Alegre","Curitiba","Chapecó","Chapeco","Criciúma","Criciuma","Florianópolis","Florianopolis"];
+const cenarioDoJogo = j => {
+  if (j.categoria === "B1") return "b1";
+  const isSul = j.regiao ? String(j.regiao).toLowerCase()==="sul" : CIDADES_SUL.includes(j.cidade);
+  return isSul ? "b2sul" : "b2s";
+};
+
 export default function TabJogos({
   jogos, filtrados, filtroRod, setFiltroRod, filtroCat, setFiltroCat,
   showPlaceholder, setShowPlaceholder, rodadasList,
@@ -10,8 +19,40 @@ export default function TabJogos({
 }) {
   const TS = tableStyles(T);
 
+  const consumidos = { b1:0, b2s:0, b2sul:0 };
+  jogos.filter(j => j.mandante !== "A definir").forEach(j => { consumidos[cenarioDoJogo(j)]++; });
+  const totalConsumidos = consumidos.b1 + consumidos.b2s + consumidos.b2sul;
+  const restantes = {
+    b1: Math.max(0, PLANO_JOGOS.b1 - consumidos.b1),
+    b2s: Math.max(0, PLANO_JOGOS.b2s - consumidos.b2s),
+    b2sul: Math.max(0, PLANO_JOGOS.b2sul - consumidos.b2sul),
+  };
+  const totalRestantes = restantes.b1 + restantes.b2s + restantes.b2sul;
+
+  const StatBox = ({ label, value, total, color, sub }) => (
+    <div style={{
+      flex:"1 1 180px",
+      padding:"14px 18px",
+      background: T.surfaceAlt || T.bg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 12,
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <p style={{margin:0,color:T.textSm,fontSize:10,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600}}>{label}</p>
+      <p className="num" style={{margin:"4px 0 0",color:T.text,fontSize:22,fontWeight:800,letterSpacing:"-0.02em"}}>
+        {value}<span style={{color:T.textSm,fontSize:13,fontWeight:600}}> / {total}</span>
+      </p>
+      {sub && <p style={{margin:"4px 0 0",color:T.textSm,fontSize:11}}>{sub}</p>}
+    </div>
+  );
+
   return (
     <>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
+        <StatBox label="Consumidos"      value={totalConsumidos} total={TOTAL_PLANO}        color={T.brand||"#10b981"} sub={`B1: ${consumidos.b1}/${PLANO_JOGOS.b1} · B2 SE: ${consumidos.b2s}/${PLANO_JOGOS.b2s} · B2 Sul: ${consumidos.b2sul}/${PLANO_JOGOS.b2sul}`}/>
+        <StatBox label="A consumir"      value={totalRestantes}  total={TOTAL_PLANO}        color="#a855f7"            sub={`B1: ${restantes.b1} · B2 SE: ${restantes.b2s} · B2 Sul: ${restantes.b2sul}`}/>
+      </div>
+
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {rodadasList.map(r => (

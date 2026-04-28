@@ -66,11 +66,13 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
       if (j) {
         // Migrações idempotentes do seed:
         //   v1: todos placeholders ("A definir") → carrega tabela oficial.
-        //   v2: jogos sem codigo_orcamento (seed antigo da v1) → substitui pelo
-        //       seed com orçado por bloco (logística/pessoal/operação) e nova fase Play In.
-        const todosPlaceholder  = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
-        const semCodigoOrc      = Array.isArray(j) && j.length > 0 && !j.some(x => x && x.codigo_orcamento);
-        if (todosPlaceholder || semCodigoOrc) {
+        //   v2: jogos sem codigo_orcamento → substitui pelo seed com orçado por bloco.
+        //   v3: jogos sem seed_version === 3 → substitui pelo seed granular (subkeys
+        //       um_b3/downlink/distribuicao/liveu/maquinas/etc) conforme planilha.
+        const todosPlaceholder = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
+        const semCodigoOrc     = Array.isArray(j) && j.length > 0 && !j.some(x => x && x.codigo_orcamento);
+        const seedDesatualizado= Array.isArray(j) && j.length > 0 && !j.every(x => x && x.seed_version === 3);
+        if (todosPlaceholder || semCodigoOrc || seedDesatualizado) {
           setJogosRaw(PAULISTAO_JOGOS_INIT);
           setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
         } else {

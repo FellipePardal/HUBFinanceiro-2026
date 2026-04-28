@@ -20,18 +20,44 @@ export const FASE_KEYS = FASES_PAULISTAO.map(f => f.key);
 export const getFase = key => FASES_PAULISTAO.find(f => f.key === key) || FASES_PAULISTAO[0];
 export const ordemFase = key => (FASES_PAULISTAO.find(f => f.key === key)?.ordem) || 99;
 
-// Cria jogo do Paulistão com orçado mapeado por bloco (logística/pessoal/operação)
-// onde o valor de cada bloco é depositado em uma subkey representativa do CATS:
-//   logística → uber (modo "uber") OU transporte (modos "van SP"/"van interior")
-//   pessoal   → coord_um (consolidado; pode ser refinado em VisaoMicro)
-//   operação  → um_b2  (consolidado; pode ser refinado em VisaoMicro)
-const buildOrcado = (logModo, ol, op, oo) => {
-  const orc = allSubKeysPaulistao();
-  if (logModo === "uber") orc.uber = ol; else orc.transporte = ol;
-  orc.coord_um = op;
-  orc.um_b2    = oo;
-  return orc;
-};
+// Mapeia o orçado granular da planilha (logistica/pessoal/operacao com subkeys)
+// para o shape uniforme de subkeys do CATS. Campos zerados ficam implícitos.
+const mapOrc = (log = {}, pess = {}, op = {}) => ({
+  ...allSubKeysPaulistao(),
+  // Logística (passagem somada com locado em "transporte" — Brasileirão usa mesma convenção)
+  uber:        log.uber        || 0,
+  transporte:  (log.locado || 0) + (log.passagem || 0),
+  hospedagem:  log.hospedagem  || 0,
+  diaria:      log.diaria_cache|| 0,
+  // Pessoal — supervisor unificado em supervisor1
+  coord_um:    pess.coord_um   || 0,
+  prod_um:     pess.prod_um    || 0,
+  prod_campo:  pess.prod_campo || 0,
+  supervisor1: pess.supervisor || 0,
+  dtv:         pess.dtv        || 0,
+  vmix:        pess.vmix       || 0,
+  // Operação
+  um_b1:       op.um_b1        || 0,
+  um_b2:       op.um_b2        || 0,
+  um_b3:       op.um_b3        || 0,
+  geradores:   op.geradores    || 0,
+  sng:         op.sng          || 0,
+  seg_espacial:op.seg_espacial || 0,
+  drone:       op.drone        || 0,
+  grua:        op.grua         || 0,
+  dslrs_transmissor: op.dslrs_transmissor || 0,
+  refcam:      op.refcam       || 0,
+  minidrone:   op.minidrone    || 0,
+  downlink:    op.downlink     || 0,
+  distribuicao:op.distribuicao || 0,
+  liveu:       op.liveu        || 0,
+  internet:    op.internet     || 0,
+  maquinas:    op.maquinas     || 0,
+  montagem_vespera: op.montagem_vespera || 0,
+  extra:       op.extra        || 0,
+});
+
+const SEED_VERSION = 3;
 
 export const makeJogoPaulistao = (j) => {
   const {
@@ -39,15 +65,16 @@ export const makeJogoPaulistao = (j) => {
     cidade="A definir", estadio="A definir", dia="", data="A definir", hora="A definir",
     mandante="A definir", visitante="A definir", detentor="A definir",
     categoria="B3", dist="", logistica_modo="uber", equipe="",
-    orcado_logistica=0, orcado_pessoal=0, orcado_operacao=0,
+    log={}, pess={}, op={},
     divergencia=false, nota_divergencia="",
   } = j;
   return {
-    id, codigo_orcamento, fase, grupo, rodada,
+    id, codigo_orcamento, seed_version: SEED_VERSION,
+    fase, grupo, rodada,
     categoria, dist, logistica_modo, equipe,
     cidade, estadio, dia, data, hora, mandante, visitante, detentor,
     divergencia, nota_divergencia,
-    orcado:       buildOrcado(logistica_modo, orcado_logistica, orcado_pessoal, orcado_operacao),
+    orcado:       mapOrc(log, pess, op),
     provisionado: { ...allSubKeysPaulistao() },
     realizado:    { ...allSubKeysPaulistao() },
   };
@@ -59,50 +86,88 @@ export const makeJogoPaulistao = (j) => {
 // Play In: 4 jogos · Semifinal: 4 jogos (ida/volta) · Final: 2 jogos (ida/volta).
 export const PAULISTAO_GRUPOS = ["-"];
 
+// Padrões reutilizáveis de pessoal/operação para reduzir repetição na seed.
+// Equipes: SP-B (sem coordenador na 1ª rodada/rodadas iniciais sem coord) e RIB (interior).
+// Operação por categoria (B3/B3+): UM B3 + geradores + sng + seg_espacial + downlink + distr + maquinas.
+const P_SPB_SEM_COORD = { coord_um:0,   prod_um:400, prod_campo:400, supervisor:600 };  // 1.400
+const P_SPB_COM_COORD = { coord_um:600, prod_um:400, prod_campo:400, supervisor:600 };  // 2.000
+const P_SEMI_FINAL    = { coord_um:800, prod_um:400, prod_campo:400, supervisor:800 };  // 2.400
+
+// Operações comuns (b3 grande SP / b3 SP / b3 SP400 / etc) — diferenças nos geradores e UM
+const OP_B3_GSP        = { um_b3:24000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 37.408
+const OP_B3_GSP_VESP   = { um_b3:24000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 37.658
+const OP_B3PLUS_SP     = { um_b3:23000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 36.408
+const OP_B3PLUS_SP_V   = { um_b3:23000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 36.658
+const OP_B3_COTIA      = { um_b3:21000, geradores:3000, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 34.208
+const OP_B3_COTIA_V    = { um_b3:21000, geradores:3000, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 34.458
+const OP_B3_SP400      = { um_b3:24000, geradores:3500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 37.708
+const OP_B3_SP400_V    = { um_b3:24000, geradores:3500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 37.958
+const OP_B3PLUS_SAN    = { um_b3:24000, geradores:3800, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 38.258
+const OP_B3_SAN200     = { um_b3:24000, geradores:3800, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 38.008
+const OP_B3_SP200_V    = { um_b3:24000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 37.658
+const OP_B3_TAU        = { um_b3:24000, geradores:3500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250, extra:9450 }; // 47.408
+const OP_B3_BAL        = { um_b3:28000, geradores:5500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 43.958
+const OP_B3_BAL_S      = { um_b3:28000, geradores:5500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 43.708
+const OP_PIN1          = { um_b3:23000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250, extra:9060 }; // 45.718
+const OP_PIN2          = { um_b3:23000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 36.408
+const OP_PIN3          = { um_b3:24000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958 }; // 37.408
+const OP_PIN4          = { um_b3:28000, geradores:5500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, maquinas:958, montagem_vespera:250 }; // 43.958
+const OP_SEMI_SP       = { um_b3:23000, geradores:3200, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, liveu:1500, maquinas:958 }; // 37.908
+const OP_SEMI_SP200    = { um_b3:24000, geradores:3800, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, liveu:1500, maquinas:958, montagem_vespera:250 }; // 39.758
+const OP_SEMI_SP400    = { um_b3:28000, geradores:5500, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, liveu:1500, maquinas:958 }; // 45.208
+const OP_FIN_SP200     = { um_b2:28000, geradores:4100, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, liveu:1500, maquinas:958, extra:10830 }; // 54.638
+const OP_FIN_SP400     = { um_b2:28000, geradores:4100, sng:4000, seg_espacial:3250, downlink:1000, distribuicao:1000, liveu:1500, maquinas:958, extra:10830 }; // 54.638
+
+// Logística por modo
+const L_UBER       = { uber:250 };                              // 250
+const L_VAN_SP     = { uber:250, locado:1200 };                 // 1.450
+const L_VAN_INT    = { uber:250, locado:2600 };                 // 2.850
+const L_VAN_INT_2K = { uber:250, locado:2000 };                 // 2.250 — Ferroviária (interior próximo)
+
 export const PAULISTAO_JOGOS_INIT = [
   // ── Primeira Fase ──────────────────────────────────────────────────────────
-  makeJogoPaulistao({ id:1001, codigo_orcamento:"PAL1", fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"18:00", mandante:"Palmeiras",     visitante:"Mirassol",      cidade:"Barueri",     estadio:"Arena Barueri",                 detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:37408 }),
-  makeJogoPaulistao({ id:1002, codigo_orcamento:"FER1", fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"20:00", mandante:"Ferroviária",  visitante:"Santos",         cidade:"Araraquara",  estadio:"Fonte Luminosa",                detentor:"Record News / HBO Max / CazeTV", dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  orcado_logistica:2250, orcado_pessoal:2000, orcado_operacao:37708 }),
-  makeJogoPaulistao({ id:1003, codigo_orcamento:"COR1", fase:"grupos", rodada:1, dia:"quinta-feira", data:"07/05/2026", hora:"21:30", mandante:"Corinthians",  visitante:"São Paulo",      cidade:"São Paulo",   estadio:"Alfredo Schürig",               detentor:"SporTV",                          dist:"SP",        categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:36408 }),
+  makeJogoPaulistao({ id:1001, codigo_orcamento:"PAL1", fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"18:00", mandante:"Palmeiras",     visitante:"Mirassol",      cidade:"Barueri",     estadio:"Arena Barueri",                  detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3_GSP }),
+  makeJogoPaulistao({ id:1002, codigo_orcamento:"FER1", fase:"grupos", rodada:1, dia:"quarta-feira", data:"06/05/2026", hora:"20:00", mandante:"Ferroviária",   visitante:"Santos",         cidade:"Araraquara",  estadio:"Fonte Luminosa",                 detentor:"Record News / HBO Max / CazeTV", dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  log:L_VAN_INT_2K,  pess:P_SPB_COM_COORD, op:OP_B3_SP400 }),
+  makeJogoPaulistao({ id:1003, codigo_orcamento:"COR1", fase:"grupos", rodada:1, dia:"quinta-feira", data:"07/05/2026", hora:"21:30", mandante:"Corinthians",   visitante:"São Paulo",      cidade:"São Paulo",   estadio:"Alfredo Schürig",                detentor:"SporTV",                          dist:"SP",        categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3PLUS_SP }),
 
-  makeJogoPaulistao({ id:1004, codigo_orcamento:"MIR1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"16:00", mandante:"Mirassol",     visitante:"Ferroviária",    cidade:"Bálsamo",     estadio:"Manuel Francisco Ferreira",     detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  orcado_logistica:2850, orcado_pessoal:2000, orcado_operacao:43958 }),
-  makeJogoPaulistao({ id:1005, codigo_orcamento:"RBB1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"17:30", mandante:"RB Bragantino",visitante:"Corinthians",    cidade:"Rio Claro",   estadio:"Benito Agnelo Castellano",      detentor:"Record / HBO Max",                dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:37658, divergencia:true, nota_divergencia:"Orçamento previa cidade Bragança Paulista, jogo real é em Rio Claro. Logística mantida mas custo pode variar." }),
-  makeJogoPaulistao({ id:1006, codigo_orcamento:"SAN1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"19:30", mandante:"Santos",       visitante:"Palmeiras",      cidade:"Santos",      estadio:"Vila Belmiro",                  detentor:"Record News / HBO Max / CazeTV", dist:"SP200",     categoria:"B3+", logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:38258 }),
-  makeJogoPaulistao({ id:1007, codigo_orcamento:"SAO1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"21:00", mandante:"São Paulo",    visitante:"Taubaté",        cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",       detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:34208 }),
+  makeJogoPaulistao({ id:1004, codigo_orcamento:"MIR1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"16:00", mandante:"Mirassol",      visitante:"Ferroviária",    cidade:"Bálsamo",     estadio:"Manuel Francisco Ferreira",      detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  log:L_VAN_INT,     pess:P_SPB_COM_COORD, op:OP_B3_BAL }),
+  makeJogoPaulistao({ id:1005, codigo_orcamento:"RBB1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"17:30", mandante:"RB Bragantino", visitante:"Corinthians",    cidade:"Rio Claro",   estadio:"Benito Agnelo Castellano",       detentor:"Record / HBO Max",                dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,      pess:P_SPB_COM_COORD, op:OP_B3_SP200_V, divergencia:true, nota_divergencia:"Orçamento previa Bragança Paulista, jogo real é em Rio Claro." }),
+  makeJogoPaulistao({ id:1006, codigo_orcamento:"SAN1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"19:30", mandante:"Santos",        visitante:"Palmeiras",      cidade:"Santos",      estadio:"Vila Belmiro",                   detentor:"Record News / HBO Max / CazeTV", dist:"SP200",     categoria:"B3+", logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,      pess:P_SPB_COM_COORD, op:OP_B3PLUS_SAN }),
+  makeJogoPaulistao({ id:1007, codigo_orcamento:"SAO1", fase:"grupos", rodada:2, dia:"quinta-feira", data:"14/05/2026", hora:"21:00", mandante:"São Paulo",     visitante:"Taubaté",        cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",        detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3_COTIA }),
 
-  makeJogoPaulistao({ id:1008, codigo_orcamento:"FER2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"18:00", mandante:"Ferroviária",  visitante:"Palmeiras",      cidade:"Araraquara",  estadio:"Fonte Luminosa",                detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  orcado_logistica:2250, orcado_pessoal:2000, orcado_operacao:37958 }),
-  makeJogoPaulistao({ id:1009, codigo_orcamento:"COR2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"19:30", mandante:"Corinthians",  visitante:"Santos",         cidade:"São Paulo",   estadio:"Alfredo Schürig",               detentor:"Record News / HBO Max / CazeTV", dist:"SP",        categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:36658 }),
-  makeJogoPaulistao({ id:1010, codigo_orcamento:"SAO2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"21:00", mandante:"São Paulo",    visitante:"RB Bragantino",  cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",       detentor:"SporTV",                          dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:34208 }),
+  makeJogoPaulistao({ id:1008, codigo_orcamento:"FER2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"18:00", mandante:"Ferroviária",   visitante:"Palmeiras",      cidade:"Araraquara",  estadio:"Fonte Luminosa",                 detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  log:L_VAN_INT_2K,  pess:P_SPB_COM_COORD, op:OP_B3_SP400_V }),
+  makeJogoPaulistao({ id:1009, codigo_orcamento:"COR2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"19:30", mandante:"Corinthians",   visitante:"Santos",         cidade:"São Paulo",   estadio:"Alfredo Schürig",                detentor:"Record News / HBO Max / CazeTV", dist:"SP",        categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3PLUS_SP_V }),
+  makeJogoPaulistao({ id:1010, codigo_orcamento:"SAO2", fase:"grupos", rodada:3, dia:"quinta-feira", data:"21/05/2026", hora:"21:00", mandante:"São Paulo",     visitante:"RB Bragantino",  cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",        detentor:"SporTV",                          dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3_COTIA }),
 
-  makeJogoPaulistao({ id:1011, codigo_orcamento:"COR3", fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Corinthians",  visitante:"Ferroviária",    cidade:"São Paulo",   estadio:"Alfredo Schürig",               detentor:"Record News / HBO Max / CazeTV", dist:"SP",        categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:36408 }),
-  makeJogoPaulistao({ id:1012, codigo_orcamento:"PAL2", fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Palmeiras",    visitante:"São Paulo",      cidade:"Barueri",     estadio:"Arena Barueri",                 detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:1400, orcado_operacao:37408 }),
+  makeJogoPaulistao({ id:1011, codigo_orcamento:"COR3", fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Corinthians",   visitante:"Ferroviária",    cidade:"São Paulo",   estadio:"Alfredo Schürig",                detentor:"Record News / HBO Max / CazeTV", dist:"SP",        categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_COM_COORD, op:OP_B3PLUS_SP }),
+  makeJogoPaulistao({ id:1012, codigo_orcamento:"PAL2", fase:"grupos", rodada:4, dia:"sexta-feira",  data:"17/07/2026", hora:"15:00", mandante:"Palmeiras",     visitante:"São Paulo",      cidade:"Barueri",     estadio:"Arena Barueri",                  detentor:"SporTV",                          dist:"Grande SP", categoria:"B3+", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_SEM_COORD, op:OP_B3_GSP }),
 
-  makeJogoPaulistao({ id:1013, codigo_orcamento:"PAL3", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"Palmeiras",    visitante:"Corinthians",    cidade:"Barueri",     estadio:"Arena Barueri",                 detentor:"SporTV",                          dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:37408 }),
-  makeJogoPaulistao({ id:1014, codigo_orcamento:"SAN2", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"RB Bragantino",visitante:"Santos",         cidade:"Rio Claro",   estadio:"Benito Agnelo Castellano",      detentor:"SporTV",                          dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:38008, divergencia:true, nota_divergencia:"Orçamento previa Santos como mandante. Jogo real tem RB Bragantino como mandante em Rio Claro." }),
-  makeJogoPaulistao({ id:1015, codigo_orcamento:"SAO3", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"São Paulo",    visitante:"Mirassol",       cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",       detentor:"Record News / HBO Max / CazeTV", dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:34458 }),
+  makeJogoPaulistao({ id:1013, codigo_orcamento:"PAL3", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"Palmeiras",     visitante:"Corinthians",    cidade:"Barueri",     estadio:"Arena Barueri",                  detentor:"SporTV",                          dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_COM_COORD, op:OP_B3_GSP }),
+  makeJogoPaulistao({ id:1014, codigo_orcamento:"SAN2", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"RB Bragantino", visitante:"Santos",         cidade:"Rio Claro",   estadio:"Benito Agnelo Castellano",       detentor:"SporTV",                          dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,      pess:P_SPB_COM_COORD, op:OP_B3_SAN200, divergencia:true, nota_divergencia:"Orçamento previa Santos como mandante. Jogo real tem RB Bragantino como mandante em Rio Claro." }),
+  makeJogoPaulistao({ id:1015, codigo_orcamento:"SAO3", fase:"grupos", rodada:5, dia:"quarta-feira", data:"29/07/2026", hora:"15:00", mandante:"São Paulo",     visitante:"Mirassol",       cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",        detentor:"Record News / HBO Max / CazeTV", dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_COM_COORD, op:OP_B3_COTIA_V }),
 
-  makeJogoPaulistao({ id:1016, codigo_orcamento:"TAU1", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Taubaté",      visitante:"Palmeiras",      cidade:"Taubaté",     estadio:"Estádio Joaquim de Morais Filho",detentor:"SporTV",                         dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:47408 }),
-  makeJogoPaulistao({ id:1017, codigo_orcamento:"MIR2", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Mirassol",     visitante:"Corinthians",    cidade:"Bálsamo",     estadio:"Manuel Francisco Ferreira",     detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  orcado_logistica:2850, orcado_pessoal:2000, orcado_operacao:43708 }),
-  makeJogoPaulistao({ id:1018, codigo_orcamento:"SAN3", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"São Paulo",    visitante:"Santos",         cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",       detentor:"Record News / HBO Max / CazeTV", dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:38008, divergencia:true, nota_divergencia:"Orçamento previa Santos como mandante. Jogo real tem São Paulo como mandante em Cotia." }),
+  makeJogoPaulistao({ id:1016, codigo_orcamento:"TAU1", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Taubaté",       visitante:"Palmeiras",      cidade:"Taubaté",     estadio:"Estádio Joaquim de Morais Filho",detentor:"SporTV",                          dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,      pess:P_SPB_COM_COORD, op:OP_B3_TAU }),
+  makeJogoPaulistao({ id:1017, codigo_orcamento:"MIR2", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"Mirassol",      visitante:"Corinthians",    cidade:"Bálsamo",     estadio:"Manuel Francisco Ferreira",      detentor:"SporTV",                          dist:"SP400",     categoria:"B3",  logistica_modo:"van interior", equipe:"equipe RIB",  log:L_VAN_INT,     pess:P_SPB_COM_COORD, op:OP_B3_BAL_S }),
+  makeJogoPaulistao({ id:1018, codigo_orcamento:"SAN3", fase:"grupos", rodada:6, dia:"quarta-feira", data:"12/08/2026", hora:"15:00", mandante:"São Paulo",     visitante:"Santos",         cidade:"Cotia",       estadio:"Marcelo Portugal Gouvêa",        detentor:"Record News / HBO Max / CazeTV", dist:"SP200",     categoria:"B3",  logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,      pess:P_SPB_COM_COORD, op:OP_B3_SAN200, divergencia:true, nota_divergencia:"Orçamento previa Santos como mandante. Jogo real tem São Paulo como mandante em Cotia." }),
 
-  makeJogoPaulistao({ id:1019, codigo_orcamento:"COR4", fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Corinthians",  visitante:"Taubaté",        cidade:"São Paulo",   estadio:"Alfredo Schürig",               detentor:"SporTV",                          dist:"SP",        categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:36408 }),
-  makeJogoPaulistao({ id:1020, codigo_orcamento:"PAL4", fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Palmeiras",    visitante:"RB Bragantino",  cidade:"Barueri",     estadio:"Arena Barueri",                 detentor:"Record News / HBO Max / CazeTV", dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:37658 }),
+  makeJogoPaulistao({ id:1019, codigo_orcamento:"COR4", fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Corinthians",   visitante:"Taubaté",        cidade:"São Paulo",   estadio:"Alfredo Schürig",                detentor:"SporTV",                          dist:"SP",        categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_COM_COORD, op:OP_B3PLUS_SP }),
+  makeJogoPaulistao({ id:1020, codigo_orcamento:"PAL4", fase:"grupos", rodada:7, dia:"quarta-feira", data:"26/08/2026", hora:"15:00", mandante:"Palmeiras",     visitante:"RB Bragantino",  cidade:"Barueri",     estadio:"Arena Barueri",                  detentor:"Record News / HBO Max / CazeTV", dist:"Grande SP", categoria:"B3",  logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,        pess:P_SPB_COM_COORD, op:OP_B3_GSP_VESP }),
 
-  // ── Play In (4 jogos placeholders) ─────────────────────────────────────────
-  makeJogoPaulistao({ id:3001, codigo_orcamento:"P-IN1", fase:"play_in", rodada:1, dist:"SP",     categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:45718 }),
-  makeJogoPaulistao({ id:3002, codigo_orcamento:"P-IN2", fase:"play_in", rodada:2, dist:"SP",     categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2000, orcado_operacao:36408 }),
-  makeJogoPaulistao({ id:3003, codigo_orcamento:"P-IN3", fase:"play_in", rodada:3, dist:"SP200",  categoria:"B3", logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2000, orcado_operacao:37408 }),
-  makeJogoPaulistao({ id:3004, codigo_orcamento:"P-IN4", fase:"play_in", rodada:4, dist:"SP400",  categoria:"B3", logistica_modo:"van interior", equipe:"equipe SP-B", orcado_logistica:2850, orcado_pessoal:2000, orcado_operacao:43958 }),
+  // ── Play In ────────────────────────────────────────────────────────────────
+  makeJogoPaulistao({ id:3001, codigo_orcamento:"P-IN1", fase:"play_in", rodada:1, dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,    pess:P_SPB_COM_COORD, op:OP_PIN1 }),
+  makeJogoPaulistao({ id:3002, codigo_orcamento:"P-IN2", fase:"play_in", rodada:2, dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,    pess:P_SPB_COM_COORD, op:OP_PIN2 }),
+  makeJogoPaulistao({ id:3003, codigo_orcamento:"P-IN3", fase:"play_in", rodada:3, dist:"SP200", categoria:"B3", logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,  pess:P_SPB_COM_COORD, op:OP_PIN3 }),
+  makeJogoPaulistao({ id:3004, codigo_orcamento:"P-IN4", fase:"play_in", rodada:4, dist:"SP400", categoria:"B3", logistica_modo:"van interior", equipe:"equipe SP-B", log:L_VAN_INT, pess:P_SPB_COM_COORD, op:OP_PIN4 }),
 
   // ── Semifinal (ida 09/12 + volta 13/12) ────────────────────────────────────
-  makeJogoPaulistao({ id:4001, codigo_orcamento:"SEMI1", fase:"semi", rodada:1, dia:"quarta-feira", data:"09/12/2026", hora:"20:00", dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2400, orcado_operacao:37908 }),
-  makeJogoPaulistao({ id:4002, codigo_orcamento:"SEMI2", fase:"semi", rodada:2, dia:"quarta-feira", data:"09/12/2026", hora:"20:00", dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", orcado_logistica:250,  orcado_pessoal:2400, orcado_operacao:37908 }),
-  makeJogoPaulistao({ id:4003, codigo_orcamento:"SEMI3", fase:"semi", rodada:3, dia:"domingo",      data:"13/12/2026", hora:"20:00", dist:"SP200", categoria:"B3", logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2400, orcado_operacao:39758 }),
-  makeJogoPaulistao({ id:4004, codigo_orcamento:"SEMI4", fase:"semi", rodada:4, dia:"domingo",      data:"13/12/2026", hora:"20:00", dist:"SP400", categoria:"B3", logistica_modo:"van interior", equipe:"equipe SP-B", orcado_logistica:2850, orcado_pessoal:2400, orcado_operacao:45208 }),
+  makeJogoPaulistao({ id:4001, codigo_orcamento:"SEMI1", fase:"semi", rodada:1, dia:"quarta-feira", data:"09/12/2026", hora:"20:00", dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,    pess:P_SEMI_FINAL, op:OP_SEMI_SP }),
+  makeJogoPaulistao({ id:4002, codigo_orcamento:"SEMI2", fase:"semi", rodada:2, dia:"quarta-feira", data:"09/12/2026", hora:"20:00", dist:"SP",    categoria:"B3", logistica_modo:"uber",          equipe:"equipe SP-B", log:L_UBER,    pess:P_SEMI_FINAL, op:OP_SEMI_SP }),
+  makeJogoPaulistao({ id:4003, codigo_orcamento:"SEMI3", fase:"semi", rodada:3, dia:"domingo",      data:"13/12/2026", hora:"20:00", dist:"SP200", categoria:"B3", logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,  pess:P_SEMI_FINAL, op:OP_SEMI_SP200 }),
+  makeJogoPaulistao({ id:4004, codigo_orcamento:"SEMI4", fase:"semi", rodada:4, dia:"domingo",      data:"13/12/2026", hora:"20:00", dist:"SP400", categoria:"B3", logistica_modo:"van interior", equipe:"equipe SP-B", log:L_VAN_INT, pess:P_SEMI_FINAL, op:OP_SEMI_SP400 }),
 
   // ── Final (ida 16/12 + volta 20/12) ────────────────────────────────────────
-  makeJogoPaulistao({ id:5001, codigo_orcamento:"FIN1", fase:"final", rodada:1, dia:"quarta-feira", data:"16/12/2026", hora:"20:00", dist:"SP200", categoria:"B2", logistica_modo:"van SP",        equipe:"equipe SP-B", orcado_logistica:1450, orcado_pessoal:2400, orcado_operacao:54638 }),
-  makeJogoPaulistao({ id:5002, codigo_orcamento:"FIN2", fase:"final", rodada:2, dia:"domingo",      data:"20/12/2026", hora:"20:00", dist:"SP400", categoria:"B2", logistica_modo:"van interior", equipe:"equipe SP-B", orcado_logistica:2850, orcado_pessoal:2400, orcado_operacao:54638 }),
+  makeJogoPaulistao({ id:5001, codigo_orcamento:"FIN1", fase:"final", rodada:1, dia:"quarta-feira", data:"16/12/2026", hora:"20:00", dist:"SP200", categoria:"B2", logistica_modo:"van SP",        equipe:"equipe SP-B", log:L_VAN_SP,  pess:P_SEMI_FINAL, op:OP_FIN_SP200 }),
+  makeJogoPaulistao({ id:5002, codigo_orcamento:"FIN2", fase:"final", rodada:2, dia:"domingo",      data:"20/12/2026", hora:"20:00", dist:"SP400", categoria:"B2", logistica_modo:"van interior", equipe:"equipe SP-B", log:L_VAN_INT, pess:P_SEMI_FINAL, op:OP_FIN_SP400 }),
 ];
 
 // ─── SERVIÇOS FIXOS — Orçamento Feminino 2026 v4 (total R$ 238.000) ───────────

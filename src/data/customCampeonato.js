@@ -141,3 +141,129 @@ export const makeFaseHelpers = (fases = []) => ({
 
 // Chave única no Supabase que guarda o registry de campeonatos custom criados
 export const REGISTRY_KEY = "campeonatos_custom";
+
+// ─── PARSER CSV ───────────────────────────────────────────────────────────────
+// Recebe uma string CSV (com ou sem aspas) e devolve um array de objetos cuja
+// chave é o cabeçalho da coluna (lowercase, sem espaços extras). Aceita ; como
+// separador também (Excel BR exporta assim). Linhas vazias são ignoradas.
+
+const detectarSeparador = (linha) => {
+  const ncomma = (linha.match(/,/g) || []).length;
+  const nsemic = (linha.match(/;/g) || []).length;
+  const ntab   = (linha.match(/\t/g) || []).length;
+  if (ntab >= ncomma && ntab >= nsemic) return "\t";
+  return nsemic > ncomma ? ";" : ",";
+};
+
+const parseCSVLine = (linha, sep) => {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < linha.length; i++) {
+    const c = linha[i];
+    if (c === '"' && linha[i+1] === '"') { cur += '"'; i++; }
+    else if (c === '"') inQuotes = !inQuotes;
+    else if (c === sep && !inQuotes) { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+};
+
+export const parseCSV = (texto) => {
+  const linhas = String(texto || "").trim().split(/\r?\n/).filter(l => l.trim());
+  if (linhas.length < 2) return { header: [], rows: [] };
+  const sep = detectarSeparador(linhas[0]);
+  const header = parseCSVLine(linhas[0], sep).map(h => h.toLowerCase().replace(/\s+/g, "_"));
+  const rows = linhas.slice(1).map(l => {
+    const cols = parseCSVLine(l, sep);
+    const obj = {};
+    header.forEach((k, i) => { obj[k] = cols[i] != null ? cols[i] : ""; });
+    return obj;
+  });
+  return { header, rows };
+};
+
+// Converte uma linha do CSV para o shape interno do jogo. Colunas ausentes
+// viram 0 (numéricos) ou string vazia. Aceita várias grafias (codigo/codigo_orcamento,
+// supervisor/supervisor1, etc).
+export const jogoFromCSVRow = (row, idx) => {
+  const get = (...keys) => { for (const k of keys) { if (row[k] != null && row[k] !== "") return row[k]; } return ""; };
+  const num = (...keys) => {
+    const v = get(...keys);
+    if (!v) return 0;
+    return parseFloat(String(v).replace(/[^0-9,.\-]/g, "").replace(",", ".")) || 0;
+  };
+  return {
+    id: 1000 + idx + 1,
+    codigo_orcamento: get("codigo", "codigo_orcamento", "code"),
+    seed_version: 3,
+    fase: faseKeyFromRaw(get("fase")),
+    grupo: get("grupo") || "-",
+    rodada: parseInt(get("rodada")) || (idx + 1),
+    categoria: get("categoria"),
+    dist: get("dist", "distancia"),
+    logistica_modo: get("logistica_modo", "logistica", "modo"),
+    equipe: get("equipe", "time_producao"),
+    cidade: get("cidade") || "A definir",
+    estadio: get("estadio") || "A definir",
+    dia: get("dia"),
+    data: get("data") || "A definir",
+    hora: get("hora") || "A definir",
+    mandante: get("mandante") || "A definir",
+    visitante: get("visitante") || "A definir",
+    detentor: get("detentor") || "A definir",
+    divergencia: false,
+    nota_divergencia: "",
+    orcado: {
+      ...allSubKeysPaulistao(),
+      uber:        num("uber"),
+      transporte:  num("locado") + num("passagem") + num("transporte"),
+      hospedagem:  num("hospedagem"),
+      diaria:      num("diaria", "diaria_cache"),
+      coord_um:    num("coord_um"),
+      prod_um:     num("prod_um"),
+      prod_campo:  num("prod_campo"),
+      supervisor1: num("supervisor", "supervisor1"),
+      supervisor2: num("supervisor2"),
+      dtv:         num("dtv"),
+      vmix:        num("vmix"),
+      um_b1:       num("um_b1"),
+      um_b2:       num("um_b2"),
+      um_b3:       num("um_b3"),
+      geradores:   num("geradores"),
+      sng:         num("sng"),
+      seg_espacial:num("seg_espacial"),
+      drone:       num("drone"),
+      grua:        num("grua"),
+      dslrs_transmissor: num("dslrs_transmissor", "dslr_transmissor"),
+      refcam:      num("refcam"),
+      minidrone:   num("minidrone"),
+      downlink:    num("downlink"),
+      distribuicao:num("distribuicao", "distribucao"),
+      liveu:       num("liveu"),
+      internet:    num("internet"),
+      maquinas:    num("maquinas"),
+      montagem_vespera: num("montagem_vespera", "montagem"),
+      extra:       num("extra"),
+    },
+    provisionado: { ...allSubKeysPaulistao() },
+    realizado:    { ...allSubKeysPaulistao() },
+  };
+};
+
+// Template CSV (1 linha de exemplo) — copiável pelo modal.
+export const CSV_TEMPLATE = [
+  "codigo,fase,rodada,dia,data,hora,mandante,visitante,cidade,estadio,detentor,categoria,dist,logistica_modo,equipe,uber,locado,passagem,hospedagem,diaria,coord_um,prod_um,prod_campo,supervisor,dtv,vmix,um_b1,um_b2,um_b3,geradores,sng,seg_espacial,drone,grua,dslrs_transmissor,refcam,minidrone,downlink,distribuicao,liveu,internet,maquinas,montagem_vespera,extra",
+  "EX1,Primeira Fase,1,quarta-feira,06/05/2026,18:00,Time A,Time B,Cidade,Estádio,Detentor,B3+,Grande SP,uber,equipe SP-B,250,0,0,0,0,0,400,400,600,0,0,0,0,24000,3200,4000,3250,0,0,0,0,0,1000,1000,0,0,958,0,0",
+].join("\n");
+
+// Presets de fase para o wizard
+export const FASES_PRESETS = [
+  { key:"grupos",  label:"Primeira Fase", color:"#3b82f6" },
+  { key:"play_in", label:"Play In",       color:"#8b5cf6" },
+  { key:"oitavas", label:"Oitavas",       color:"#f59e0b" },
+  { key:"quartas", label:"Quartas",       color:"#ec4899" },
+  { key:"semi",    label:"Semifinal",     color:"#ef4444" },
+  { key:"final",   label:"Final",         color:"#10b981" },
+];

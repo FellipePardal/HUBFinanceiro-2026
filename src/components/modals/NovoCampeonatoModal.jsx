@@ -40,6 +40,8 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
   // ── Step state ─────────────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
   // Step 1
+  const [formato, setFormato]         = useState("mata_mata"); // "pontos_corridos" | "mata_mata"
+  const [numRodadas, setNumRodadas]   = useState("38");
   const [nome, setNome]               = useState("");
   const [edicao, setEdicao]           = useState("2026");
   const [icon, setIcon]               = useState("🏆");
@@ -59,7 +61,13 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
   const validarStep1 = () => {
     if (!nome.trim())   { setErro("Informe o nome do campeonato."); return false; }
     if (!edicao.trim()) { setErro("Informe a edição (ex: 2026)."); return false; }
-    if (fasesSel.length === 0) { setErro("Selecione pelo menos uma fase."); return false; }
+    if (formato === "mata_mata" && fasesSel.length === 0) {
+      setErro("Selecione pelo menos uma fase."); return false;
+    }
+    if (formato === "pontos_corridos") {
+      const n = parseInt(numRodadas);
+      if (!n || n < 1 || n > 99) { setErro("Informe um número de rodadas entre 1 e 99."); return false; }
+    }
     setErro("");
     return true;
   };
@@ -70,9 +78,11 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
 
   const buildConfig = () => {
     const id = slugify(`${nome}-${edicao}`);
-    const fases = FASES_PRESETS
-      .filter(f => fasesSel.includes(f.key))
-      .map((f, i) => ({ key:f.key, label:f.label, short:f.label, color:f.color, ordem:i+1 }));
+    const fases = formato === "pontos_corridos"
+      ? [{ key:"rodadas", label:"Rodadas", short:"Rodadas", color:cor, ordem:1 }]
+      : FASES_PRESETS
+          .filter(f => fasesSel.includes(f.key))
+          .map((f, i) => ({ key:f.key, label:f.label, short:f.label, color:f.color, ordem:i+1 }));
     return {
       id, nome: nome.trim(), edicao: edicao.trim(), status,
       statusColor: status==="Em andamento" ? "#22c55e" : status==="Finalizado" ? "#94a3b8" : "#f59e0b",
@@ -80,6 +90,8 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
       corGrad: `linear-gradient(135deg, ${cor}, ${cor}dd)`,
       icon: icon || "🏆",
       descricao: descricao.trim() || `${nome.trim()} · ${edicao.trim()}`,
+      formato,
+      numRodadas: formato === "pontos_corridos" ? parseInt(numRodadas) || 0 : null,
       fases,
       createdAt: new Date().toISOString(),
     };
@@ -141,9 +153,43 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
     </div>
   );
 
+  const FormatoBtn = ({ value, titulo, sub, ativo }) => (
+    <button type="button" onClick={()=>setFormato(value)} style={{
+      flex:1,
+      padding:"14px 18px",
+      border: ativo ? `2px solid ${cor}` : `1px solid ${T.border}`,
+      background: ativo ? cor + "11" : T.surfaceAlt || T.bg,
+      borderRadius: 10,
+      cursor:"pointer",
+      textAlign:"left",
+      transition:"all .15s",
+    }}>
+      <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color: ativo ? cor : T.text,letterSpacing:"-0.01em"}}>{titulo}</p>
+      <p style={{margin:0,fontSize:11,color:T.textMd,lineHeight:1.4}}>{sub}</p>
+    </button>
+  );
+
   // ── Step 1: Info básica + fases ────────────────────────────────────────────
   const Step1 = () => (
     <>
+      <div style={{marginBottom:16}}>
+        <label style={{ color:T.textMd, fontSize:12, display:"block", marginBottom:8, fontWeight:600 }}>Formato do campeonato *</label>
+        <div style={{display:"flex", gap:8}}>
+          <FormatoBtn
+            value="pontos_corridos"
+            titulo="Pontos Corridos"
+            sub="Turno único ou ida/volta. Define o número de rodadas; sem mata-mata."
+            ativo={formato==="pontos_corridos"}
+          />
+          <FormatoBtn
+            value="mata_mata"
+            titulo="Primeira Fase + Mata-mata"
+            sub="Fase classificatória + Play In / Oitavas / Quartas / Semi / Final."
+            ativo={formato==="mata_mata"}
+          />
+        </div>
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:"0 16px"}}>
         <Field label="Nome do campeonato *" span={2}>
           <input value={nome} onChange={e=>setNome(e.target.value)} style={IS} placeholder="Ex: Carioca Feminino" autoFocus/>
@@ -181,21 +227,32 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
         </Field>
       </div>
 
-      <div style={{marginTop:8, marginBottom:12}}>
-        <label style={{ color:T.textMd, fontSize:12, display:"block", marginBottom:8, fontWeight:600 }}>
-          Fases do campeonato * <span style={{color:T.textSm, fontWeight:500}}>(clique para adicionar/remover)</span>
-        </label>
-        <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
-          {FASES_PRESETS.map(f => (
-            <Chip key={f.key} active={fasesSel.includes(f.key)} onClick={()=>toggleFase(f.key)} T={T} color={f.color}>
-              {f.label}
-            </Chip>
-          ))}
+      {formato === "pontos_corridos" ? (
+        <div style={{marginTop:8, marginBottom:12}}>
+          <label style={{ color:T.textMd, fontSize:12, display:"block", marginBottom:6, fontWeight:600 }}>Número de rodadas *</label>
+          <input value={numRodadas} onChange={e=>setNumRodadas(e.target.value.replace(/[^0-9]/g, ""))}
+                 style={{...IS, maxWidth:120}} placeholder="38"/>
+          <p style={{margin:"8px 0 0", fontSize:11, color:T.textSm}}>
+            O campeonato terá uma única fase "Rodadas" (1 a {parseInt(numRodadas)||0}). Os jogos podem ser adicionados na próxima etapa via CSV ou depois pelo botão "Novo Jogo".
+          </p>
         </div>
-        <p style={{margin:"8px 0 0", fontSize:11, color:T.textSm}}>
-          Ordem usada: {fasesSel.length===0 ? "—" : FASES_PRESETS.filter(f=>fasesSel.includes(f.key)).map(f=>f.label).join(" → ")}
-        </p>
-      </div>
+      ) : (
+        <div style={{marginTop:8, marginBottom:12}}>
+          <label style={{ color:T.textMd, fontSize:12, display:"block", marginBottom:8, fontWeight:600 }}>
+            Fases do campeonato * <span style={{color:T.textSm, fontWeight:500}}>(clique para adicionar/remover)</span>
+          </label>
+          <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+            {FASES_PRESETS.map(f => (
+              <Chip key={f.key} active={fasesSel.includes(f.key)} onClick={()=>toggleFase(f.key)} T={T} color={f.color}>
+                {f.label}
+              </Chip>
+            ))}
+          </div>
+          <p style={{margin:"8px 0 0", fontSize:11, color:T.textSm}}>
+            Ordem usada: {fasesSel.length===0 ? "—" : FASES_PRESETS.filter(f=>fasesSel.includes(f.key)).map(f=>f.label).join(" → ")}
+          </p>
+        </div>
+      )}
     </>
   );
 

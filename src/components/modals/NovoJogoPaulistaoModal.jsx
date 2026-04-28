@@ -71,6 +71,7 @@ export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES
   };
 
   const fasesOpts = (fases || FASES_PAULISTAO).map(f => ({ value:f.key, label:f.label }));
+  const faseUnica = fasesOpts.length === 1;
 
   return (
     <div style={overlayStyle}>
@@ -79,9 +80,10 @@ export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES
           {isEdit ? "Editar Jogo" : `Novo Jogo · ${titulo}`}
         </h3>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-          {field("Fase","fase",fasesOpts)}
-          {mostraGrupo ? field("Grupo","grupo",PAULISTAO_GRUPOS) : field("Rodada","rodada")}
-          {mostraGrupo && field("Rodada","rodada")}
+          {!faseUnica && field("Fase","fase",fasesOpts)}
+          {faseUnica && field("Rodada","rodada")}
+          {!faseUnica && (mostraGrupo ? field("Grupo","grupo",PAULISTAO_GRUPOS) : field("Rodada","rodada"))}
+          {!faseUnica && mostraGrupo && field("Rodada","rodada")}
           {field("Mandante","mandante",TIMES)}
           {field("Visitante","visitante",TIMES)}
           {field("Cidade","cidade",CIDADES)}

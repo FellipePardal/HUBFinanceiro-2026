@@ -6,12 +6,16 @@ import { FASES_PAULISTAO } from "../../constants";
 
 export default function TabJogosPaulistao({
   jogos, filtroFase, setFiltroFase, filtroGrupo, setFiltroGrupo,
+  filtroRodada = "Todas", setFiltroRodada,
   showPlaceholder, setShowPlaceholder,
   setMicroJogoId, setTab, setNovo, onDelete, onEdit, T,
   fases = FASES_PAULISTAO,
+  formato = "mata_mata", // "pontos_corridos" | "mata_mata"
+  numRodadas = 0,
 }) {
   const TS = tableStyles(T);
   const FASES = fases;
+  const isPC = formato === "pontos_corridos";
   const getFase   = (key) => FASES.find(f => f.key === key) || FASES[0] || { key, short:key, color:"#888", ordem:99 };
   const ordemFase = (key) => FASES.find(f => f.key === key)?.ordem || 99;
 
@@ -26,8 +30,16 @@ export default function TabJogosPaulistao({
 
   const temGrupos = jogos.some(j => j.grupo && j.grupo !== "-");
 
+  // Lista de rodadas para o modo Pontos Corridos: usa numRodadas (se informado) ou
+  // deriva das rodadas presentes nos jogos.
+  const rodadasDisponiveis = isPC
+    ? (numRodadas > 0
+        ? Array.from({length:numRodadas}, (_,i) => i+1)
+        : Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b)=>a-b))
+    : [];
+
   const filtrados = (showPlaceholder ? jogos : jogos.filter(j => j.mandante !== "A definir"))
-    .filter(j => filtroFase === "Todas" || j.fase === filtroFase)
+    .filter(j => isPC ? (filtroRodada === "Todas" || String(j.rodada) === String(filtroRodada)) : (filtroFase === "Todas" || j.fase === filtroFase))
     .filter(j => !temGrupos || filtroGrupo === "Todos" || j.grupo === filtroGrupo)
     .sort((a,b) => ordemFase(a.fase) - ordemFase(b.fase) || a.rodada - b.rodada || a.id - b.id);
 
@@ -49,20 +61,39 @@ export default function TabJogosPaulistao({
 
   return (
     <>
-      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
-        {FASES.map(f => (
-          <StatBox key={f.key} label={f.short} value={consumidos[f.key]||0} total={totaisFase[f.key]||0} color={f.color}/>
-        ))}
-      </div>
+      {!isPC && (
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
+          {FASES.map(f => (
+            <StatBox key={f.key} label={f.short} value={consumidos[f.key]||0} total={totaisFase[f.key]||0} color={f.color}/>
+          ))}
+        </div>
+      )}
+      {isPC && (
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
+          <StatBox label="Jogos divulgados" value={jogos.filter(j=>j.mandante!=="A definir").length} total={jogos.length} color={FASES[0]?.color || T.brand}/>
+          {numRodadas > 0 && (
+            <StatBox label="Rodadas previstas" value={Array.from(new Set(jogos.filter(j=>j.mandante!=="A definir").map(j=>j.rodada))).length} total={numRodadas} color="#a855f7"/>
+          )}
+        </div>
+      )}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          <Chip active={filtroFase==="Todas"} onClick={()=>setFiltroFase("Todas")} T={T}>Todas as fases</Chip>
-          {FASES.map(f => (
-            <Chip key={f.key} active={filtroFase===f.key} onClick={()=>setFiltroFase(f.key)} T={T} color={f.color}>
-              {f.short}
-            </Chip>
-          ))}
+          {isPC ? (<>
+            <Chip active={filtroRodada==="Todas"} onClick={()=>setFiltroRodada && setFiltroRodada("Todas")} T={T}>Todas as rodadas</Chip>
+            {rodadasDisponiveis.map(r => (
+              <Chip key={r} active={String(filtroRodada)===String(r)} onClick={()=>setFiltroRodada && setFiltroRodada(r)} T={T} color={FASES[0]?.color}>
+                Rd {r}
+              </Chip>
+            ))}
+          </>) : (<>
+            <Chip active={filtroFase==="Todas"} onClick={()=>setFiltroFase("Todas")} T={T}>Todas as fases</Chip>
+            {FASES.map(f => (
+              <Chip key={f.key} active={filtroFase===f.key} onClick={()=>setFiltroFase(f.key)} T={T} color={f.color}>
+                {f.short}
+              </Chip>
+            ))}
+          </>)}
           {temGrupos && (<>
             <div style={{width:1,height:24,background:T.border,margin:"0 6px"}}/>
             {["Todos","A","B","C","D"].map(g => (
@@ -86,7 +117,7 @@ export default function TabJogosPaulistao({
           <table style={{...TS.table, minWidth:920}}>
             <thead>
               <tr style={TS.thead}>
-                {["Jogo","Fase",...(temGrupos?["Grupo"]:[]),"Rd","Cidade","Data","Detentor","Orçado","Provisionado","Realizado","Saving",""].map(h => (
+                {["Jogo",...(isPC?[]:["Fase"]),...(temGrupos?["Grupo"]:[]),"Rd","Cidade","Data","Detentor","Orçado","Provisionado","Realizado","Saving",""].map(h => (
                   <th key={h} style={{...TS.th, ...((h==="Orçado"||h==="Provisionado"||h==="Realizado"||h==="Saving")?TS.thRight:TS.thLeft)}}>{h}</th>
                 ))}
               </tr>
@@ -101,7 +132,7 @@ export default function TabJogosPaulistao({
                     <td style={{...TS.td, fontWeight:600, whiteSpace:"nowrap"}}>
                       {isDef ? <span style={{color:T.textSm,fontStyle:"italic"}}>A divulgar</span> : `${j.mandante} × ${j.visitante}`}
                     </td>
-                    <td style={TS.td}><Pill label={fase.short} color={fase.color}/></td>
+                    {!isPC && <td style={TS.td}><Pill label={fase.short} color={fase.color}/></td>}
                     {temGrupos && <td style={{...TS.td, color:T.textMd, fontSize:12}}>{j.grupo}</td>}
                     <td className="num" style={{...TS.td, color:T.textMd, fontSize:12}}>{j.rodada}</td>
                     <td style={{...TS.td, color:T.textMd, fontSize:12, whiteSpace:"nowrap"}}>{j.cidade}</td>

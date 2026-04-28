@@ -30,8 +30,9 @@ import { makeFaseHelpers } from "../data/customCampeonato";
 // um campeonato do outro fica nesse objeto. Os jogos seed vêm de
 // initialJogos (definidos no momento da criação no NovoCampeonatoModal).
 export default function CampeonatoCustom({ config, initialJogos = [], initialServicos = [], onBack, onOpenHub, T, darkMode, setDarkMode }) {
-  const { id: campId, nome, edicao, cor: PRIMARY, fases } = config;
+  const { id: campId, nome, edicao, cor: PRIMARY, fases, formato = "mata_mata", numRodadas = 0 } = config;
   const { getFase, ordemFase } = makeFaseHelpers(fases);
+  const isPC = formato === "pontos_corridos";
 
   // Chaves namespaced no Supabase — uma por campeonato.
   const K = {
@@ -242,6 +243,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const [showNovo, setNovo]             = useState(false);
   const [jogoEdit, setJogoEdit]         = useState(null);
   const [filtroFase, setFiltroFase]     = useState("Todas");
+  const [filtroRodada, setFiltroRodada] = useState("Todas");
   const [filtroGrupo, setFiltroGrupo]   = useState("Todos");
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [microJogoId, setMicroJogoId]   = useState(jogos.find(j=>j.mandante!=="A definir")?.id);
@@ -289,11 +291,12 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const mediaOrc = divulgados.length ? divulgados.reduce((s,j)=>s+subTotal(j.orcado),0) / divulgados.length : 0;
   const totalProjetado = totalProv + aDivulgar.length * mediaOrc;
 
-  // Reaproveita TabSavings com mapeamento fase→rodada compósita
+  // Reaproveita TabSavings com mapeamento fase→rodada compósita.
+  // Pontos corridos: usa rodada direto (1..N). Mata-mata: ordemFase*100+rodada.
   const jogosParaSavings = useMemo(() => divulgados.map(j => ({
     ...j,
-    rodada: ordemFase(j.fase) * 100 + (j.rodada || 0),
-  })), [divulgados]);
+    rodada: isPC ? (j.rodada || 0) : (ordemFase(j.fase) * 100 + (j.rodada || 0)),
+  })), [divulgados, isPC]);
   const rodadasListSavings = useMemo(() => {
     const set = new Set(jogosParaSavings.map(j => j.rodada));
     return ["Todas", ...Array.from(set).sort((a,b)=>a-b).map(String)];
@@ -414,7 +417,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
                   <span style={{ color:T.border, margin:"0 8px" }}>·</span>
                   <span className="num" style={{ color:T.text, fontWeight:600 }}>{aDivulgar.length}</span> a divulgar
                   <span style={{ color:T.border, margin:"0 8px" }}>·</span>
-                  <span className="num" style={{ color:T.text, fontWeight:600 }}>{fases.length}</span> {fases.length===1?"fase":"fases"}
+                  <span className="num" style={{ color:T.text, fontWeight:600 }}>{isPC ? (numRodadas || Array.from(new Set(jogos.map(j=>j.rodada))).length) : fases.length}</span> {isPC ? "rodadas" : (fases.length===1?"fase":"fases")}
                 </p>
               </div>
             </div>
@@ -508,7 +511,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
           </Card>
         </>)}
 
-        {tab==="jogos"         && <TabJogosPaulistao jogos={jogosCalc} fases={fases} filtroFase={filtroFase} setFiltroFase={setFiltroFase} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
+        {tab==="jogos"         && <TabJogosPaulistao jogos={jogosCalc} fases={fases} formato={formato} numRodadas={numRodadas} filtroFase={filtroFase} setFiltroFase={setFiltroFase} filtroRodada={filtroRodada} setFiltroRodada={setFiltroRodada} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
         {tab==="savings"       && <TabSavings jogosFiltered={jogosFilteredSav} divulgados={jogosParaSavings} totOrcJogos={totOrcSav} totProvJogos={totProvSav} filtroRod={filtroRodSav} setFiltroRod={setFiltroRodSav} filtroCat={filtroCatSav} setFiltroCat={setFiltroCatSav} rodadasList={rodadasListSavings} T={T}/>}
         {tab==="gráficos"      && <TabGraficos divulgados={divulgados} savingRodada={savingPorFase} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}

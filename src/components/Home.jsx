@@ -1,6 +1,8 @@
 import { CAMPEONATOS, RADIUS, FONT } from "../constants";
 import { getChampionshipConfig } from "../config/championships";
+import { CAMPEONATO_ENTITIES, getEntity } from "../config/entities";
 import ChampionshipLogo from "./ChampionshipLogo";
+import EntityLogo, { EntityLogoStack } from "./EntityLogo";
 import { Card, Stat, Button, Badge } from "./ui";
 import {
   Trophy, Calendar, Building2, Sun, Moon,
@@ -41,11 +43,19 @@ function LivemodeMark({ size = 36 }) {
 
 // Stats por campeonato — extraído pra ler de qualquer estrutura sem alterar dados.
 function CampStats({ camp, T }) {
+  const ents = CAMPEONATO_ENTITIES[camp.id];
   if (camp.id === "brasileirao-2026") {
     return (
       <>
         <StatBlock label="Rodadas" value={camp.rodadas} T={T}/>
-        <StatBlock label="Detentores" value="3" T={T} hint="CazeTV · Record · Amazon"/>
+        <div>
+          <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 6px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, fontFamily: FONT.ui }}>Detentores</p>
+          {ents?.detentores?.length ? (
+            <EntityLogoStack entityIds={ents.detentores} size={22} T={T}/>
+          ) : (
+            <p style={{ color: T.text, fontSize: 12, margin: 0, fontFamily: FONT.ui }}>—</p>
+          )}
+        </div>
       </>
     );
   }
@@ -100,6 +110,7 @@ function StatBlock({ label, value, hint, T }) {
 
 function ChampCard({ camp, onEnter, onDelete, T }) {
   const cfg = getChampionshipConfig(camp.id, camp);
+  const ents = CAMPEONATO_ENTITIES[camp.id];
   return (
     <div className="lm-card-hover" style={{
       background: T.surface || T.card,
@@ -135,7 +146,19 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
               fontSize: 11,
               color: T.textSm,
               fontFamily: FONT.ui,
-            }}>{camp.edicao} · Temporada</p>
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}>
+              {ents?.organizador && (
+                <>
+                  <EntityLogo entityId={ents.organizador} size={14} T={T}/>
+                  <span>{getEntity(ents.organizador).name}</span>
+                  <span style={{ opacity: 0.4 }}>·</span>
+                </>
+              )}
+              {camp.edicao} · Temporada
+            </p>
           </div>
         </div>
 

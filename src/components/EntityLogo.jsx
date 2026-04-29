@@ -61,39 +61,44 @@ export default function EntityLogo({ entityId, size = 24, title, showName = fals
 }
 
 // Lista horizontal de logos sobrepostos (avatar stack) — útil para "detentores".
-// Hover: o item passa pra frente (z-index), cresce levemente e ganha sombra.
+// Hover: item ativo cresce e ganha sombra; demais ficam com blur e opacidade reduzida.
 export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T, overlap = 8 }) {
+  const [hover, setHover] = useState(null);
   const visible = entityIds.slice(0, max);
   const rest = entityIds.length - visible.length;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center" }}>
-      {visible.map((id, i) => (
-        <span
-          key={id}
-          className="entity-stack-item"
-          style={{
-            marginLeft: i === 0 ? 0 : -overlap,
-            display: "inline-flex",
-            position: "relative",
-            zIndex: i + 1,
-            transition: "transform var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), filter var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), z-index 0ms",
-            cursor: "default",
-            filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.18))",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.zIndex = 99;
-            e.currentTarget.style.transform = "translateY(-3px) scale(1.22)";
-            e.currentTarget.style.filter = "drop-shadow(0 8px 14px rgba(0,0,0,0.28))";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.zIndex = i + 1;
-            e.currentTarget.style.transform = "";
-            e.currentTarget.style.filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.18))";
-          }}
-        >
-          <EntityLogo entityId={id} size={size} T={T}/>
-        </span>
-      ))}
+    <span
+      style={{ display: "inline-flex", alignItems: "center" }}
+      onMouseLeave={() => setHover(null)}
+    >
+      {visible.map((id, i) => {
+        const isActive = hover === i;
+        const isOther = hover !== null && hover !== i;
+        return (
+          <span
+            key={id}
+            className="entity-stack-item"
+            onMouseEnter={() => setHover(i)}
+            style={{
+              marginLeft: i === 0 ? 0 : -overlap,
+              display: "inline-flex",
+              position: "relative",
+              zIndex: isActive ? 99 : (i + 1),
+              transition: "transform 240ms cubic-bezier(0.16, 1, 0.3, 1), filter 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms cubic-bezier(0.16, 1, 0.3, 1)",
+              cursor: "default",
+              transform: isActive ? "translateY(-4px) scale(1.45)" : "none",
+              opacity: isOther ? 0.4 : 1,
+              filter: isActive
+                ? "drop-shadow(0 10px 18px rgba(0,0,0,0.32))"
+                : isOther
+                  ? "blur(2.5px) drop-shadow(0 1px 1px rgba(0,0,0,0.10))"
+                  : "drop-shadow(0 1px 2px rgba(0,0,0,0.18))",
+            }}
+          >
+            <EntityLogo entityId={id} size={size} T={T}/>
+          </span>
+        );
+      })}
       {rest > 0 && (
         <span style={{
           marginLeft: -overlap,
@@ -110,6 +115,9 @@ export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T, overlap
           flexShrink: 0,
           position: "relative",
           zIndex: visible.length + 1,
+          transition: "opacity 240ms, filter 240ms",
+          opacity: hover !== null ? 0.4 : 1,
+          filter: hover !== null ? "blur(2.5px)" : "none",
         }}>+{rest}</span>
       )}
     </span>

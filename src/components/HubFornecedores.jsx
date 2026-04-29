@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { RADIUS } from "../constants";
+import { RADIUS, FONT } from "../constants";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
@@ -119,7 +119,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   );
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex"}}>
+    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Poppins',sans-serif",display:"flex"}}>
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <aside style={{
@@ -140,17 +140,16 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
       }}>
         <button onClick={onBack} title="Voltar ao portal"
           style={{
-            width:44, height:44, borderRadius:12, border:"none", cursor:"pointer",
-            background:"linear-gradient(135deg,#059669,#10b981)",
-            color:"#fff",
+            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
+            background:"#1A1A1A", color:"#fff",
             display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:14,
-            boxShadow:"0 6px 16px rgba(16,185,129,0.35)",
+            marginBottom:12, gap:1,
+            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
           }}>
-          <ArrowLeft size={18} strokeWidth={2.25}/>
+          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
         </button>
 
-        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.08)", marginBottom:8 }}/>
+        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
 
         <IconButton icon={Users} title="Fornecedores" active={true} onClick={()=>{}} size={44} T={T}/>
 
@@ -190,10 +189,9 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
           }}>
             <div style={{ minWidth:0, display:"flex", alignItems:"center", gap:14 }}>
               <div style={{
-                width:44, height:44, borderRadius:12,
-                background: T.brandSoft || "rgba(16,185,129,0.12)",
-                border: `1px solid ${T.brandBorder || "rgba(16,185,129,0.28)"}`,
-                color: T.brand || "#10b981",
+                width:42, height:42, borderRadius:RADIUS.md,
+                background: T.brandSoft || "rgba(101,179,46,0.10)",
+                color: T.brand || "#65B32E",
                 display:"flex", alignItems:"center", justifyContent:"center",
                 flexShrink:0,
               }}>
@@ -201,12 +199,13 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
               </div>
               <div style={{ minWidth:0 }}>
                 <p style={{
-                  color: T.brand || "#10b981",
+                  color: T.brand || "#65B32E",
                   fontSize: 10,
                   letterSpacing:"0.16em",
                   textTransform:"uppercase",
                   margin:"0 0 3px",
-                  fontWeight:700,
+                  fontWeight:600,
+                  fontFamily: FONT.ui,
                   display:"inline-flex",
                   alignItems:"center",
                   gap:6,
@@ -215,11 +214,13 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
                   Hub Global · Módulo Financeiro
                 </p>
                 <h1 style={{
-                  fontSize:20,
-                  fontWeight:800,
+                  fontFamily: FONT.display,
+                  fontSize:22,
+                  fontWeight:700,
                   margin:0,
                   color:T.text,
-                  letterSpacing:"-0.02em",
+                  letterSpacing:"-0.005em",
+                  lineHeight:1.1,
                 }}>Fornecedores & Negociações</h1>
                 <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
                   Cadastro, cotações, chat e análise preditiva —

@@ -55,7 +55,7 @@ const btnSty = (variant = "primary") => ({
   background: variant === "primary" ? T.brand : "transparent",
   color: variant === "primary" ? "#fff" : T.textMd,
   fontWeight:700,fontSize:14,cursor:"pointer",
-  fontFamily:"'Inter',sans-serif",
+  fontFamily:"'Poppins',sans-serif",
   letterSpacing:"-0.005em",
 });
 
@@ -176,7 +176,7 @@ export default function TabelaPrecoPublica({ token }) {
   const status = statusTabelaInfo(tabela.status);
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Poppins',sans-serif"}}>
       {/* Header */}
       <div style={{
         background:T.surface,
@@ -341,7 +341,7 @@ export default function TabelaPrecoPublica({ token }) {
 // ── Tela de estado vazio/erro ───────────────────────────────────────────────
 function FullCenter({ icon:Icon, title, msg, spin }) {
   return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Poppins',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
       <div style={{maxWidth:420,textAlign:"center"}}>
         <div style={{
           width:72,height:72,borderRadius:18,

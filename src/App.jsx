@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO } from "./constants";
+import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO, FONT } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
 import { KPI, Pill, CustomTooltip } from "./components/shared";
@@ -393,7 +393,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   const setorAtual = SETORES.find(s => s.k === setor);
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex"}}>
+    <div className="page-enter" style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Poppins',sans-serif",display:"flex"}}>
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <aside style={{
@@ -412,20 +412,23 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         top:0,
         height:"100vh",
       }}>
-        {/* logo / back */}
+        {/* Livemode mark — clica para voltar */}
         <button onClick={onBack} title="Voltar ao portal"
           style={{
-            width:44, height:44, borderRadius:12, border:"none", cursor:"pointer",
-            background:"linear-gradient(135deg,#059669,#10b981)",
+            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
+            background:"#1A1A1A",
             color:"#fff",
             display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:14,
-            boxShadow:"0 6px 16px rgba(16,185,129,0.35)",
-          }}>
-          <ArrowLeft size={18} strokeWidth={2.25}/>
+            marginBottom:12, gap:1,
+            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
+          }}
+          onMouseEnter={e => { e.currentTarget.dataset.hover = "1"; }}
+          onMouseLeave={e => { e.currentTarget.dataset.hover = ""; }}
+        >
+          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
         </button>
 
-        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.08)", marginBottom:8 }}/>
+        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
 
         {/* setores */}
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
@@ -487,19 +490,22 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
               )}
               <div style={{ minWidth:0 }}>
                 <p style={{
-                  color: T.brand || "#10b981",
+                  color: T.brand || "#65B32E",
                   fontSize: 10,
                   letterSpacing:"0.16em",
                   textTransform:"uppercase",
                   margin:"0 0 3px",
-                  fontWeight:700,
+                  fontWeight:600,
+                  fontFamily: FONT.ui,
                 }}>Livemode · Transmissões · {setorAtual?.l}</p>
                 <h1 style={{
-                  fontSize:20,
-                  fontWeight:800,
+                  fontFamily: FONT.display,
+                  fontSize:22,
+                  fontWeight:700,
                   margin:0,
                   color:T.text,
-                  letterSpacing:"-0.02em",
+                  letterSpacing:"-0.005em",
+                  lineHeight:1.1,
                 }}>Brasileirão Série A 2026</h1>
                 <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
                   <span className="num" style={{ color:T.text, fontWeight:600 }}>{divulgados.length}</span> divulgados
@@ -519,17 +525,18 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                 border: `1px solid ${T.border}`,
                 borderRadius: RADIUS.lg,
               }}>
-                <Wallet size={16} color="#a855f7" strokeWidth={2.25}/>
+                <Wallet size={16} color={T.projetado || "#7C3AED"} strokeWidth={2.25}/>
                 <div style={{ textAlign:"right" }}>
-                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Orçado total campeonato</p>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600 }}>Orçado total campeonato</p>
                   <p className="num" style={{
+                    fontFamily: FONT.display,
                     fontSize:22,
-                    fontWeight:800,
-                    color:"#a855f7",
+                    fontWeight:700,
+                    color: T.projetado || "#7C3AED",
                     margin:0,
                     filter:ocultar?"blur(8px)":"none",
                     transition:"filter 0.2s",
-                    letterSpacing:"-0.02em",
+                    letterSpacing:"-0.005em",
                     lineHeight:1,
                   }}>{fmt(11540692)}</p>
                 </div>
@@ -542,17 +549,18 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                 border: `1px solid ${T.border}`,
                 borderRadius: RADIUS.lg,
               }}>
-                <Activity size={16} color={T.brand || "#10b981"} strokeWidth={2.25}/>
+                <Activity size={16} color={T.brand || "#65B32E"} strokeWidth={2.25}/>
                 <div style={{ textAlign:"right" }}>
-                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
                   <p className="num" style={{
+                    fontFamily: FONT.display,
                     fontSize:22,
-                    fontWeight:800,
-                    color: pctGasto>80 ? (T.danger||"#ef4444") : (T.brand||"#10b981"),
+                    fontWeight:700,
+                    color: pctGasto>80 ? (T.danger||"#DC2626") : (T.brand||"#65B32E"),
                     margin:0,
                     filter:ocultar?"blur(8px)":"none",
                     transition:"filter 0.2s",
-                    letterSpacing:"-0.02em",
+                    letterSpacing:"-0.005em",
                     lineHeight:1,
                   }}>{pctGasto}%</p>
                 </div>
@@ -569,19 +577,19 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
               const isActive = tab===t;
               return (
                 <button key={t} onClick={()=>setTab(t)} style={{
-                  padding:"10px 16px",
+                  padding:"12px 16px",
                   border:"none",
-                  borderBottom: `2px solid ${isActive ? (T.brand||"#10b981") : "transparent"}`,
+                  borderBottom: `2px solid ${isActive ? (T.brand||"#65B32E") : "transparent"}`,
                   background:"transparent",
-                  color: isActive ? (T.brand||"#10b981") : T.textMd,
-                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? T.text : T.textMd,
+                  fontFamily: FONT.ui,
+                  fontWeight: isActive ? 500 : 400,
                   fontSize:13,
                   cursor:"pointer",
                   whiteSpace:"nowrap",
                   textTransform:"capitalize",
                   flexShrink:0,
-                  transition:"color .15s, border-color .15s",
-                  letterSpacing:"-0.005em",
+                  letterSpacing:"0",
                 }}>
                   {t}
                 </button>
@@ -590,15 +598,15 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
           </div>
         </div>
 
-        <div style={{padding:"28px 32px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
+        <div key={tab} className="tab-content" style={{padding:"28px 32px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
 
         {/* ── DASHBOARD ── */}
         {tab==="dashboard" && (<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
-            <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}           sub="Jogos + serviços fixos"                                           color={T.brand}   icon={Wallet}     />
-            <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info}    icon={PiggyBank}  />
-            <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color={T.warning} icon={TrendingUp} />
-            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)}     sub={`Provisionado + ${(PLANO_JOGOS.b1+PLANO_JOGOS.b2s+PLANO_JOGOS.b2sul)-divulgados.length} jogos a divulgar`} color="#a855f7"  icon={Target}     />
+          <div className="stagger" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:24}}>
+            <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}           sub="Jogos + serviços fixos"                                           color={T.info}    icon={Wallet}     />
+            <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}          sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.warning} icon={PiggyBank}  />
+            <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}          sub={`${pctGasto}% executado`}                                         color={T.success} icon={TrendingUp} />
+            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)}     sub={`Provisionado + ${(PLANO_JOGOS.b1+PLANO_JOGOS.b2s+PLANO_JOGOS.b2sul)-divulgados.length} jogos a divulgar`} color={T.projetado || "#7C3AED"}  icon={Target} />
           </div>
           <Card T={T}>
             <SectionHeader
@@ -641,8 +649,8 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                         <td style={{padding:"13px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text,fontSize:13}}>{c.nome}</td>
                         <td style={{padding:"13px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
-                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
-                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#D97706",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.success||"#16A34A",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.text,fontSize:13}}>{pct.toFixed(1)}%</td>
                         <td style={{padding:"13px 20px",minWidth:120}}>
                           <Progress value={pct} T={T}/>
@@ -652,9 +660,9 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
                   })}
                   <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
                     <td colSpan={2} style={{padding:"14px 16px",color:T.text,fontSize:12,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total Geral</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.brand||"#10b981",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc)}</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalProv)}</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalReal)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#2563EB",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalOrc)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#D97706",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalProv)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.success||"#16A34A",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalReal)}</td>
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.text,fontSize:14,fontWeight:700}}>{pctGasto}%</td>
                     <td/>
                   </tr>
@@ -708,18 +716,18 @@ function LoginGate({ onAuth, T }) {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter',sans-serif"}}>
+    <div className="page-enter" style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
       <div style={{width:"100%",maxWidth:400,padding:32}}>
         <div style={{
-          width:56,height:56,borderRadius:16,
-          background:"linear-gradient(135deg,#059669,#10b981)",
-          display:"flex",alignItems:"center",justifyContent:"center",
+          width:56,height:56,borderRadius:12,
+          background:"#1A1A1A",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:2,
           margin:"0 auto 24px",
-          boxShadow:"0 8px 24px rgba(16,185,129,0.35)",
+          fontFamily: FONT.display, fontWeight:700, color:"#fff", fontSize:22, letterSpacing:"0.02em",
         }}>
-          <Lock size={26} color="#fff" strokeWidth={2.25}/>
+          LM<span style={{width:9, height:9, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
         </div>
-        <h1 style={{textAlign:"center",fontSize:22,fontWeight:800,color:T.text,margin:"0 0 6px",letterSpacing:"-0.02em"}}>HUB Financeiro</h1>
+        <h1 style={{textAlign:"center",fontFamily: FONT.display,fontSize:26,fontWeight:700,color:T.text,margin:"0 0 6px",letterSpacing:"-0.005em"}}>HUB FINANCEIRO</h1>
         <p style={{textAlign:"center",color:T.textMd,fontSize:13,margin:"0 0 28px"}}>Acesso restrito — insira o código de acesso</p>
         <form onSubmit={handleSubmit}>
           <input
@@ -730,24 +738,23 @@ function LoginGate({ onAuth, T }) {
             autoFocus
             style={{
               width:"100%",boxSizing:"border-box",
-              background:T.card,border:`1px solid ${erro ? (T.danger||"#ef4444") : T.muted}`,
-              borderRadius:10,padding:"12px 16px",fontSize:15,color:T.text,
-              fontFamily:"'Inter',sans-serif",textAlign:"center",letterSpacing:"0.1em",
+              background:T.surface||T.card,border:`1px solid ${erro ? (T.danger||"#DC2626") : T.borderStrong||T.muted}`,
+              borderRadius:8,padding:"12px 16px",fontSize:15,color:T.text,
+              fontFamily:"'Poppins',sans-serif",textAlign:"center",letterSpacing:"0.1em",
               transition:"border-color 0.2s",
             }}
           />
-          {erro && <p style={{color:T.danger||"#ef4444",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:600}}>Código incorreto</p>}
+          {erro && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>Código incorreto</p>}
           <button type="submit" style={{
             width:"100%",marginTop:16,
-            background:"linear-gradient(135deg,#047857,#059669)",
-            color:"#fff",border:"none",borderRadius:10,padding:"12px",
-            cursor:"pointer",fontWeight:700,fontSize:14,
-            boxShadow:"0 4px 14px rgba(5,150,105,0.35)",
+            background: T.brand || "#65B32E",
+            color:"#fff",border:"none",borderRadius:7,padding:"10px",height:38,
+            cursor:"pointer",fontWeight:500,fontSize:13,fontFamily: "'Poppins',sans-serif",
           }}>
             Entrar
           </button>
         </form>
-        <p style={{textAlign:"center",color:T.textSm,fontSize:10,margin:"24px 0 0",letterSpacing:"0.04em"}}>
+        <p style={{textAlign:"center",color:T.textSm,fontSize:10,margin:"24px 0 0",letterSpacing:"0.08em",textTransform:"uppercase"}}>
           Livemode · Transmissões · 2026
         </p>
       </div>

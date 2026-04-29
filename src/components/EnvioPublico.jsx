@@ -80,13 +80,13 @@ export default function EnvioPublico({ numero }) {
   };
 
   if (loading) return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>
     </div>
   );
 
   if (!envio) return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
       <p style={{color:T.textMd,fontSize:16}}>Envio não encontrado</p>
     </div>
   );
@@ -95,7 +95,7 @@ export default function EnvioPublico({ numero }) {
   const tdS = { padding:"12px 14px", fontSize:12, borderBottom:`1px solid ${T.border}`, color:T.text };
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Inter',sans-serif",color:T.text}}>
+    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Poppins',sans-serif",color:T.text}}>
       <style>{`@media print { .no-print{display:none!important} body{margin:0} @page{margin:12mm} } .num { font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }`}</style>
 
       {/* Header */}
@@ -291,7 +291,7 @@ export default function EnvioPublico({ numero }) {
             <div style={{marginBottom:22}}>
               <label style={{display:"block",fontSize:10,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:700}}>Seu nome (opcional)</label>
               <input value={payerName} onChange={e=>setPayerName(e.target.value)} placeholder="Ex: Maria Silva"
-                style={{width:"100%",boxSizing:"border-box",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",fontSize:13,color:T.text,background:T.bg,fontFamily:"'Inter',sans-serif"}}/>
+                style={{width:"100%",boxSizing:"border-box",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",fontSize:13,color:T.text,background:T.bg,fontFamily:"'Poppins',sans-serif"}}/>
               <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Para registro de quem confirmou o pagamento.</p>
             </div>
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>

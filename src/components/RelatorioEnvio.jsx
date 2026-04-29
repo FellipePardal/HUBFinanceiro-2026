@@ -56,7 +56,7 @@ export default function RelatorioEnvio() {
   };
 
   if (loading) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter',sans-serif"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
       <p style={{color:"#666",fontSize:16}}>Carregando...</p>
     </div>
   );
@@ -65,7 +65,7 @@ export default function RelatorioEnvio() {
   const tdS = { padding:"8px 12px", fontSize:12, borderBottom:`1px solid ${T.border}` };
 
   return (
-    <div style={{minHeight:"100vh",background:"#fff",fontFamily:"'Inter',sans-serif",color:T.text}}>
+    <div style={{minHeight:"100vh",background:"#fff",fontFamily:"'Poppins',sans-serif",color:T.text}}>
       {/* Header — não imprime os controles */}
       <div style={{background:"linear-gradient(135deg,#166534,#15803d)",padding:"20px 24px",color:"#fff"}} className="no-print-bg">
         <div style={{maxWidth:900,margin:"0 auto"}}>

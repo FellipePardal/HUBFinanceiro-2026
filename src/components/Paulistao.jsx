@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { CATS, TIPO_COLOR, RADIUS, FASES_PAULISTAO } from "../constants";
+import { CATS, TIPO_COLOR, RADIUS, FASES_PAULISTAO, FONT } from "../constants";
 import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./ui";
@@ -382,7 +382,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                               + servicos.reduce((t,sec)=>t+sec.itens.reduce((u,i)=>u+(i.orcado||0),0),0);
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Inter',sans-serif",display:"flex"}}>
+    <div className="page-enter" style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Poppins',sans-serif",display:"flex"}}>
       {/* Sidebar */}
       <aside style={{
         width:72, minHeight:"100vh",
@@ -394,14 +394,15 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
       }}>
         <button onClick={onBack} title="Voltar ao portal"
           style={{
-            width:44, height:44, borderRadius:12, border:"none", cursor:"pointer",
-            background:"linear-gradient(135deg,#9d174d,#ec4899)",
-            color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:14, boxShadow:"0 6px 16px rgba(236,72,153,0.35)",
+            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
+            background:"#1A1A1A", color:"#fff",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            marginBottom:12, gap:1,
+            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
           }}>
-          <ArrowLeft size={18} strokeWidth={2.25}/>
+          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
         </button>
-        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.08)", marginBottom:8 }}/>
+        <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
           {SETORES.map(s => (
             <IconButton key={s.k} icon={s.icon} title={s.l}
@@ -428,10 +429,9 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
             <div style={{ minWidth:0, display:"flex", alignItems:"center", gap:14 }}>
               {setorAtual?.icon && (
                 <div style={{
-                  width:42, height:42, borderRadius:12,
-                  background:"rgba(236,72,153,0.12)",
-                  border:"1px solid rgba(236,72,153,0.32)",
-                  color:"#ec4899",
+                  width:42, height:42, borderRadius:RADIUS.md,
+                  background: T.brandSoft || "rgba(101,179,46,0.10)",
+                  color: T.brand || "#65B32E",
                   display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
                 }}>
                   <setorAtual.icon size={20} strokeWidth={2.25}/>
@@ -439,11 +439,11 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
               )}
               <div style={{ minWidth:0 }}>
                 <p style={{
-                  color:"#ec4899",
+                  color: T.brand || "#65B32E",
                   fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase",
-                  margin:"0 0 3px", fontWeight:700,
+                  margin:"0 0 3px", fontWeight:600, fontFamily: FONT.ui,
                 }}>Livemode · Transmissões · {setorAtual?.l}</p>
-                <h1 style={{ fontSize:20, fontWeight:800, margin:0, color:T.text, letterSpacing:"-0.02em" }}>Paulistão Feminino 2026</h1>
+                <h1 style={{ fontFamily: FONT.display, fontSize:22, fontWeight:700, margin:0, color:T.text, letterSpacing:"-0.005em", lineHeight:1.1 }}>Paulistão Feminino 2026</h1>
                 <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
                   <span className="num" style={{ color:T.text, fontWeight:600 }}>{divulgados.length}</span> divulgados
                   <span style={{ color:T.border, margin:"0 8px" }}>·</span>
@@ -459,13 +459,13 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                 display:"flex", alignItems:"center", gap:12, padding:"10px 18px",
                 background: T.surfaceAlt || T.bg, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
               }}>
-                <Wallet size={16} color="#a855f7" strokeWidth={2.25}/>
+                <Wallet size={16} color={T.projetado || "#7C3AED"} strokeWidth={2.25}/>
                 <div style={{ textAlign:"right" }}>
-                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Orçado total campeonato</p>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600 }}>Orçado total campeonato</p>
                   <p className="num" style={{
-                    fontSize:22, fontWeight:800, color:"#a855f7", margin:0,
+                    fontFamily: FONT.display, fontSize:22, fontWeight:700, color: T.projetado || "#7C3AED", margin:0,
                     filter:ocultar?"blur(8px)":"none", transition:"filter 0.2s",
-                    letterSpacing:"-0.02em", lineHeight:1,
+                    letterSpacing:"-0.005em", lineHeight:1,
                   }}>{fmt(orcadoTotalCampeonato)}</p>
                 </div>
               </div>
@@ -474,14 +474,14 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                 display:"flex", alignItems:"center", gap:12, padding:"10px 18px",
                 background: T.surfaceAlt || T.bg, border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
               }}>
-                <Activity size={16} color={"#ec4899"} strokeWidth={2.25}/>
+                <Activity size={16} color={T.brand || "#65B32E"} strokeWidth={2.25}/>
                 <div style={{ textAlign:"right" }}>
-                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.06em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
+                  <p style={{ color:T.textSm, fontSize:10, margin:"0 0 2px", letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600 }}>Execução geral</p>
                   <p className="num" style={{
-                    fontSize:22, fontWeight:800,
-                    color: pctGasto>80 ? (T.danger||"#ef4444") : "#ec4899",
+                    fontFamily: FONT.display, fontSize:22, fontWeight:700,
+                    color: pctGasto>80 ? (T.danger||"#DC2626") : (T.brand||"#65B32E"),
                     margin:0, filter:ocultar?"blur(8px)":"none", transition:"filter 0.2s",
-                    letterSpacing:"-0.02em", lineHeight:1,
+                    letterSpacing:"-0.005em", lineHeight:1,
                   }}>{pctGasto}%</p>
                 </div>
               </div>
@@ -493,28 +493,29 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
               const isActive = tab===t;
               return (
                 <button key={t} onClick={()=>setTab(t)} style={{
-                  padding:"10px 16px", border:"none",
-                  borderBottom: `2px solid ${isActive ? "#ec4899" : "transparent"}`,
+                  padding:"12px 16px", border:"none",
+                  borderBottom: `2px solid ${isActive ? (T.brand||"#65B32E") : "transparent"}`,
                   background:"transparent",
-                  color: isActive ? "#ec4899" : T.textMd,
-                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? T.text : T.textMd,
+                  fontFamily: FONT.ui,
+                  fontWeight: isActive ? 500 : 400,
                   fontSize:13, cursor:"pointer", whiteSpace:"nowrap",
                   textTransform:"capitalize", flexShrink:0,
-                  transition:"color .15s, border-color .15s", letterSpacing:"-0.005em",
+                  letterSpacing:"0",
                 }}>{t}</button>
               );
             })}
           </div>
         </div>
 
-        <div style={{padding:"28px 32px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
+        <div key={tab} className="tab-content" style={{padding:"28px 32px",filter:ocultar?"blur(10px)":"none",transition:"filter 0.3s",userSelect:ocultar?"none":"auto"}}>
 
         {tab==="dashboard" && (<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
-            <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}       sub="Jogos + serviços fixos" color="#ec4899" icon={Wallet}/>
-            <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}      sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info} icon={PiggyBank}/>
-            <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}      sub={`${pctGasto}% executado`} color={T.warning} icon={TrendingUp}/>
-            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub="Provisionado quando há, senão orçado" color="#a855f7" icon={Target}/>
+          <div className="stagger" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:24}}>
+            <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}       sub="Jogos + serviços fixos" color={T.info} icon={Wallet}/>
+            <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}      sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.warning} icon={PiggyBank}/>
+            <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}      sub={`${pctGasto}% executado`} color={T.success} icon={TrendingUp}/>
+            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub="Provisionado quando há, senão orçado" color={T.projetado || "#7C3AED"} icon={Target}/>
           </div>
           <Card T={T}>
             <SectionHeader
@@ -550,8 +551,8 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                         <td style={{padding:"13px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text,fontSize:13}}>{c.nome}</td>
                         <td style={{padding:"13px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
-                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
-                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.warning||"#D97706",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.provisionado||0)}</td>
+                        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.success||"#16A34A",whiteSpace:"nowrap",fontSize:13}}>{fmt(c.realizado)}</td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.text,fontSize:13}}>{pct.toFixed(1)}%</td>
                         <td style={{padding:"13px 20px",minWidth:120}}><Progress value={pct} T={T}/></td>
                       </tr>
@@ -559,9 +560,9 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                   })}
                   <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
                     <td colSpan={2} style={{padding:"14px 16px",color:T.text,fontSize:12,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total Geral</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:"#ec4899",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalOrc)}</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#3b82f6",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalProv)}</td>
-                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#f59e0b",whiteSpace:"nowrap",fontSize:14,fontWeight:700}}>{fmt(totalReal)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#2563EB",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalOrc)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.warning||"#D97706",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalProv)}</td>
+                    <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.success||"#16A34A",whiteSpace:"nowrap",fontSize:14,fontWeight:600}}>{fmt(totalReal)}</td>
                     <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.text,fontSize:14,fontWeight:700}}>{pctGasto}%</td>
                     <td/>
                   </tr>

@@ -21,8 +21,6 @@ export default function ChampionshipLogo({ championshipId, size = 48, config: cu
         style={{
           objectFit: "contain",
           borderRadius: radius,
-          background: "rgba(255,255,255,0.08)",
-          border: "1px solid rgba(255,255,255,0.12)",
           padding: 4,
           flexShrink: 0,
         }}

@@ -65,11 +65,13 @@ function CampStats({ camp, T }) {
   );
 }
 
+// ── Card de campeonato — surface do tema (branco em light, dark em dark) ───────
+
 function StatBlock({ label, value, hint, T }) {
   return (
     <div>
       <p style={{
-        color: "rgba(255,255,255,0.45)",
+        color: T.textSm,
         fontSize: 10,
         margin: "0 0 4px",
         letterSpacing: "0.08em",
@@ -78,16 +80,16 @@ function StatBlock({ label, value, hint, T }) {
         fontFamily: FONT.ui,
       }}>{label}</p>
       <p className="num" style={{
-        color: "#fff",
+        color: T.text,
         fontFamily: FONT.display,
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 700,
         margin: 0,
         letterSpacing: "-0.005em",
         lineHeight: 1.2,
       }}>{value}</p>
       {hint && <p style={{
-        color: "rgba(255,255,255,0.45)",
+        color: T.textSm,
         fontSize: 10,
         margin: "2px 0 0",
         fontFamily: FONT.ui,
@@ -96,25 +98,23 @@ function StatBlock({ label, value, hint, T }) {
   );
 }
 
-// ── Card de campeonato — fundo escuro temático com logo + stats + CTA ──────────
-function ChampCard({ camp, onEnter, onDelete }) {
+function ChampCard({ camp, onEnter, onDelete, T }) {
   const cfg = getChampionshipConfig(camp.id, camp);
   return (
     <div className="lm-card-hover" style={{
-      background: cfg.bgColor,
+      background: T.surface || T.card,
       borderRadius: RADIUS.lg,
-      borderTop: `2px solid ${cfg.accentColor}`,
+      border: `1px solid ${T.border}`,
+      borderTop: `3px solid ${cfg.accentColor}`,
       padding: 22,
       cursor: "pointer",
-      border: `1px solid rgba(255,255,255,0.06)`,
-      borderTopColor: cfg.accentColor,
-      borderTopWidth: 2,
       position: "relative",
       overflow: "hidden",
       minHeight: 240,
       display: "flex",
       flexDirection: "column",
       gap: 18,
+      boxShadow: T.shadow || "0 1px 3px rgba(0,0,0,0.06)",
     }} onClick={() => onEnter(camp.id.startsWith("custom-") ? `custom:${camp.id}` : camp.id)}>
       {/* Cabeçalho: logo + nome + badge */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12 }}>
@@ -124,16 +124,16 @@ function ChampCard({ camp, onEnter, onDelete }) {
             <h4 style={{
               margin: "0 0 2px",
               fontFamily: FONT.display,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: 700,
-              color: "#fff",
+              color: T.text,
               letterSpacing: "-0.005em",
               lineHeight: 1.1,
             }}>{camp.nome}</h4>
             <p style={{
               margin: 0,
               fontSize: 11,
-              color: "rgba(255,255,255,0.45)",
+              color: T.textSm,
               fontFamily: FONT.ui,
             }}>{camp.edicao} · Temporada</p>
           </div>
@@ -141,9 +141,9 @@ function ChampCard({ camp, onEnter, onDelete }) {
 
         {/* Badge "Em andamento" com ponto pulsante */}
         <span style={{
-          background: "rgba(101,179,46,0.12)",
-          border: "1px solid rgba(101,179,46,0.35)",
-          color: "#8ed45c",
+          background: "rgba(101,179,46,0.10)",
+          border: "1px solid rgba(101,179,46,0.30)",
+          color: T.brand || "#65B32E",
           borderRadius: RADIUS.pill,
           padding: "0 10px",
           height: 22,
@@ -169,8 +169,14 @@ function ChampCard({ camp, onEnter, onDelete }) {
       </div>
 
       {/* Stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <CampStats camp={camp}/>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 16,
+        paddingBottom: 16,
+        borderBottom: `1px solid ${T.border}`,
+      }}>
+        <CampStats camp={camp} T={T}/>
       </div>
 
       <div style={{ flex: 1 }}/>
@@ -181,10 +187,10 @@ function ChampCard({ camp, onEnter, onDelete }) {
           onClick={e => { e.stopPropagation(); onEnter(camp.id.startsWith("custom-") ? `custom:${camp.id}` : camp.id); }}
           style={{
             flex: 1,
-            background: "rgba(101,179,46,0.12)",
-            border: "1px solid rgba(101,179,46,0.35)",
-            color: "#8ed45c",
-            borderRadius: 8,
+            background: T.brand || "#65B32E",
+            border: "1px solid transparent",
+            color: "#fff",
+            borderRadius: 7,
             height: 36,
             cursor: "pointer",
             fontFamily: FONT.ui,
@@ -196,14 +202,8 @@ function ChampCard({ camp, onEnter, onDelete }) {
             gap: 8,
             letterSpacing: "0",
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = "rgba(101,179,46,0.18)";
-            e.currentTarget.style.borderColor = "rgba(101,179,46,0.55)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = "rgba(101,179,46,0.12)";
-            e.currentTarget.style.borderColor = "rgba(101,179,46,0.35)";
-          }}
+          onMouseEnter={e => { e.currentTarget.style.background = T.brandStrong || "#5aa327"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = T.brand || "#65B32E"; }}
         >
           Abrir campeonato <ArrowRight size={14} strokeWidth={2.25}/>
         </button>
@@ -216,8 +216,8 @@ function ChampCard({ camp, onEnter, onDelete }) {
               height: 36,
               background: "rgba(220,38,38,0.08)",
               border: "1px solid rgba(220,38,38,0.2)",
-              color: "#fca5a5",
-              borderRadius: 8,
+              color: T.danger || "#DC2626",
+              borderRadius: 7,
               cursor: "pointer",
               display: "inline-flex",
               alignItems: "center",
@@ -362,6 +362,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
               key={camp.id}
               camp={camp}
               onEnter={onEnter}
+              T={T}
             />
           ))}
 
@@ -369,6 +370,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
             <ChampCard
               key={camp.id}
               camp={camp}
+              T={T}
               onEnter={(id) => onEnter(`custom:${camp.id}`)}
               onDelete={(c) => {
                 if (window.confirm(`Excluir o campeonato "${c.nome}"? Os dados (jogos, notas, logística) ficam no Supabase mas o campeonato some do portal.`)) {

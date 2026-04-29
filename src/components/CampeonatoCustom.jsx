@@ -24,6 +24,7 @@ import { getState, setState as setSupabaseState, supabase } from "../lib/supabas
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
 import { makeFaseHelpers } from "../data/customCampeonato";
+import LivemodeLogo from "./LivemodeLogo";
 
 // Página genérica para qualquer campeonato dinâmico criado via "Criar Novo".
 // Recebe `config` com id, nome, edicao, cor, fases — e tudo que diferencia
@@ -370,16 +371,9 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         paddingTop:16, paddingBottom:16, gap:6, flexShrink:0,
         position:"sticky", top:0, height:"100vh",
       }}>
-        <button onClick={onBack} title="Voltar ao portal"
-          style={{
-            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
-            background:"#1A1A1A", color:"#fff",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:12, gap:1,
-            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
-          }}>
-          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
-        </button>
+        <div style={{ marginBottom: 12 }}>
+          <LivemodeLogo size={40} onClick={onBack} title="Voltar ao portal"/>
+        </div>
         <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
           {SETORES.map(s => (

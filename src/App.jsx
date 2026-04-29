@@ -10,6 +10,7 @@ import {
   Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
 import Home             from "./components/Home";
+import LivemodeLogo     from "./components/LivemodeLogo";
 import TabJogos         from "./components/tabs/TabJogos";
 import TabSavings       from "./components/tabs/TabSavings";
 import TabGraficos      from "./components/tabs/TabGraficos";
@@ -413,20 +414,9 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         height:"100vh",
       }}>
         {/* Livemode mark — clica para voltar */}
-        <button onClick={onBack} title="Voltar ao portal"
-          style={{
-            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
-            background:"#1A1A1A",
-            color:"#fff",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:12, gap:1,
-            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
-          }}
-          onMouseEnter={e => { e.currentTarget.dataset.hover = "1"; }}
-          onMouseLeave={e => { e.currentTarget.dataset.hover = ""; }}
-        >
-          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
-        </button>
+        <div style={{ marginBottom: 12 }}>
+          <LivemodeLogo size={40} onClick={onBack} title="Voltar ao portal"/>
+        </div>
 
         <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
 
@@ -718,14 +708,8 @@ function LoginGate({ onAuth, T }) {
   return (
     <div className="page-enter" style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
       <div style={{width:"100%",maxWidth:400,padding:32}}>
-        <div style={{
-          width:56,height:56,borderRadius:12,
-          background:"#1A1A1A",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:2,
-          margin:"0 auto 24px",
-          fontFamily: FONT.display, fontWeight:700, color:"#fff", fontSize:22, letterSpacing:"0.02em",
-        }}>
-          LM<span style={{width:9, height:9, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
+        <div style={{ margin:"0 auto 24px", display:"flex", justifyContent:"center" }}>
+          <LivemodeLogo size={56} radius={12}/>
         </div>
         <h1 style={{textAlign:"center",fontFamily: FONT.display,fontSize:26,fontWeight:700,color:T.text,margin:"0 0 6px",letterSpacing:"-0.005em"}}>HUB FINANCEIRO</h1>
         <p style={{textAlign:"center",color:T.textMd,fontSize:13,margin:"0 0 28px"}}>Acesso restrito — insira o código de acesso</p>

@@ -3,6 +3,7 @@ import { getChampionshipConfig } from "../config/championships";
 import { CAMPEONATO_ENTITIES, getEntity } from "../config/entities";
 import ChampionshipLogo from "./ChampionshipLogo";
 import EntityLogo, { EntityLogoStack } from "./EntityLogo";
+import LivemodeLogo from "./LivemodeLogo";
 import { Card, Stat, Button, Badge } from "./ui";
 import {
   Trophy, Calendar, Building2, Sun, Moon,
@@ -10,36 +11,6 @@ import {
   Plus, Trash2,
 } from "lucide-react";
 
-// Logotipo Livemode — versão compacta inline (LM + círculo verde).
-function LivemodeMark({ size = 36 }) {
-  return (
-    <div style={{
-      width: size, height: size,
-      borderRadius: 8,
-      background: "#1A1A1A",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 2,
-      fontFamily: FONT.display,
-      fontWeight: 700,
-      color: "#fff",
-      fontSize: Math.round(size * 0.42),
-      letterSpacing: "0.02em",
-      flexShrink: 0,
-    }}>
-      LM
-      <span style={{
-        width: Math.round(size * 0.18),
-        height: Math.round(size * 0.18),
-        borderRadius: "50%",
-        background: "#65B32E",
-        display: "inline-block",
-        marginLeft: 1,
-      }}/>
-    </div>
-  );
-}
 
 // Stats por campeonato — extraído pra ler de qualquer estrutura sem alterar dados.
 function CampStats({ camp, T }) {
@@ -269,7 +240,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
         zIndex: 10,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <LivemodeMark size={32}/>
+          <LivemodeLogo size={32}/>
           <span style={{
             fontFamily: FONT.display,
             fontSize: 13,

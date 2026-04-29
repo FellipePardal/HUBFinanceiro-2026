@@ -8,6 +8,7 @@ import { JOGOS_FORN_INIT } from "../data/jogosFornecedores";
 import { ALL_JOGOS } from "../data";
 import { fmt, fmtK } from "../utils";
 import { Stat, Badge, IconButton } from "./ui";
+import LivemodeLogo from "./LivemodeLogo";
 import {
   ArrowLeft, Eye, EyeOff, Sun, Moon, Users,
   Handshake, Wallet, Building2, Trophy, Globe2,
@@ -138,16 +139,9 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
         top:0,
         height:"100vh",
       }}>
-        <button onClick={onBack} title="Voltar ao portal"
-          style={{
-            width:40, height:40, borderRadius:8, border:"none", cursor:"pointer",
-            background:"#1A1A1A", color:"#fff",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            marginBottom:12, gap:1,
-            fontFamily: FONT.display, fontWeight:700, fontSize:13, letterSpacing:"0.02em",
-          }}>
-          LM<span style={{width:6, height:6, borderRadius:"50%", background:"#65B32E", display:"inline-block", marginLeft:1}}/>
-        </button>
+        <div style={{ marginBottom: 12 }}>
+          <LivemodeLogo size={40} onClick={onBack} title="Voltar ao portal"/>
+        </div>
 
         <div style={{ width:32, height:1, background:"rgba(255,255,255,0.06)", marginBottom:8 }}/>
 

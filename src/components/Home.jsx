@@ -101,12 +101,14 @@ function ChampCard({ camp, onEnter, onDelete }) {
   const cfg = getChampionshipConfig(camp.id, camp);
   return (
     <div className="lm-card-hover" style={{
-      background: cfg.bgGradient,
-      backgroundColor: cfg.bgColor,
+      background: cfg.bgColor,
       borderRadius: RADIUS.lg,
+      borderTop: `2px solid ${cfg.accentColor}`,
       padding: 22,
       cursor: "pointer",
-      border: "1px solid rgba(255,255,255,0.06)",
+      border: `1px solid rgba(255,255,255,0.06)`,
+      borderTopColor: cfg.accentColor,
+      borderTopWidth: 2,
       position: "relative",
       overflow: "hidden",
       minHeight: 240,

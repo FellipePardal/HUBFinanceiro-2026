@@ -127,62 +127,62 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
       gap: 18,
       boxShadow: T.shadow || "0 1px 3px rgba(0,0,0,0.06)",
     }} onClick={() => onEnter(camp.id.startsWith("custom-") ? `custom:${camp.id}` : camp.id)}>
-      {/* Cabeçalho: logo + nome + badge */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12 }}>
-        <div style={{ display:"flex", alignItems:"center", gap: 14, minWidth: 0 }}>
-          {ents?.organizador
-            ? <EntityLogo entityId={ents.organizador} size={48} T={T}/>
-            : <ChampionshipLogo championshipId={camp.id} size={48} config={camp}/>}
-          <div style={{ minWidth: 0 }}>
-            <h4 style={{
-              margin: "0 0 2px",
-              fontFamily: FONT.display,
-              fontSize: 22,
-              fontWeight: 700,
-              color: T.text,
-              letterSpacing: "-0.005em",
-              lineHeight: 1.1,
-            }}>{camp.nome}</h4>
-            <p style={{
-              margin: 0,
-              fontSize: 11,
-              color: T.textSm,
-              fontFamily: FONT.ui,
-            }}>
-              {ents?.organizador && <>{getEntity(ents.organizador).name} · </>}
-              {camp.edicao} · Temporada
-            </p>
-          </div>
+      {/* Cabeçalho: logo + nome (linha cheia) */}
+      <div style={{ display:"flex", alignItems:"center", gap: 14, minWidth: 0 }}>
+        {ents?.organizador
+          ? <EntityLogo entityId={ents.organizador} size={48} T={T}/>
+          : <ChampionshipLogo championshipId={camp.id} size={48} config={camp}/>}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h4 style={{
+            margin: "0 0 2px",
+            fontFamily: FONT.display,
+            fontSize: 22,
+            fontWeight: 700,
+            color: T.text,
+            letterSpacing: "-0.005em",
+            lineHeight: 1.1,
+          }}>{camp.nome}</h4>
+          <p style={{
+            margin: 0,
+            fontSize: 11,
+            color: T.textSm,
+            fontFamily: FONT.ui,
+          }}>
+            {ents?.organizador && <>{getEntity(ents.organizador).name} · </>}
+            {camp.edicao} · Temporada
+          </p>
         </div>
-
-        {/* Badge "Em andamento" com ponto pulsante */}
-        <span style={{
-          background: "rgba(101,179,46,0.10)",
-          border: "1px solid rgba(101,179,46,0.30)",
-          color: T.brand || "#65B32E",
-          borderRadius: RADIUS.pill,
-          padding: "0 10px",
-          height: 22,
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontFamily: FONT.ui,
-        }}>
-          <span className="live-dot" style={{
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: "#65B32E",
-            display: "inline-block",
-          }}/>
-          {camp.status}
-        </span>
       </div>
+
+      {/* Badge "Em andamento" — linha própria, abaixo do nome */}
+      <span style={{
+        background: "rgba(101,179,46,0.10)",
+        border: "1px solid rgba(101,179,46,0.30)",
+        color: T.brand || "#65B32E",
+        borderRadius: RADIUS.pill,
+        padding: "0 10px",
+        height: 22,
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignSelf: "flex-start",
+        alignItems: "center",
+        gap: 6,
+        marginTop: -8,
+        fontFamily: FONT.ui,
+      }}>
+        <span className="live-dot" style={{
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: "#65B32E",
+          display: "inline-block",
+        }}/>
+        {camp.status}
+      </span>
 
       {/* Stats grid */}
       <div style={{

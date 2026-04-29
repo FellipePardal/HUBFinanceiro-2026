@@ -130,7 +130,9 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
       {/* Cabeçalho: logo + nome + badge */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12 }}>
         <div style={{ display:"flex", alignItems:"center", gap: 14, minWidth: 0 }}>
-          <ChampionshipLogo championshipId={camp.id} size={48} config={camp}/>
+          {ents?.organizador
+            ? <EntityLogo entityId={ents.organizador} size={48} T={T}/>
+            : <ChampionshipLogo championshipId={camp.id} size={48} config={camp}/>}
           <div style={{ minWidth: 0 }}>
             <h4 style={{
               margin: "0 0 2px",
@@ -146,17 +148,8 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
               fontSize: 11,
               color: T.textSm,
               fontFamily: FONT.ui,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
             }}>
-              {ents?.organizador && (
-                <>
-                  <EntityLogo entityId={ents.organizador} size={14} T={T}/>
-                  <span>{getEntity(ents.organizador).name}</span>
-                  <span style={{ opacity: 0.4 }}>·</span>
-                </>
-              )}
+              {ents?.organizador && <>{getEntity(ents.organizador).name} · </>}
               {camp.edicao} · Temporada
             </p>
           </div>

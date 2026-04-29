@@ -23,8 +23,8 @@ export default function EntityLogo({ entityId, size = 24, title, showName = fals
       height={size}
       style={{
         objectFit: "contain",
-        borderRadius: 4,
         flexShrink: 0,
+        background: "transparent",
       }}
       onError={() => setImgError(true)}
     />
@@ -73,25 +73,22 @@ export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T, overlap
           className="entity-stack-item"
           style={{
             marginLeft: i === 0 ? 0 : -overlap,
-            background: T?.surface || "#fff",
-            padding: 2,
-            borderRadius: 6,
-            border: `1px solid ${T?.border || "rgba(0,0,0,0.08)"}`,
             display: "inline-flex",
             position: "relative",
             zIndex: i + 1,
-            transition: "transform var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), z-index 0ms",
+            transition: "transform var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), filter var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), z-index 0ms",
             cursor: "default",
+            filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.18))",
           }}
           onMouseEnter={e => {
             e.currentTarget.style.zIndex = 99;
-            e.currentTarget.style.transform = "translateY(-2px) scale(1.18)";
-            e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.18)";
+            e.currentTarget.style.transform = "translateY(-3px) scale(1.22)";
+            e.currentTarget.style.filter = "drop-shadow(0 8px 14px rgba(0,0,0,0.28))";
           }}
           onMouseLeave={e => {
             e.currentTarget.style.zIndex = i + 1;
             e.currentTarget.style.transform = "";
-            e.currentTarget.style.boxShadow = "";
+            e.currentTarget.style.filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.18))";
           }}
         >
           <EntityLogo entityId={id} size={size} T={T}/>
@@ -100,12 +97,10 @@ export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T, overlap
       {rest > 0 && (
         <span style={{
           marginLeft: -overlap,
-          width: size + 4,
-          height: size + 4,
-          borderRadius: 6,
-          background: T?.surfaceAlt || "#F8F9FA",
+          width: size,
+          height: size,
+          borderRadius: 4,
           color: T?.textMd || "#6B7280",
-          border: `1px solid ${T?.border || "rgba(0,0,0,0.08)"}`,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",

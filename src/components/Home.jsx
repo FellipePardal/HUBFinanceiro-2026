@@ -22,7 +22,7 @@ function CampStats({ camp, T }) {
         <div>
           <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 6px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600, fontFamily: FONT.ui }}>Detentores</p>
           {ents?.detentores?.length ? (
-            <EntityLogoStack entityIds={ents.detentores} size={22} T={T}/>
+            <EntityLogoStack entityIds={ents.detentores} size={28} overlap={10} T={T}/>
           ) : (
             <p style={{ color: T.text, fontSize: 12, margin: 0, fontFamily: FONT.ui }}>—</p>
           )}

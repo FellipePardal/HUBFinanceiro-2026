@@ -61,28 +61,48 @@ export default function EntityLogo({ entityId, size = 24, title, showName = fals
 }
 
 // Lista horizontal de logos sobrepostos (avatar stack) — útil para "detentores".
-export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T }) {
+// Hover: o item passa pra frente (z-index), cresce levemente e ganha sombra.
+export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T, overlap = 8 }) {
   const visible = entityIds.slice(0, max);
   const rest = entityIds.length - visible.length;
   return (
     <span style={{ display: "inline-flex", alignItems: "center" }}>
       {visible.map((id, i) => (
-        <span key={id} style={{
-          marginLeft: i === 0 ? 0 : -6,
-          background: T?.surface || "#fff",
-          padding: 1,
-          borderRadius: 5,
-          display: "inline-flex",
-        }}>
+        <span
+          key={id}
+          className="entity-stack-item"
+          style={{
+            marginLeft: i === 0 ? 0 : -overlap,
+            background: T?.surface || "#fff",
+            padding: 2,
+            borderRadius: 6,
+            border: `1px solid ${T?.border || "rgba(0,0,0,0.08)"}`,
+            display: "inline-flex",
+            position: "relative",
+            zIndex: i + 1,
+            transition: "transform var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow var(--duration-base, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), z-index 0ms",
+            cursor: "default",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.zIndex = 99;
+            e.currentTarget.style.transform = "translateY(-2px) scale(1.18)";
+            e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.18)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.zIndex = i + 1;
+            e.currentTarget.style.transform = "";
+            e.currentTarget.style.boxShadow = "";
+          }}
+        >
           <EntityLogo entityId={id} size={size} T={T}/>
         </span>
       ))}
       {rest > 0 && (
         <span style={{
-          marginLeft: -6,
-          width: size,
-          height: size,
-          borderRadius: 4,
+          marginLeft: -overlap,
+          width: size + 4,
+          height: size + 4,
+          borderRadius: 6,
           background: T?.surfaceAlt || "#F8F9FA",
           color: T?.textMd || "#6B7280",
           border: `1px solid ${T?.border || "rgba(0,0,0,0.08)"}`,
@@ -93,6 +113,8 @@ export function EntityLogoStack({ entityIds = [], size = 24, max = 4, T }) {
           fontSize: 10,
           fontWeight: 600,
           flexShrink: 0,
+          position: "relative",
+          zIndex: visible.length + 1,
         }}>+{rest}</span>
       )}
     </span>

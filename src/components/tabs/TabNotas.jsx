@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, extractNF, diffNF } from "../../lib/supabase";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
 
@@ -487,36 +487,13 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 }
 
 // ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
-function RecebidasTab({ notas, addNota, jogos, fornecedores = [], T }) {
+function RecebidasTab({ notas, addNota, jogos, T }) {
   const [submissions, setSubmissions] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editServicos, setEditServicos] = useState({});
   const [viewTab, setViewTab] = useState("pendentes"); // "pendentes" | "historico"
-  const [extracting, setExtracting] = useState({}); // { subId: true }
-  const [extractError, setExtractError] = useState({}); // { subId: msg }
-
-  const fornecedoresMap = useMemo(() => {
-    const m = {};
-    fornecedores.forEach(f => { m[f.apelido] = f; });
-    return m;
-  }, [fornecedores]);
-
-  const conferirNF = async (sub) => {
-    setExtractError(prev => ({ ...prev, [sub.id]: null }));
-    setExtracting(prev => ({ ...prev, [sub.id]: true }));
-    try {
-      const extracted = await extractNF(sub.id);
-      const next = submissions.map(s => s.id === sub.id ? { ...s, extracted, conferidoEm: new Date().toISOString() } : s);
-      setSubmissions(next);
-      await setSupabaseState('nf_submissions', next);
-    } catch (e) {
-      setExtractError(prev => ({ ...prev, [sub.id]: String(e?.message || e) }));
-    } finally {
-      setExtracting(prev => ({ ...prev, [sub.id]: false }));
-    }
-  };
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
 
@@ -681,57 +658,7 @@ function RecebidasTab({ notas, addNota, jogos, fornecedores = [], T }) {
               {sub.hasFile && <Pill label="Arquivo anexo" color="#22c55e"/>}
               <span style={{color:T.textSm}}>Enviado: {new Date(sub.enviadoEm).toLocaleDateString("pt-BR")}</span>
             </div>
-
-            {/* Painel de conferência automática */}
-            {sub.extracted && (() => {
-              const diffs = diffNF(sub, sub.extracted, fornecedoresMap);
-              const hasFail = diffs.some(d => d.status === 'fail');
-              const allOk = diffs.length > 0 && diffs.every(d => d.status === 'ok');
-              const headerColor = hasFail ? '#ef4444' : (allOk ? '#22c55e' : '#f59e0b');
-              const headerLabel = hasFail ? 'Divergências encontradas' : (allOk ? 'Tudo confere' : 'Conferência parcial');
-              return (
-                <div style={{background:T.bg,border:`1px solid ${headerColor}55`,borderRadius:10,padding:"12px 14px",marginBottom:12}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <span style={{fontSize:12,fontWeight:700,color:headerColor}}>🤖 {headerLabel}</span>
-                    {sub.extracted.confianca && <span style={{fontSize:10,color:T.textSm}}>Confiança: {sub.extracted.confianca}</span>}
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"110px 1fr 1fr 24px",gap:"4px 12px",fontSize:11}}>
-                    <span style={{color:T.textSm,fontWeight:600}}></span>
-                    <span style={{color:T.textSm,fontWeight:600}}>Digitado</span>
-                    <span style={{color:T.textSm,fontWeight:600}}>Na NF</span>
-                    <span/>
-                    {diffs.map(d => {
-                      const ic = d.status === 'ok' ? '✅' : d.status === 'fail' ? '❌' : '⚠️';
-                      const fmtVal = (v) => d.campo === 'valor_total' ? fmt(v) : (v || '—');
-                      return (
-                        <React.Fragment key={d.campo}>
-                          <span style={{color:T.textMd,fontWeight:600}}>{d.label}</span>
-                          <span style={{color:T.text}}>{fmtVal(d.digitado)}</span>
-                          <span style={{color:d.status==='fail'?'#ef4444':T.text}}>{fmtVal(d.extraido)}</span>
-                          <span>{ic}</span>
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-                  {sub.extracted.observacoes && (
-                    <p style={{margin:"8px 0 0",fontSize:11,color:T.textSm,fontStyle:"italic"}}>{sub.extracted.observacoes}</p>
-                  )}
-                </div>
-              );
-            })()}
-            {extractError[sub.id] && (
-              <div style={{background:"#7f1d1d33",border:"1px solid #ef444455",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#fca5a5"}}>
-                Erro na extração: {extractError[sub.id]}
-              </div>
-            )}
-
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {sub.hasFile && (
-                <button onClick={() => conferirNF(sub)} disabled={extracting[sub.id]}
-                  style={{...btnStyle,background:extracting[sub.id]?"#475569":"#8b5cf6",padding:"6px 20px",fontSize:12,opacity:extracting[sub.id]?0.6:1}}>
-                  {extracting[sub.id] ? "Lendo NF..." : (sub.extracted ? "Reconferir" : "🤖 Conferir NF")}
-                </button>
-              )}
+            <div style={{display:"flex",gap:8}}>
               {!isEditing && <button onClick={() => startEdit(sub)} style={{...btnStyle,background:"#3b82f6",padding:"6px 20px",fontSize:12}}>Editar</button>}
               {isEditing && <button onClick={() => setEditingId(null)} style={{...btnStyle,background:"#475569",padding:"6px 20px",fontSize:12}}>Cancelar</button>}
               <button onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12}}>Aprovar</button>
@@ -1287,7 +1214,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
       {/* ── RECEBIDAS (do formulário externo) ── */}
       {tab === "recebidas" && (
-        <RecebidasTab notas={notas} addNota={addNota} jogos={jogos} fornecedores={fornecedores} T={T}/>
+        <RecebidasTab notas={notas} addNota={addNota} jogos={jogos} T={T}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}

@@ -287,9 +287,16 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     .sort((a,b) => ordemFase(a.fase) - ordemFase(b.fase) || a.rodada - b.rodada || a.id - b.id);
   const aDivulgar  = jogos.filter(j => j.mandante === "A definir");
 
-  // Projetado: provisionado + (jogos a divulgar × média de orçado dos divulgados)
-  const mediaOrc = divulgados.length ? divulgados.reduce((s,j)=>s+subTotal(j.orcado),0) / divulgados.length : 0;
-  const totalProjetado = totalProv + aDivulgar.length * mediaOrc;
+  // Projetado: por jogo, usa provisionado quando > 0; senão o orçado.
+  // Idem para cada item de serviço fixo. Migra de orçado p/ provisionado
+  // conforme o operador trava cada item.
+  const projetadoJogos = jogosCalc.reduce((s, j) => {
+    const prov = subTotal(j.provisionado);
+    return s + (prov > 0 ? prov : subTotal(j.orcado));
+  }, 0);
+  const projetadoServicos = servicosCalc.reduce((s, sec) =>
+    s + sec.itens.reduce((u, i) => u + ((i.provisionado || 0) > 0 ? i.provisionado : (i.orcado || 0)), 0), 0);
+  const totalProjetado = projetadoJogos + projetadoServicos;
 
   // Reaproveita TabSavings com mapeamento fase→rodada compósita.
   // Pontos corridos: usa rodada direto (1..N). Mata-mata: ordemFase*100+rodada.
@@ -465,7 +472,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
             <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}       sub="Jogos + serviços fixos" color={PRIMARY} icon={Wallet}/>
             <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}      sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info} icon={PiggyBank}/>
             <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}      sub={`${pctGasto}% executado`} color={T.warning} icon={TrendingUp}/>
-            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub={`Provisionado + ${aDivulgar.length} a divulgar`} color="#a855f7" icon={Target}/>
+            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub="Provisionado quando há, senão orçado" color="#a855f7" icon={Target}/>
           </div>
           <Card T={T}>
             <SectionHeader T={T} title="Resumo por Categoria" subtitle="Visão consolidada por natureza de despesa" icon={LayoutDashboard}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { CATS, TIPO_COLOR, RADIUS, PAULISTAO_CENARIO_INFO, FASES_PAULISTAO } from "../constants";
+import { CATS, TIPO_COLOR, RADIUS, FASES_PAULISTAO } from "../constants";
 import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./ui";
@@ -308,9 +308,17 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
     .sort((a,b) => ordemFase(a.fase) - ordemFase(b.fase) || a.rodada - b.rodada || a.id - b.id);
   const aDivulgar  = jogos.filter(j => j.mandante === "A definir");
 
-  // Projetado: provisionado + (jogos a divulgar × cenário base)
-  const cenarioBase = PAULISTAO_CENARIO_INFO.paulistao.total;
-  const totalProjetado = totalProv + aDivulgar.length * cenarioBase;
+  // Projetado: por jogo, usa provisionado quando > 0; senão usa o orçado.
+  // O mesmo vale para cada item de serviço fixo. É a melhor estimativa de
+  // gasto total ao longo do campeonato — vai migrando de orçado para
+  // provisionado conforme o operador trava cada item.
+  const projetadoJogos = jogosCalc.reduce((s, j) => {
+    const prov = subTotal(j.provisionado);
+    return s + (prov > 0 ? prov : subTotal(j.orcado));
+  }, 0);
+  const projetadoServicos = servicosCalc.reduce((s, sec) =>
+    s + sec.itens.reduce((u, i) => u + ((i.provisionado || 0) > 0 ? i.provisionado : (i.orcado || 0)), 0), 0);
+  const totalProjetado = projetadoJogos + projetadoServicos;
 
   // Para reaproveitar TabSavings (que opera por rodada numérica), mapeamos fase→rodada compósita: ordem*100 + rodada
   const jogosParaSavings = useMemo(() => divulgados.map(j => ({
@@ -506,7 +514,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
             <Stat T={T} label="Total Orçado"       value={fmt(totalOrc)}       sub="Jogos + serviços fixos" color="#ec4899" icon={Wallet}/>
             <Stat T={T} label="Total Provisionado" value={fmt(totalProv)}      sub={`${totalOrc?((totalProv/totalOrc)*100).toFixed(1):0}% do orçado`} color={T.info} icon={PiggyBank}/>
             <Stat T={T} label="Total Realizado"    value={fmt(totalReal)}      sub={`${pctGasto}% executado`} color={T.warning} icon={TrendingUp}/>
-            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub={`Provisionado + ${aDivulgar.length} jogos a divulgar`} color="#a855f7" icon={Target}/>
+            <Stat T={T} label="Projetado"          value={fmt(totalProjetado)} sub="Provisionado quando há, senão orçado" color="#a855f7" icon={Target}/>
           </div>
           <Card T={T}>
             <SectionHeader

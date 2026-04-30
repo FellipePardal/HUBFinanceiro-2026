@@ -437,7 +437,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
                   fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase",
                   margin:"0 0 3px", fontWeight:600, fontFamily: FONT.ui,
                 }}>Livemode · Transmissões · {setorAtual?.l}</p>
-                <h1 style={{ fontFamily: FONT.display, fontSize:22, fontWeight:700, margin:0, color:T.text, letterSpacing:"-0.005em", lineHeight:1.1 }}>Paulistão Feminino 2026</h1>
+                <h1 style={{ fontFamily: FONT.display, fontSize:22, fontWeight:700, margin:0, color:T.text, letterSpacing:"-0.005em", lineHeight:1.1 }}>Paulistão F 2026</h1>
                 <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
                   <span className="num" style={{ color:T.text, fontWeight:600 }}>{divulgados.length}</span> divulgados
                   <span style={{ color:T.border, margin:"0 8px" }}>·</span>

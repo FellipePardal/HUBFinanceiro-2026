@@ -23,7 +23,7 @@ const dialogStyle = (T, max=480) => ({
   boxShadow:T.shadow||"0 20px 40px rgba(0,0,0,0.4)",
 });
 
-export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES_PAULISTAO, titulo = "Paulistão Feminino" }) {
+export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES_PAULISTAO, titulo = "Paulistão F" }) {
   const faseInicial = fases?.[0]?.key || "grupos";
   const [form, setForm] = useState(jogo ? {
     mandante:  jogo.mandante,

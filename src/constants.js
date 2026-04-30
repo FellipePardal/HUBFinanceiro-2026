@@ -119,7 +119,7 @@ export const CAMPEONATOS = [
   },
   {
     id:"paulistao-feminino-2026",
-    nome:"Paulistão Feminino",
+    nome:"Paulistão F",
     edicao:"2026",
     status:"Em andamento",
     statusColor:"#65B32E",
@@ -141,7 +141,7 @@ export const FASES_PAULISTAO = [
 ];
 
 export const PAULISTAO_CENARIO_INFO = {
-  paulistao: { label:"Paulistão Feminino", color:"#7C3AED", total:80000, cat:"PAU", regiao:"sudeste" },
+  paulistao: { label:"Paulistão F", color:"#7C3AED", total:80000, cat:"PAU", regiao:"sudeste" },
 };
 
 // ─── APRESENTAÇÕES ────────────────────────────────────────────────────────────

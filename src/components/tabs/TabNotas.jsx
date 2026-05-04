@@ -823,7 +823,8 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], fornecedoresJogo = {}, setFornecedoresJogo, T }) {
   const { portal } = usePortalLink('brasileirao');
 
-  // Auto-preenche fornecedoresJogo a partir do Portal (apenas slots vazios; nunca sobrescreve valores manuais)
+  // Sincroniza fornecedoresJogo com o Portal (matriz). Se Portal tem valor, sobrescreve;
+  // se Portal não tem valor para aquele slot, preserva o que houver (override manual permanece).
   useEffect(() => {
     if (!portal || !setFornecedoresJogo) return;
     const updates = {};
@@ -832,11 +833,11 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       CATS.forEach(cat => {
         cat.subs.forEach(sub => {
           const key = `${jogo.id}_${sub.key}`;
-          if (fornecedoresJogo[key]) return; // já tem valor — preserva
           const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
-          if (opers.length > 0) {
-            // Pega o primeiro nome operacional; se houver mais, junta com vírgula
-            updates[key] = opers.join(' / ');
+          if (opers.length === 0) return; // Portal não cobre → não toca
+          const portalValor = opers.join(' / ');
+          if (fornecedoresJogo[key] !== portalValor) {
+            updates[key] = portalValor;
             changed = true;
           }
         });

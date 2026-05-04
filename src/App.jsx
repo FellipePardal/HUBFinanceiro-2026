@@ -47,8 +47,17 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
   useEffect(() => {
     async function load() {
       const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
-      if (j) setJogosRaw(j); else setSupabaseState('jogos', ALL_JOGOS);
-      if (s) {
+      // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
+      // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
+      // dados existentes — assim um getState com falha transitória/null não zera
+      // notas, notas_mensais, fornecedores etc. (incidente 2026-05-01).
+      const seedIfMissing = (val, key, init, setRaw) => {
+        if (val != null) { setRaw(val); return; }
+        setRaw(init);
+        setSupabaseState(key, init);
+      };
+      seedIfMissing(j, 'jogos', ALL_JOGOS, setJogosRaw);
+      if (s != null) {
         // Migração: renomear "Infraestrutura e Distribuição de Sinais" -> "Serviços Complementares"
         const OLD = "Infraestrutura e Distribuição de Sinais";
         const NEW = "Serviços Complementares";
@@ -60,17 +69,17 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode }) {
         } else {
           setServicosRaw(s);
         }
-      } else setSupabaseState('servicos', SERVICOS_INIT);
-      if (n) setNotasRaw(n); else setSupabaseState('notas', []);
-      if (f) setFornecedoresRaw(f); else setSupabaseState('fornecedores', FORNECEDORES_INIT);
-      if (nm) setNotasMensaisRaw(nm); else setSupabaseState('notas_mensais', []);
-      if (ev) setEnviosRaw(ev); else setSupabaseState('envios', []);
-      if (lm) setLivemodeRaw(lm); else setSupabaseState('livemode', []);
-      if (nlm) setNotasLivemodeRaw(nlm); else setSupabaseState('notas_livemode', []);
-      if (co) setCotacoesRaw(co); else setSupabaseState('cotacoes', COTACAO_INIT);
-      if (fj) setFornecedoresJogoRaw(fj); else setSupabaseState('fornecedores_jogo', {});
-      if (lg) setLogisticaRaw(lg); else setSupabaseState('logistica', []);
-      if (elg) setEventosLogRaw(elg); else setSupabaseState('eventos_log', []);
+      } else { setServicosRaw(SERVICOS_INIT); setSupabaseState('servicos', SERVICOS_INIT); }
+      seedIfMissing(n,   'notas',             [],                  setNotasRaw);
+      seedIfMissing(f,   'fornecedores',      FORNECEDORES_INIT,   setFornecedoresRaw);
+      seedIfMissing(nm,  'notas_mensais',     [],                  setNotasMensaisRaw);
+      seedIfMissing(ev,  'envios',            [],                  setEnviosRaw);
+      seedIfMissing(lm,  'livemode',          [],                  setLivemodeRaw);
+      seedIfMissing(nlm, 'notas_livemode',    [],                  setNotasLivemodeRaw);
+      seedIfMissing(co,  'cotacoes',          COTACAO_INIT,        setCotacoesRaw);
+      seedIfMissing(fj,  'fornecedores_jogo', {},                  setFornecedoresJogoRaw);
+      seedIfMissing(lg,  'logistica',         [],                  setLogisticaRaw);
+      seedIfMissing(elg, 'eventos_log',       [],                  setEventosLogRaw);
       setLoading(false);
     }
     load();

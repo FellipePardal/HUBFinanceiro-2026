@@ -72,18 +72,26 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
       ]);
-      if (j) setJogosRaw(j);          else setSupabaseState(K.jogos, initialJogos);
-      if (s) setServicosRaw(s);       else setSupabaseState(K.servicos, initialServicos);
-      if (n) setNotasRaw(n);          else setSupabaseState(K.notas, []);
-      if (f) setFornecedoresRaw(f);   else setSupabaseState(K.fornecedores, FORNECEDORES_INIT);
-      if (nm) setNotasMensaisRaw(nm); else setSupabaseState(K.notas_mensais, []);
-      if (ev) setEnviosRaw(ev);       else setSupabaseState(K.envios, []);
-      if (lm) setLivemodeRaw(lm);     else setSupabaseState(K.livemode, []);
-      if (nlm) setNotasLivemodeRaw(nlm); else setSupabaseState(K.notas_livemode, []);
-      if (co) setCotacoesRaw(co);     else setSupabaseState(K.cotacoes, COTACAO_INIT);
-      if (fj) setFornecedoresJogoRaw(fj); else setSupabaseState(K.fornecedores_jogo, {});
-      if (lg) setLogisticaRaw(lg);    else setSupabaseState(K.logistica, []);
-      if (elg) setEventosLogRaw(elg); else setSupabaseState(K.eventos_log, []);
+      // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
+      // Nunca sobrescreve dados — getState com falha transitória não pode zerar
+      // notas/fornecedores etc. (incidente 2026-05-01).
+      const seedIfMissing = (val, key, init, setRaw) => {
+        if (val != null) { setRaw(val); return; }
+        setRaw(init);
+        setSupabaseState(key, init);
+      };
+      seedIfMissing(j,   K.jogos,             initialJogos,        setJogosRaw);
+      seedIfMissing(s,   K.servicos,          initialServicos,     setServicosRaw);
+      seedIfMissing(n,   K.notas,             [],                  setNotasRaw);
+      seedIfMissing(f,   K.fornecedores,      FORNECEDORES_INIT,   setFornecedoresRaw);
+      seedIfMissing(nm,  K.notas_mensais,     [],                  setNotasMensaisRaw);
+      seedIfMissing(ev,  K.envios,            [],                  setEnviosRaw);
+      seedIfMissing(lm,  K.livemode,          [],                  setLivemodeRaw);
+      seedIfMissing(nlm, K.notas_livemode,    [],                  setNotasLivemodeRaw);
+      seedIfMissing(co,  K.cotacoes,          COTACAO_INIT,        setCotacoesRaw);
+      seedIfMissing(fj,  K.fornecedores_jogo, {},                  setFornecedoresJogoRaw);
+      seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
+      seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
       setLoading(false);
     }
     load();

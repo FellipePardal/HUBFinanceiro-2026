@@ -64,7 +64,15 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
       ]);
-      if (j) {
+      // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
+      // Nunca sobrescreve dados — getState com falha transitória não pode zerar
+      // notas/fornecedores etc. (incidente 2026-05-01).
+      const seedIfMissing = (val, key, init, setRaw) => {
+        if (val != null) { setRaw(val); return; }
+        setRaw(init);
+        setSupabaseState(key, init);
+      };
+      if (j != null) {
         // Migrações idempotentes do seed:
         //   v1: todos placeholders ("A definir") → carrega tabela oficial.
         //   v2: jogos sem codigo_orcamento → substitui pelo seed com orçado por bloco.
@@ -79,10 +87,10 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
         } else {
           setJogosRaw(j);
         }
-      } else setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
+      } else { setJogosRaw(PAULISTAO_JOGOS_INIT); setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT); }
       // Serviços fixos: migra seed antigo (sem "Festa de Encerramento" e sem orçado)
       // para o orçamento aprovado v4 (R$ 238k). Não mexe se o operador já customizou.
-      if (s) {
+      if (s != null) {
         const temFesta  = Array.isArray(s) && s.some(sec => Array.isArray(sec.itens) && sec.itens.some(i => /festa de encerramento/i.test(i.nome||"")));
         const totalOrc  = Array.isArray(s) ? s.reduce((t,sec)=>t+(sec.itens||[]).reduce((u,i)=>u+(i.orcado||0),0),0) : 0;
         if (!temFesta && totalOrc === 0) {
@@ -91,17 +99,17 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode 
         } else {
           setServicosRaw(s);
         }
-      } else setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
-      if (n) setNotasRaw(n);          else setSupabaseState(K.notas, []);
-      if (f) setFornecedoresRaw(f);   else setSupabaseState(K.fornecedores, FORNECEDORES_INIT);
-      if (nm) setNotasMensaisRaw(nm); else setSupabaseState(K.notas_mensais, []);
-      if (ev) setEnviosRaw(ev);       else setSupabaseState(K.envios, []);
-      if (lm) setLivemodeRaw(lm);     else setSupabaseState(K.livemode, []);
-      if (nlm) setNotasLivemodeRaw(nlm); else setSupabaseState(K.notas_livemode, []);
-      if (co) setCotacoesRaw(co);     else setSupabaseState(K.cotacoes, COTACAO_INIT);
-      if (fj) setFornecedoresJogoRaw(fj); else setSupabaseState(K.fornecedores_jogo, {});
-      if (lg) setLogisticaRaw(lg);    else setSupabaseState(K.logistica, []);
-      if (elg) setEventosLogRaw(elg); else setSupabaseState(K.eventos_log, []);
+      } else { setServicosRaw(PAULISTAO_SERVICOS_INIT); setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT); }
+      seedIfMissing(n,   K.notas,             [],                  setNotasRaw);
+      seedIfMissing(f,   K.fornecedores,      FORNECEDORES_INIT,   setFornecedoresRaw);
+      seedIfMissing(nm,  K.notas_mensais,     [],                  setNotasMensaisRaw);
+      seedIfMissing(ev,  K.envios,            [],                  setEnviosRaw);
+      seedIfMissing(lm,  K.livemode,          [],                  setLivemodeRaw);
+      seedIfMissing(nlm, K.notas_livemode,    [],                  setNotasLivemodeRaw);
+      seedIfMissing(co,  K.cotacoes,          COTACAO_INIT,        setCotacoesRaw);
+      seedIfMissing(fj,  K.fornecedores_jogo, {},                  setFornecedoresJogoRaw);
+      seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
+      seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
       setLoading(false);
     }
     load();

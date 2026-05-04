@@ -14,10 +14,10 @@ export const SUBKEY_TO_PORTAL = {
   vmix:        { source: 'controle', cols: ['op_vmix'] },
   audio:       { source: 'controle', cols: ['op_audio'] },
 
-  // Operações — UM (1 só coluna no Portal cobre b1/b2/b3)
-  um_b1:       { source: 'controle', cols: ['um'] },
-  um_b2:       { source: 'controle', cols: ['um'] },
-  um_b3:       { source: 'controle', cols: ['um'] },
+  // Operações — UM (Portal tem 1 coluna 'um'; padrão do jogo decide qual subKey usar)
+  um_b1:       { source: 'controle', cols: ['um'], padrao: 'B1' },
+  um_b2:       { source: 'controle', cols: ['um'], padrao: 'B2' },
+  um_b3:       { source: 'controle', cols: ['um'], padrao: 'B3' },
 
   geradores:   { source: 'controle', cols: ['gerador'] },
 
@@ -136,6 +136,7 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
   if (cfg.source === 'controle') {
     const row = portal.controle.get(id);
     if (!row) return [];
+    if (cfg.padrao && String(row.padrao || '').toUpperCase() !== cfg.padrao.toUpperCase()) return [];
     const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
     return [...new Set(nomes)].filter(emiteNF);
   }

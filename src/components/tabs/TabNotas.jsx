@@ -9,6 +9,14 @@ import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-re
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
 
+// Append-only em nf_historico — toda criação/exclusão de NF deixa rastro
+// (independente da origem: formulário público, "Registrar NF" ou "NF Avulsa").
+// Permite reconstruir o array de notas se ele for zerado por bug ou ação manual.
+async function pushHistorico(entry) {
+  const atual = (await getState('nf_historico')) || [];
+  await setSupabaseState('nf_historico', [...atual, entry]);
+}
+
 function FornecedorInput({ value, onChange, fornecedores, T }) {
   const IS = iSty(T);
   const [open, setOpen] = useState(false);
@@ -840,14 +848,27 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
   const addNota = nota => {
     setNotas(ns => [...ns, nota]);
+    // Histórico append-only: registra a criação. RecebidasTab já grava
+    // "aprovada" para NFs vindas do formulário; aqui usamos "registrada"
+    // para diferenciar criações via "Registrar NF" e "NF Avulsa".
+    const jaTemDecisao = nota.decisao === "aprovada" || nota.decisao === "rejeitada";
+    if (!jaTemDecisao) {
+      pushHistorico({
+        ...nota,
+        decisao: nota.tipo === "avulsa" ? "avulsa" : "registrada",
+        decidoEm: new Date().toISOString(),
+      });
+    }
     setShowRegistrar(null);
     setShowAvulsa(false);
   };
 
   const deleteNota = id => {
     if (window.confirm("Excluir esta NF?")) {
+      const nota = notas.find(n => n.id === id);
       deleteNFFile(id);
       setNotas(ns => ns.filter(n => n.id !== id));
+      if (nota) pushHistorico({ ...nota, decisao: "excluida", excluidoEm: new Date().toISOString() });
     }
   };
 
@@ -855,7 +876,11 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     const nfsRodada = notas.filter(n => n.rodada === rodada);
     if (nfsRodada.length === 0) return;
     if (!window.confirm(`Apagar todas as ${nfsRodada.length} NFs da rodada ${rodada}? Os arquivos também serão removidos.`)) return;
-    nfsRodada.forEach(n => deleteNFFile(n.id));
+    const agora = new Date().toISOString();
+    nfsRodada.forEach(n => {
+      deleteNFFile(n.id);
+      pushHistorico({ ...n, decisao: "excluida", excluidoEm: agora, motivo: `limpar_rodada_${rodada}` });
+    });
     setNotas(ns => ns.filter(n => n.rodada !== rodada));
   };
 

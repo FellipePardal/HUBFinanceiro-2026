@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt } from "../../utils";
 import { btnStyle, iSty, RADIUS } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText } from "lucide-react";
 
@@ -257,12 +257,25 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
   const totalValor = filtered.reduce((s, n) => s + (n.valor || 0), 0);
   const totalGeral = notas.reduce((s, n) => s + (n.valor || 0), 0);
 
-  const addNota = n => { setNotas(ns => [...ns, n]); setShowNova(false); };
+  // Histórico append-only para notas mensais (espelha o de TabNotas).
+  // Permite recuperar a lista se for zerada por bug ou ação manual.
+  const pushHistoricoMensal = async (entry) => {
+    const atual = (await getState('nf_historico_mensal')) || [];
+    await setSupabaseState('nf_historico_mensal', [...atual, entry]);
+  };
+
+  const addNota = n => {
+    setNotas(ns => [...ns, n]);
+    pushHistoricoMensal({ ...n, decisao: "registrada", decidoEm: new Date().toISOString() });
+    setShowNova(false);
+  };
 
   const deleteNota = id => {
     if (window.confirm("Excluir esta nota?")) {
+      const nota = notas.find(n => n.id === id);
       deleteNFFile(id);
       setNotas(ns => ns.filter(n => n.id !== id));
+      if (nota) pushHistoricoMensal({ ...nota, decisao: "excluida", excluidoEm: new Date().toISOString() });
     }
   };
 

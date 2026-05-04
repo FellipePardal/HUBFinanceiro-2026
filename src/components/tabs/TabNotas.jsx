@@ -3,6 +3,8 @@ import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
+import { usePortalLink } from "../../hooks/usePortalLink";
+import { getOperacionaisPorSubKey, findFornecedorTolerante } from "../../lib/portalLink";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
 
@@ -135,7 +137,11 @@ function gerarCodigo(rodada, mandante, visitante, valorNF, numeroNF) {
 }
 
 // ─── Modal para registrar NF (suporta multi-jogo e multi-serviço) ────────────
-function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, onClose, T }) {
+const norm = s => String(s || '').trim().toLowerCase()
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, onClose, T, portal }) {
   const IS = iSty(T);
   const [form, setForm] = useState({
     numeroNF: "", fornecedor: "", dataEmissao: "", dataEnvio: "", obs: "",
@@ -193,6 +199,31 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
   const selKeys = Object.keys(selecionados);
   const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
   const rodada = jogosRodada[0]?.rodada;
+
+  // Auto-marcar serviços que correspondem ao fornecedor digitado (via Portal)
+  const autoSelecionarPorFornecedor = () => {
+    if (!form.fornecedor || !portal) return;
+    const novo = { ...selecionados };
+    let count = 0;
+    jogosComServicos.forEach(({ jogo, servicos }) => {
+      servicos.forEach(s => {
+        const opers = getOperacionaisPorSubKey(jogo.id, s.subKey, portal);
+        const match = opers.some(n =>
+          norm(n) === norm(form.fornecedor) ||
+          norm(n).includes(norm(form.fornecedor)) ||
+          norm(form.fornecedor).includes(norm(n))
+        );
+        if (match) {
+          const key = `${jogo.id}_${s.subKey}`;
+          if (novo[key] === undefined) {
+            novo[key] = s.multi ? s.restante : s.valorRef;
+            count++;
+          }
+        }
+      });
+    });
+    if (count > 0) setSelecionados(novo);
+  };
   const jogoIds = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
   const jogoLabel = jogoIds.map(id => { const j = jogosRodada.find(x => x.id === id); return j ? `${j.mandante} x ${j.visitante}` : ""; }).join(" + ");
   const firstJogo = jogosRodada.find(j => j.id === jogoIds[0]) || jogosRodada[0];
@@ -265,12 +296,23 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
                   const key = `${jogo.id}_${s.subKey}`;
                   const checked = selecionados[key] !== undefined;
                   const valorSugerido = s.multi ? s.restante : s.valorRef;
+                  const opers = portal ? getOperacionaisPorSubKey(jogo.id, s.subKey, portal) : [];
+                  const matchOpFornecedor = form.fornecedor && opers.some(n => norm(n) === norm(form.fornecedor) || norm(n).includes(norm(form.fornecedor)) || norm(form.fornecedor).includes(norm(n)));
                   return (
                     <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
-                      background:checked?s.catColor+"18":"transparent"}}>
+                      background:checked?s.catColor+"18":(matchOpFornecedor?"#10b98114":"transparent"),
+                      border: matchOpFornecedor && !checked ? "1px dashed #10b98155" : "1px solid transparent"}}>
                       <input type="checkbox" checked={checked} onChange={() => toggleServico(jogo.id, s.subKey, valorSugerido)}/>
-                      <span style={{fontSize:13,color:T.text,flex:1,display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:13,color:T.text,flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         {s.subLabel}
+                        {opers.length > 0 && opers.map((nm, i) => (
+                          <span key={i}
+                            onClick={() => { set("fornecedor", nm); if (!checked) toggleServico(jogo.id, s.subKey, valorSugerido); }}
+                            title="Nome operacional do Portal — clique para usar como fornecedor"
+                            style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#10b98122",color:"#10b981",fontWeight:600,letterSpacing:0.3,cursor:"pointer",border:"1px solid #10b98144"}}>
+                            → {nm}
+                          </span>
+                        ))}
                         {s.multi && s.lancado > 0 && (
                           <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:"#f59e0b22",color:"#f59e0b",fontWeight:600,letterSpacing:0.3}}>
                             {fmt(s.lancado)} / {fmt(s.valorRef)}
@@ -306,7 +348,15 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           <div style={{marginBottom:12}}>
-            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor</label>
+            <label style={{color:T.textMd,fontSize:12,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>Fornecedor</span>
+              {portal && form.fornecedor && (
+                <button type="button" onClick={autoSelecionarPorFornecedor}
+                  style={{background:"#10b98122",border:"1px solid #10b98166",color:"#10b981",fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:6,cursor:"pointer",letterSpacing:0.3,textTransform:"uppercase"}}>
+                  ⚡ Auto-marcar do Portal
+                </button>
+              )}
+            </label>
             <FornecedorInput value={form.fornecedor} onChange={v => set("fornecedor", v)} fornecedores={fornecedores} T={T}/>
           </div>
           <div style={{marginBottom:12}}>
@@ -764,6 +814,7 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
 }
 
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], fornecedoresJogo = {}, setFornecedoresJogo, T }) {
+  const { portal } = usePortalLink('brasileirao');
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);
@@ -1242,7 +1293,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         <RecebidasTab notas={notas} addNota={addNota} jogos={jogos} T={T}/>
       )}
 
-      {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T}/>}
+      {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T} portal={portal}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
       {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
       <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}

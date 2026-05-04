@@ -822,6 +822,32 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
 
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], fornecedoresJogo = {}, setFornecedoresJogo, T }) {
   const { portal } = usePortalLink('brasileirao');
+
+  // Auto-preenche fornecedoresJogo a partir do Portal (apenas slots vazios; nunca sobrescreve valores manuais)
+  useEffect(() => {
+    if (!portal || !setFornecedoresJogo) return;
+    const updates = {};
+    let changed = false;
+    jogos.filter(j => j.mandante && j.mandante !== 'A definir').forEach(jogo => {
+      CATS.forEach(cat => {
+        cat.subs.forEach(sub => {
+          const key = `${jogo.id}_${sub.key}`;
+          if (fornecedoresJogo[key]) return; // já tem valor — preserva
+          const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
+          if (opers.length > 0) {
+            // Pega o primeiro nome operacional; se houver mais, junta com vírgula
+            updates[key] = opers.join(' / ');
+            changed = true;
+          }
+        });
+      });
+    });
+    if (changed) {
+      setFornecedoresJogo(prev => ({ ...prev, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portal, jogos]);
+
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
   const [showRegistrar, setShowRegistrar] = useState(null);

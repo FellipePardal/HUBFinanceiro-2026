@@ -200,30 +200,45 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
   const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
   const rodada = jogosRodada[0]?.rodada;
 
-  // Auto-marcar serviços que correspondem ao fornecedor digitado (via Portal)
-  const autoSelecionarPorFornecedor = () => {
-    if (!form.fornecedor || !portal) return;
+  // Auto-seleção: ao mudar o fornecedor, marca serviços que casam com o nome operacional do Portal,
+  // e desmarca os que tinham sido marcados automaticamente para o fornecedor anterior.
+  const autoMarcadosRef = useRef(new Set());
+  useEffect(() => {
+    if (!portal) return;
+    const target = norm(form.fornecedor || '');
+    const previous = autoMarcadosRef.current;
+    const novosAuto = new Set();
     const novo = { ...selecionados };
-    let count = 0;
-    jogosComServicos.forEach(({ jogo, servicos }) => {
-      servicos.forEach(s => {
-        const opers = getOperacionaisPorSubKey(jogo.id, s.subKey, portal);
-        const match = opers.some(n =>
-          norm(n) === norm(form.fornecedor) ||
-          norm(n).includes(norm(form.fornecedor)) ||
-          norm(form.fornecedor).includes(norm(n))
-        );
-        if (match) {
-          const key = `${jogo.id}_${s.subKey}`;
-          if (novo[key] === undefined) {
-            novo[key] = s.multi ? s.restante : s.valorRef;
-            count++;
-          }
-        }
-      });
+
+    // Remove auto-marcas anteriores que não pertencem mais ao fornecedor atual
+    previous.forEach(k => {
+      delete novo[k];
     });
-    if (count > 0) setSelecionados(novo);
-  };
+
+    if (target) {
+      jogosComServicos.forEach(({ jogo, servicos }) => {
+        servicos.forEach(s => {
+          const opers = getOperacionaisPorSubKey(jogo.id, s.subKey, portal);
+          const match = opers.some(n => {
+            const a = norm(n);
+            return a === target || a.includes(target) || target.includes(a);
+          });
+          if (match) {
+            const key = `${jogo.id}_${s.subKey}`;
+            // Só auto-marca se ainda não estava manualmente marcado
+            if (novo[key] === undefined) {
+              novo[key] = s.multi ? s.restante : s.valorRef;
+              novosAuto.add(key);
+            }
+          }
+        });
+      });
+    }
+
+    autoMarcadosRef.current = novosAuto;
+    setSelecionados(novo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.fornecedor, portal]);
   const jogoIds = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
   const jogoLabel = jogoIds.map(id => { const j = jogosRodada.find(x => x.id === id); return j ? `${j.mandante} x ${j.visitante}` : ""; }).join(" + ");
   const firstJogo = jogosRodada.find(j => j.id === jogoIds[0]) || jogosRodada[0];
@@ -348,15 +363,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
           <div style={{marginBottom:12}}>
-            <label style={{color:T.textMd,fontSize:12,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span>Fornecedor</span>
-              {portal && form.fornecedor && (
-                <button type="button" onClick={autoSelecionarPorFornecedor}
-                  style={{background:"#10b98122",border:"1px solid #10b98166",color:"#10b981",fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:6,cursor:"pointer",letterSpacing:0.3,textTransform:"uppercase"}}>
-                  ⚡ Auto-marcar do Portal
-                </button>
-              )}
-            </label>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor</label>
             <FornecedorInput value={form.fornecedor} onChange={v => set("fornecedor", v)} fornecedores={fornecedores} T={T}/>
           </div>
           <div style={{marginBottom:12}}>

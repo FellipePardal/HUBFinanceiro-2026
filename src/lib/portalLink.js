@@ -31,11 +31,12 @@ export const SUBKEY_TO_PORTAL = {
   dslrs_transmissor: { source: 'periferico', toggle: 'dslr', cols: ['fornecedor_dslr'] },
   grua:        { source: 'periferico', toggle: 'grua',      cols: ['fornecedor_grua'] },
   goalcam:     { source: 'periferico', toggle: 'goalcam',   cols: ['fornecedor_goalcam'] },
+  carrinho:    { source: 'periferico', toggle: 'carrinho',  cols: ['fornecedor_carrinho'] },
 
-  // Especial = Trilho + Carrinho (cada um respeita seu próprio toggle no Portal)
+  // Especial = Trilho + ClipCam (cada um respeita seu próprio toggle no Portal)
   especial:    { source: 'periferico-multi', subs: [
-    { toggle: 'trilho',   col: 'fornecedor_trilho' },
-    { toggle: 'carrinho', col: 'fornecedor_carrinho' },
+    { toggle: 'trilho',  col: 'fornecedor_trilho' },
+    { toggle: 'clipcam', col: 'fornecedor_clipcam' },
   ]},
 };
 

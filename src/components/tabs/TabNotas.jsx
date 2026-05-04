@@ -168,9 +168,28 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     }
   });
 
-  // Serviços livres por jogo
+  // Serviços livres por jogo (provisionado > 0 + extras com fornecedor no Portal)
   const jogosComServicos = jogosRodada.map(jogo => {
-    const servicos = extrairServicos(jogo).map(s => {
+    const base = extrairServicos(jogo);
+    const baseKeys = new Set(base.map(s => s.subKey));
+    const portalExtras = [];
+    if (portal) {
+      CATS.forEach(cat => {
+        cat.subs.forEach(sub => {
+          if (baseKeys.has(sub.key)) return;
+          if (SUBS_EXCLUIR.has(sub.key)) return;
+          const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
+          if (opers.length > 0) {
+            portalExtras.push({
+              subKey: sub.key, subLabel: sub.label,
+              catLabel: cat.label, catColor: cat.color,
+              valorRef: 0, fromPortal: true,
+            });
+          }
+        });
+      });
+    }
+    const servicos = [...base, ...portalExtras].map(s => {
       const key = `${jogo.id}_${s.subKey}`;
       const lancado = valoresLancados[key] || 0;
       const restante = Math.max(0, s.valorRef - lancado);
@@ -1039,7 +1058,29 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         </div>
 
         {jogosRodada.map(jogo => {
-          const servicos = extrairServicos(jogo);
+          // Base: serviços com provisionado > 0
+          const baseServicos = extrairServicos(jogo);
+          const baseKeys = new Set(baseServicos.map(s => s.subKey));
+          // Extras: serviços onde o Portal tem fornecedor (mesmo sem provisionado).
+          // Valor de referência fica 0 — preenche depois quando a NF chegar.
+          const portalExtras = [];
+          if (portal) {
+            CATS.forEach(cat => {
+              cat.subs.forEach(sub => {
+                if (baseKeys.has(sub.key)) return;
+                if (SUBS_EXCLUIR.has(sub.key)) return;
+                const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
+                if (opers.length > 0) {
+                  portalExtras.push({
+                    subKey: sub.key, subLabel: sub.label,
+                    catLabel: cat.label, catColor: cat.color,
+                    valorRef: 0, fromPortal: true,
+                  });
+                }
+              });
+            });
+          }
+          const servicos = [...baseServicos, ...portalExtras];
           const nfsDoJogo = notas.filter(n =>
             n.servicosKeys?.some(k => k.startsWith(`${jogo.id}_`))
             || (n.tipo === "avulsa" && n.jogoId === jogo.id)

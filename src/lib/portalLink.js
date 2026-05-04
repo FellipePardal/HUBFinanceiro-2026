@@ -49,6 +49,25 @@ const norm = s => String(s || '')
   .replace(/\s+/g, ' ')
   .trim();
 
+// Nomes que NÃO emitem NF (contratados internos ou já contemplados em outras NFs).
+// Match é tolerante: nome do Portal pode vir com sufixos como "/ 21 98038-6887".
+const NAO_EMITE_NF = [
+  'anderson fernandes',
+  'rafael gusmao',
+  'op da produtora',
+  'op. da produtora',
+  'operador da produtora',
+];
+
+function emiteNF(nomeOperacional) {
+  const n = norm(nomeOperacional);
+  if (!n) return false;
+  return !NAO_EMITE_NF.some(blocked => {
+    const b = norm(blocked);
+    return n === b || n.startsWith(b + ' ') || n.includes(' ' + b + ' ') || n.startsWith(b);
+  });
+}
+
 // Match tolerante: aceita prefixo, contém, e troca de "Athletico"/"Athletico PR".
 function matchAny(target, candidate) {
   const a = norm(target), b = norm(candidate);
@@ -118,7 +137,7 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
     const row = portal.controle.get(id);
     if (!row) return [];
     const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    return [...new Set(nomes)];
+    return [...new Set(nomes)].filter(emiteNF);
   }
 
   if (cfg.source === 'periferico') {
@@ -126,7 +145,7 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
     if (!row) return [];
     if (row[cfg.toggle] !== 'Sim') return [];
     const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    return [...new Set(nomes)];
+    return [...new Set(nomes)].filter(emiteNF);
   }
 
   if (cfg.source === 'periferico-multi') {
@@ -138,7 +157,7 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
         nomes.push(String(row[sub.col]).trim());
       }
     });
-    return [...new Set(nomes.filter(Boolean))];
+    return [...new Set(nomes.filter(Boolean))].filter(emiteNF);
   }
 
   return [];

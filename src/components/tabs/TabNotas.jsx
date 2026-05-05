@@ -924,6 +924,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       CATS.forEach(cat => cat.subs.forEach(sub => {
         if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
       }));
+      // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
+      // antes do alias sng_host->sng / sng_premiere->sng_extra)
+      delete realizado.sng_host;
+      delete realizado.sng_premiere;
       // Somar valores — usa servicosDetalhe (granular por jogo) se disponível
       notas.forEach(n => {
         if (n.servicosDetalhe) {

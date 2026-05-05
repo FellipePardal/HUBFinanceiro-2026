@@ -27,8 +27,8 @@ export const SUBKEY_TO_PORTAL = {
   // Periféricos — só conta se o toggle correspondente estiver = "Sim"
   drone:       { source: 'periferico', toggle: 'drone',     cols: ['fornecedor_drone'] },
   minidrone:   { source: 'periferico', toggle: 'minidrone', cols: ['fornecedor_minidrone'] },
+  // DSLR + Microlink e DSLR + Transmissor são a mesma coisa — só usamos a subKey "dslr".
   dslr:        { source: 'periferico', toggle: 'dslr',      cols: ['fornecedor_dslr'] },
-  dslrs_transmissor: { source: 'periferico', toggle: 'dslr', cols: ['fornecedor_dslr'] },
   grua:        { source: 'periferico', toggle: 'grua',      cols: ['fornecedor_grua'] },
   goalcam:     { source: 'periferico', toggle: 'goalcam',   cols: ['fornecedor_goalcam'] },
   carrinho:    { source: 'periferico', toggle: 'carrinho',  cols: ['fornecedor_carrinho'] },

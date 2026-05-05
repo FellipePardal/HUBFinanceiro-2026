@@ -219,45 +219,9 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
   const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
   const rodada = jogosRodada[0]?.rodada;
 
-  // Auto-seleção: ao mudar o fornecedor, marca serviços que casam com o nome operacional do Portal,
-  // e desmarca os que tinham sido marcados automaticamente para o fornecedor anterior.
-  const autoMarcadosRef = useRef(new Set());
-  useEffect(() => {
-    if (!portal) return;
-    const target = norm(form.fornecedor || '');
-    const previous = autoMarcadosRef.current;
-    const novosAuto = new Set();
-    const novo = { ...selecionados };
-
-    // Remove auto-marcas anteriores que não pertencem mais ao fornecedor atual
-    previous.forEach(k => {
-      delete novo[k];
-    });
-
-    if (target) {
-      jogosComServicos.forEach(({ jogo, servicos }) => {
-        servicos.forEach(s => {
-          const opers = getOperacionaisPorSubKey(jogo.id, s.subKey, portal);
-          const match = opers.some(n => {
-            const a = norm(n);
-            return a === target || a.includes(target) || target.includes(a);
-          });
-          if (match) {
-            const key = `${jogo.id}_${s.subKey}`;
-            // Só auto-marca se ainda não estava manualmente marcado
-            if (novo[key] === undefined) {
-              novo[key] = s.multi ? s.restante : s.valorRef;
-              novosAuto.add(key);
-            }
-          }
-        });
-      });
-    }
-
-    autoMarcadosRef.current = novosAuto;
-    setSelecionados(novo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.fornecedor, portal]);
+  // Seleção é manual: o usuário clica em cada chip do fornecedor (ou no checkbox)
+  // pra adicionar serviço por serviço. Isso permite registrar 1 NF por jogo
+  // quando o fornecedor manda notas separadas.
   const jogoIds = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
   const jogoLabel = jogoIds.map(id => { const j = jogosRodada.find(x => x.id === id); return j ? `${j.mandante} x ${j.visitante}` : ""; }).join(" + ");
   const firstJogo = jogosRodada.find(j => j.id === jogoIds[0]) || jogosRodada[0];

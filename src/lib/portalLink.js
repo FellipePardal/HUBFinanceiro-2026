@@ -69,13 +69,28 @@ function emiteNF(nomeOperacional) {
   });
 }
 
-// Match tolerante: aceita prefixo, contém, e troca de "Athletico"/"Athletico PR".
+// Match tolerante: aceita prefixo, contém, e nome+sobrenome em comum
+// (ex.: "Julio Fornazari / 11 98433-9323" ↔ "Julio Cesar Fornazari").
 function matchAny(target, candidate) {
   const a = norm(target), b = norm(candidate);
   if (!a || !b) return false;
   if (a === b) return true;
   if (a.startsWith(b + ' ') || b.startsWith(a + ' ')) return true;
   if (a.includes(b) || b.includes(a)) return true;
+  // Token-based: se primeiro+último de um aparecem no outro, é a mesma pessoa.
+  const ta = a.split(' ').filter(Boolean);
+  const tb = b.split(' ').filter(Boolean);
+  // ignora tokens só de dígitos (telefone) na hora de calcular primeiro/último relevante
+  const palavras = arr => arr.filter(t => !/^\d+$/.test(t));
+  const wa = palavras(ta), wb = palavras(tb);
+  if (wa.length >= 2 && wb.length >= 1) {
+    const first = wa[0], last = wa[wa.length - 1];
+    if (wb.includes(first) && (wa.length === 1 || wb.includes(last))) return true;
+  }
+  if (wb.length >= 2 && wa.length >= 1) {
+    const first = wb[0], last = wb[wb.length - 1];
+    if (wa.includes(first) && (wb.length === 1 || wa.includes(last))) return true;
+  }
   return false;
 }
 

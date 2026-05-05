@@ -294,7 +294,12 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
                   const key = `${jogo.id}_${s.subKey}`;
                   const checked = selecionados[key] !== undefined;
                   const valorSugerido = s.multi ? s.restante : s.valorRef;
-                  const opers = portal ? getOperacionaisPorSubKey(jogo.id, s.subKey, portal) : [];
+                  const opersRaw = portal ? getOperacionaisPorSubKey(jogo.id, s.subKey, portal) : [];
+                  // Substitui pelo apelido canônico do Hub quando há match tolerante
+                  const opers = [...new Set(opersRaw.map(n => {
+                    const f = findFornecedorTolerante(fornecedores, n);
+                    return f ? f.apelido : n;
+                  }))];
                   const matchOpFornecedor = form.fornecedor && opers.some(n => norm(n) === norm(form.fornecedor) || norm(n).includes(norm(form.fornecedor)) || norm(form.fornecedor).includes(norm(n)));
                   return (
                     <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,
@@ -806,8 +811,8 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], fornecedoresJogo = {}, setFornecedoresJogo, T }) {
   const { portal } = usePortalLink('brasileirao');
 
-  // Sincroniza fornecedoresJogo com o Portal (matriz). Se Portal tem valor, sobrescreve;
-  // se Portal não tem valor para aquele slot, preserva o que houver (override manual permanece).
+  // Sincroniza fornecedoresJogo com o Portal (matriz). Converte o nome operacional do Portal
+  // no apelido canônico cadastrado no Hub (quando bate por match tolerante).
   useEffect(() => {
     if (!portal || !setFornecedoresJogo) return;
     const updates = {};
@@ -817,8 +822,13 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         cat.subs.forEach(sub => {
           const key = `${jogo.id}_${sub.key}`;
           const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
-          if (opers.length === 0) return; // Portal não cobre → não toca
-          const portalValor = opers.join(' / ');
+          if (opers.length === 0) return;
+          // Resolve para apelido canônico do Hub (se houver match)
+          const canonicos = opers.map(n => {
+            const f = findFornecedorTolerante(fornecedores, n);
+            return f ? f.apelido : n;
+          });
+          const portalValor = [...new Set(canonicos)].join(' / ');
           if (fornecedoresJogo[key] !== portalValor) {
             updates[key] = portalValor;
             changed = true;
@@ -830,7 +840,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       setFornecedoresJogo(prev => ({ ...prev, ...updates }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [portal, jogos]);
+  }, [portal, jogos, fornecedores]);
 
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);

@@ -57,6 +57,7 @@ const NAO_EMITE_NF = [
   'op da produtora',
   'op. da produtora',
   'operador da produtora',
+  'estrutura globo',
 ];
 
 function emiteNF(nomeOperacional) {

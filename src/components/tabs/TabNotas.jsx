@@ -173,7 +173,12 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     const base = extrairServicos(jogo);
     const baseKeys = new Set(base.map(s => s.subKey));
     const portalExtras = [];
-    let baseFinal = base;
+    // Filtra UM B1/B2/B3 que não bate com a categoria do jogo
+    const padraoUM = { um_b1: 'B1', um_b2: 'B2', um_b3: 'B3' };
+    let baseFinal = base.filter(s => {
+      if (!jogo.categoria || !padraoUM[s.subKey]) return true;
+      return padraoUM[s.subKey] === jogo.categoria;
+    });
     if (portal) {
       const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
       // SNG: divide em Premiere e Host (usam buckets financeiros diferentes — sng_extra e sng)
@@ -1066,7 +1071,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           // Extras: serviços onde o Portal tem fornecedor (mesmo sem provisionado).
           // Valor de referência fica 0 — preenche depois quando a NF chegar.
           const portalExtras = [];
-          let baseFinal = baseServicos;
+          // Filtra UM B1/B2/B3 que não bate com a categoria do jogo
+          const padraoUM = { um_b1: 'B1', um_b2: 'B2', um_b3: 'B3' };
+          let baseFinal = baseServicos.filter(s => {
+            if (!jogo.categoria || !padraoUM[s.subKey]) return true;
+            return padraoUM[s.subKey] === jogo.categoria;
+          });
           if (portal) {
             const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
             // SNG: separa em Host (bucket sng) + Premiere (bucket sng_extra)

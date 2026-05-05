@@ -63,9 +63,13 @@ const NAO_EMITE_NF = [
   'estrutura globo',
 ];
 
+// Marcadores de "sem fornecedor" no Portal (ex: SNG Premiere = "Não" significa que não houve)
+const VALORES_NULOS = new Set(['nao', 'n/a', 'na', 'sem', '-', '--', 'x', 'nenhum', 'nada']);
+
 function emiteNF(nomeOperacional) {
   const n = norm(nomeOperacional);
   if (!n) return false;
+  if (VALORES_NULOS.has(n)) return false;
   return !NAO_EMITE_NF.some(blocked => {
     const b = norm(blocked);
     return n === b || n.startsWith(b + ' ') || n.includes(' ' + b + ' ') || n.startsWith(b);

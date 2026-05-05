@@ -916,6 +916,9 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
   // Recalcula o realizado sempre que as notas mudam
   useEffect(() => {
+    // Aliases: subKeys virtuais (NF) → subKey financeira (CATS)
+    // SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra".
+    const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra' };
     setJogos(js => js.map(j => {
       const realizado = {...(j.realizado || {})};
       CATS.forEach(cat => cat.subs.forEach(sub => {
@@ -929,13 +932,15 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
             const [jId, ...rest] = k.split("_");
             if (parseInt(jId) === j.id) {
               const subKey = rest.join("_");
-              realizado[subKey] = (realizado[subKey] || 0) + valor;
+              const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+              realizado[finalKey] = (realizado[finalKey] || 0) + valor;
             }
           });
         } else if (n.jogoId === j.id && n.servicosValores) {
           // Formato antigo: jogoId simples
           Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
-            realizado[subKey] = (realizado[subKey] || 0) + valor;
+            const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+            realizado[finalKey] = (realizado[finalKey] || 0) + valor;
           });
         }
       });

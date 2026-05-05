@@ -189,7 +189,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
           if (sub.key === 'sng') return;
           if (baseKeys.has(sub.key)) return;
           if (SUBS_EXCLUIR.has(sub.key)) return;
-          const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
+          const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal, jogo.categoria);
           if (opers.length > 0) {
             portalExtras.push({
               subKey: sub.key, subLabel: sub.label,
@@ -305,7 +305,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
                   const key = `${jogo.id}_${s.subKey}`;
                   const checked = selecionados[key] !== undefined;
                   const valorSugerido = s.multi ? s.restante : s.valorRef;
-                  const opersRaw = portal ? getOperacionaisPorSubKey(jogo.id, s.subKey, portal) : [];
+                  const opersRaw = portal ? getOperacionaisPorSubKey(jogo.id, s.subKey, portal, jogo.categoria) : [];
                   // Substitui pelo apelido canônico do Hub quando há match tolerante
                   const opers = [...new Set(opersRaw.map(n => {
                     const f = findFornecedorTolerante(fornecedores, n);
@@ -831,7 +831,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
     function aplicarSubKey(jogo, subKey) {
       const key = `${jogo.id}_${subKey}`;
-      const opers = getOperacionaisPorSubKey(jogo.id, subKey, portal);
+      const opers = getOperacionaisPorSubKey(jogo.id, subKey, portal, jogo.categoria);
       if (opers.length === 0) return;
       const canonicos = opers.map(n => {
         const f = findFornecedorTolerante(fornecedores, n);
@@ -1082,7 +1082,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                 if (sub.key === 'sng') return;
                 if (baseKeys.has(sub.key)) return;
                 if (SUBS_EXCLUIR.has(sub.key)) return;
-                const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
+                const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal, jogo.categoria);
                 if (opers.length > 0) {
                   portalExtras.push({
                     subKey: sub.key, subLabel: sub.label,

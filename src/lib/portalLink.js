@@ -63,13 +63,18 @@ const NAO_EMITE_NF = [
   'estrutura globo',
 ];
 
-// Marcadores de "sem fornecedor" no Portal (ex: SNG Premiere = "Não" significa que não houve)
-const VALORES_NULOS = new Set(['nao', 'n/a', 'na', 'sem', '-', '--', 'x', 'nenhum', 'nada']);
+// Marcadores de "sem fornecedor" no Portal (qualquer valor que ESTRITAMENTE seja um marcador nulo)
+const VALORES_NULOS = new Set(['nao', 'n/a', 'na', 'sem', '-', '--', 'x', 'nenhum', 'nada', 'n a']);
+
+// Prefixos: qualquer texto que comece com isso é tratado como "sem fornecedor"
+// (ex: "NÃO / Narração no local 5 câmeras..." vira observação, não é fornecedor)
+const PREFIXOS_NULOS = ['nao ', 'sem ', 'n a '];
 
 function emiteNF(nomeOperacional) {
   const n = norm(nomeOperacional);
   if (!n) return false;
   if (VALORES_NULOS.has(n)) return false;
+  if (PREFIXOS_NULOS.some(p => n.startsWith(p))) return false;
   return !NAO_EMITE_NF.some(blocked => {
     const b = norm(blocked);
     return n === b || n.startsWith(b + ' ') || n.includes(' ' + b + ' ') || n.startsWith(b);
@@ -151,7 +156,8 @@ export async function loadPortalData(campeonato = 'brasileirao') {
 
 // Para um jogo do Hub e uma subKey financeira, retorna o(s) nome(s) operacional(is) do Portal.
 // Retorna array (pode haver mais de um — ex: SNG Premiere + Host distintos).
-export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
+// `jogoCategoria` opcional: usa B1/B2 do Hub para filtrar UM correta (Portal pode ter padrao=null).
+export function getOperacionaisPorSubKey(jogoHubId, subKey, portal, jogoCategoria) {
   const cfg = SUBKEY_TO_PORTAL[subKey];
   if (!cfg || !portal) return [];
   const id = String(jogoHubId);
@@ -159,7 +165,10 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal) {
   if (cfg.source === 'controle') {
     const row = portal.controle.get(id);
     if (!row) return [];
-    if (cfg.padrao && String(row.padrao || '').toUpperCase() !== cfg.padrao.toUpperCase()) return [];
+    if (cfg.padrao) {
+      const padraoEfetivo = (row.padrao && String(row.padrao).trim()) || jogoCategoria || '';
+      if (String(padraoEfetivo).toUpperCase() !== cfg.padrao.toUpperCase()) return [];
+    }
     const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
     return [...new Set(nomes)].filter(emiteNF);
   }

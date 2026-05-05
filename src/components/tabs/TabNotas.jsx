@@ -176,13 +176,13 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     let baseFinal = base;
     if (portal) {
       const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
-      // SNG: divide em Premiere e Host
+      // SNG: divide em Premiere e Host (usam buckets financeiros diferentes — sng_extra e sng)
       const sngP = getOperacionaisPorSubKey(jogo.id, 'sng_premiere', portal);
       const sngH = getOperacionaisPorSubKey(jogo.id, 'sng_host', portal);
       if (sngP.length || sngH.length) {
-        baseFinal = base.filter(s => s.subKey !== 'sng'); // remove a linha consolidada
-        if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
-        if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+        baseFinal = base.filter(s => s.subKey !== 'sng' && s.subKey !== 'sng_extra');
+        if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: jogo.provisionado?.sng || 0, fromPortal: true });
+        if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: jogo.provisionado?.sng_extra || 0, fromPortal: true });
       }
       CATS.forEach(cat => {
         cat.subs.forEach(sub => {
@@ -1069,13 +1069,13 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           let baseFinal = baseServicos;
           if (portal) {
             const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
-            // SNG: separa em SNG Premiere + SNG Host (não são a mesma coisa)
+            // SNG: separa em Host (bucket sng) + Premiere (bucket sng_extra)
             const sngP = getOperacionaisPorSubKey(jogo.id, 'sng_premiere', portal);
             const sngH = getOperacionaisPorSubKey(jogo.id, 'sng_host', portal);
             if (sngP.length || sngH.length) {
-              baseFinal = baseServicos.filter(s => s.subKey !== 'sng');
-              if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
-              if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+              baseFinal = baseServicos.filter(s => s.subKey !== 'sng' && s.subKey !== 'sng_extra');
+              if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: jogo.provisionado?.sng || 0, fromPortal: true });
+              if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: jogo.provisionado?.sng_extra || 0, fromPortal: true });
             }
             CATS.forEach(cat => {
               cat.subs.forEach(sub => {

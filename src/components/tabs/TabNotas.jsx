@@ -173,9 +173,20 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     const base = extrairServicos(jogo);
     const baseKeys = new Set(base.map(s => s.subKey));
     const portalExtras = [];
+    let baseFinal = base;
     if (portal) {
+      const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
+      // SNG: divide em Premiere e Host
+      const sngP = getOperacionaisPorSubKey(jogo.id, 'sng_premiere', portal);
+      const sngH = getOperacionaisPorSubKey(jogo.id, 'sng_host', portal);
+      if (sngP.length || sngH.length) {
+        baseFinal = base.filter(s => s.subKey !== 'sng'); // remove a linha consolidada
+        if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+        if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+      }
       CATS.forEach(cat => {
         cat.subs.forEach(sub => {
+          if (sub.key === 'sng') return;
           if (baseKeys.has(sub.key)) return;
           if (SUBS_EXCLUIR.has(sub.key)) return;
           const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
@@ -189,7 +200,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
         });
       });
     }
-    const servicos = [...base, ...portalExtras].map(s => {
+    const servicos = [...baseFinal, ...portalExtras].map(s => {
       const key = `${jogo.id}_${s.subKey}`;
       const lancado = valoresLancados[key] || 0;
       const restante = Math.max(0, s.valorRef - lancado);
@@ -817,24 +828,32 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     if (!portal || !setFornecedoresJogo) return;
     const updates = {};
     let changed = false;
+
+    function aplicarSubKey(jogo, subKey) {
+      const key = `${jogo.id}_${subKey}`;
+      const opers = getOperacionaisPorSubKey(jogo.id, subKey, portal);
+      if (opers.length === 0) return;
+      const canonicos = opers.map(n => {
+        const f = findFornecedorTolerante(fornecedores, n);
+        return f ? f.apelido : n;
+      });
+      const portalValor = [...new Set(canonicos)].join(' / ');
+      if (fornecedoresJogo[key] !== portalValor) {
+        updates[key] = portalValor;
+        changed = true;
+      }
+    }
+
     jogos.filter(j => j.mandante && j.mandante !== 'A definir').forEach(jogo => {
       CATS.forEach(cat => {
         cat.subs.forEach(sub => {
-          const key = `${jogo.id}_${sub.key}`;
-          const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
-          if (opers.length === 0) return;
-          // Resolve para apelido canônico do Hub (se houver match)
-          const canonicos = opers.map(n => {
-            const f = findFornecedorTolerante(fornecedores, n);
-            return f ? f.apelido : n;
-          });
-          const portalValor = [...new Set(canonicos)].join(' / ');
-          if (fornecedoresJogo[key] !== portalValor) {
-            updates[key] = portalValor;
-            changed = true;
-          }
+          if (sub.key === 'sng') return; // tratado como 2 virtuais abaixo
+          aplicarSubKey(jogo, sub.key);
         });
       });
+      // SNG dividido em duas linhas
+      aplicarSubKey(jogo, 'sng_premiere');
+      aplicarSubKey(jogo, 'sng_host');
     });
     if (changed) {
       setFornecedoresJogo(prev => ({ ...prev, ...updates }));
@@ -1038,9 +1057,20 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
           // Extras: serviços onde o Portal tem fornecedor (mesmo sem provisionado).
           // Valor de referência fica 0 — preenche depois quando a NF chegar.
           const portalExtras = [];
+          let baseFinal = baseServicos;
           if (portal) {
+            const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
+            // SNG: separa em SNG Premiere + SNG Host (não são a mesma coisa)
+            const sngP = getOperacionaisPorSubKey(jogo.id, 'sng_premiere', portal);
+            const sngH = getOperacionaisPorSubKey(jogo.id, 'sng_host', portal);
+            if (sngP.length || sngH.length) {
+              baseFinal = baseServicos.filter(s => s.subKey !== 'sng');
+              if (sngP.length) portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+              if (sngH.length) portalExtras.push({ subKey: 'sng_host', subLabel: 'SNG Host', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
+            }
             CATS.forEach(cat => {
               cat.subs.forEach(sub => {
+                if (sub.key === 'sng') return;
                 if (baseKeys.has(sub.key)) return;
                 if (SUBS_EXCLUIR.has(sub.key)) return;
                 const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal);
@@ -1054,7 +1084,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               });
             });
           }
-          const servicos = [...baseServicos, ...portalExtras];
+          const servicos = [...baseFinal, ...portalExtras];
           const nfsDoJogo = notas.filter(n =>
             n.servicosKeys?.some(k => k.startsWith(`${jogo.id}_`))
             || (n.tipo === "avulsa" && n.jogoId === jogo.id)

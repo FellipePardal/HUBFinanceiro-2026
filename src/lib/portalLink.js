@@ -21,8 +21,9 @@ export const SUBKEY_TO_PORTAL = {
 
   geradores:   { source: 'controle', cols: ['gerador'] },
 
-  // SNG: Hub tem subKey único, Portal tem 2 colunas — listamos as duas (gera 1 entry por fornecedor distinto)
-  sng:         { source: 'controle', cols: ['sng_premiere', 'sng_host'] },
+  // SNG: tratado como 2 subKeys virtuais (Premiere e Host são serviços distintos com fornecedores próprios)
+  sng_premiere: { source: 'controle', cols: ['sng_premiere'] },
+  sng_host:     { source: 'controle', cols: ['sng_host'] },
 
   // Periféricos — só conta se o toggle correspondente estiver = "Sim"
   drone:       { source: 'periferico', toggle: 'drone',     cols: ['fornecedor_drone'] },

@@ -24,6 +24,8 @@ export const SUBKEY_TO_PORTAL = {
   // SNG: tratado como 2 subKeys virtuais (Premiere e Host são serviços distintos com fornecedores próprios)
   sng_premiere: { source: 'controle', cols: ['sng_premiere'] },
   sng_host:     { source: 'controle', cols: ['sng_host'] },
+  // SNG Extra (CATS) = SNG Premiere — mesmo fornecedor
+  sng_extra:    { source: 'controle', cols: ['sng_premiere'] },
 
   // Periféricos — só conta se o toggle correspondente estiver = "Sim"
   drone:       { source: 'periferico', toggle: 'drone',     cols: ['fornecedor_drone'] },

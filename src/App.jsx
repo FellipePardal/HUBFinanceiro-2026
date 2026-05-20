@@ -890,6 +890,7 @@ export default function App() {
   const [customCampeonatos, setCustomCampeonatos] = useState([]);
   const [showNovoCampModal, setShowNovoCampModal] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
   const T = darkMode ? DARK : LIGHT;
 
   useEffect(() => {
@@ -921,6 +922,12 @@ export default function App() {
   }, []);
 
   const signOut = async () => { await supabase.auth.signOut(); };
+
+  useEffect(() => {
+    const onHash = () => setCurrentHash(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   // Carrega o registry de campeonatos custom uma vez ao logar.
   useEffect(() => {
@@ -974,11 +981,11 @@ export default function App() {
   };
 
   // Rotas públicas — acessíveis sem autenticação
-  if (window.location.hash === "#formulario") return <FormularioPublico/>;
-  if (window.location.hash === "#formulario-paulistao") return <FormularioPublicoPaulistao/>;
-  const envioMatch = window.location.hash.match(/^#envio\/(.+)$/);
+  if (currentHash === "#formulario") return <FormularioPublico/>;
+  if (currentHash === "#formulario-paulistao") return <FormularioPublicoPaulistao/>;
+  const envioMatch = currentHash.match(/^#envio\/(.+)$/);
   if (envioMatch) return <EnvioPublico envioRef={envioMatch[1]}/>;
-  const tabelaMatch = window.location.hash.match(/^#tabela\/([0-9a-fA-F-]+)$/);
+  const tabelaMatch = currentHash.match(/^#tabela\/([0-9a-fA-F-]+)$/);
   if (tabelaMatch) return <TabelaPrecoPublica token={tabelaMatch[1]}/>;
 
   // Auth loading

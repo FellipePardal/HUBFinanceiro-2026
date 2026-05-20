@@ -207,7 +207,7 @@ function ApprovalModal({ user, T, onApprove, onDeny, onClose }) {
         <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui, lineHeight:1.8 }}>
           <strong style={{ color:T.text }}>{user.nome || user.email}</strong>
           {user.funcao && <span> · {user.funcao}</span>}
-          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "FFU — Campeonato Brasileiro" : user.entidade === "paulistao-feminino-2026" ? "FPF — Campeonato Paulista F" : user.entidade}</span></>}
+          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "FFU - Futebol Forte União" : user.entidade === "paulistao-feminino-2026" ? "FPF - Federação Paulista de Futebol" : user.entidade}</span></>}
           <br/><span style={{ color:T.textSm }}>{user.email}</span>
         </p>
 

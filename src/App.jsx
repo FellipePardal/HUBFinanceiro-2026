@@ -739,8 +739,8 @@ function FornecedorPage({ T, onSignOut }) {
 }
 
 const ENTIDADES = [
-  { id: "brasileirao-2026",        label: "FFU — Campeonato Brasileiro" },
-  { id: "paulistao-feminino-2026", label: "FPF — Campeonato Paulista F" },
+  { id: "brasileirao-2026",        label: "FFU - Futebol Forte União" },
+  { id: "paulistao-feminino-2026", label: "FPF - Federação Paulista de Futebol" },
   { id: "outro",                   label: "Outro" },
 ];
 

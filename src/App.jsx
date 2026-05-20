@@ -1016,6 +1016,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Deslogado automaticamente se o admin apagar o perfil.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`profile-deleted-${user.id}`)
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => supabase.auth.signOut()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   // Carrega o registry de campeonatos custom uma vez ao logar.
   useEffect(() => {
     if (!user) return;

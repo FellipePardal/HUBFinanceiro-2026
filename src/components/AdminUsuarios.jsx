@@ -272,14 +272,9 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
 
   const handleDelete = async (u) => {
     if (!window.confirm(`Excluir o usuário "${u.nome || u.email}"?\n\nEsta ação é irreversível.`)) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      await supabase.functions.invoke('admin-invite', {
-        body: { action: 'delete', userId: u.id },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      setUsers(us => us.filter(x => x.id !== u.id));
-    } catch {}
+    const { error } = await supabase.from('profiles').delete().eq('id', u.id);
+    if (error) { alert(`Erro ao excluir: ${error.message}`); return; }
+    setUsers(us => us.filter(x => x.id !== u.id));
   };
 
   // Stats

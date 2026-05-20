@@ -275,17 +275,20 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
   const handleRoleChange = async (userId, newRole) => {
     setRoleUpdating(r => ({ ...r, [userId]: true }));
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    await supabase.rpc('log_audit_action', { p_action: 'role_change', p_target_user_id: userId, p_details: { new_role: newRole } });
     setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u));
     setRoleUpdating(r => ({ ...r, [userId]: false }));
   };
 
   const handleApprove = async (userId, newRole) => {
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    await supabase.rpc('log_audit_action', { p_action: 'user_approved', p_target_user_id: userId, p_details: { new_role: newRole } });
     setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u));
   };
 
   const handleDelete = async (u) => {
     if (!window.confirm(`Excluir o usuário "${u.nome || u.email}"?\n\nEsta ação é irreversível.`)) return;
+    await supabase.rpc('log_audit_action', { p_action: 'user_deleted', p_target_user_id: u.id, p_details: { email: u.email, nome: u.nome } });
     const { error } = await supabase.rpc('admin_delete_user', { user_id: u.id });
     if (error) { alert(`Erro ao excluir: ${error.message}`); return; }
     setUsers(us => us.filter(x => x.id !== u.id));

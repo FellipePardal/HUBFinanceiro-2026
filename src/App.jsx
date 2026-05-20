@@ -26,6 +26,7 @@ import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModa
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
+import { useSessionTimeout } from "./hooks/useSessionTimeout";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
@@ -754,8 +755,10 @@ function LoginGate({ T, authError, setAuthError }) {
   const [loading, setLoading]   = useState(false);
   const [erro, setErro]         = useState("");
   const [sucesso, setSucesso]   = useState("");
+  const [lgpdConsent, setLgpdConsent] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
-  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); setEntidade(""); setNome(""); setFuncao(""); };
+  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); setEntidade(""); setNome(""); setFuncao(""); setLgpdConsent(false); };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -765,6 +768,7 @@ function LoginGate({ T, authError, setAuthError }) {
       if (password.length < 8) { setErro("Senha deve ter no mínimo 8 caracteres."); return; }
       if (!/[A-Z]/.test(password)) { setErro("Senha deve ter pelo menos 1 letra maiúscula."); return; }
       if (!/[^A-Za-z0-9]/.test(password)) { setErro("Senha deve ter pelo menos 1 caractere especial."); return; }
+      if (!lgpdConsent) { setErro("Aceite a Política de Privacidade para continuar."); return; }
     }
     setLoading(true);
     if (modo === "login") {
@@ -773,7 +777,7 @@ function LoginGate({ T, authError, setAuthError }) {
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { nome, funcao, entidade } },
+        options: { data: { nome, funcao, entidade, lgpd_consent: true, lgpd_consent_at: new Date().toISOString() } },
       });
       if (error) { setErro(error.message || "Erro ao criar conta"); setLoading(false); }
       else { setSucesso("Cadastro enviado! Aguarde a aprovação de um administrador para acessar o hub."); setLoading(false); }
@@ -855,6 +859,18 @@ function LoginGate({ T, authError, setAuthError }) {
               </>}
               <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(""); }} placeholder="E-mail" autoFocus={modo==="login"} required style={inputStyle}/>
               <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthError(""); }} placeholder={modo==="cadastro" ? "Criar senha" : "Senha"} required style={{...inputStyle, marginBottom:0}}/>
+              {modo === "cadastro" && (
+                <label style={{display:"flex",alignItems:"flex-start",gap:10,marginTop:12,cursor:"pointer"}}>
+                  <input type="checkbox" checked={lgpdConsent} onChange={e => setLgpdConsent(e.target.checked)} style={{marginTop:2,accentColor:T.brand||"#65B32E",flexShrink:0}}/>
+                  <span style={{fontSize:12,color:T.textMd,fontFamily:"'Poppins',sans-serif",lineHeight:1.5}}>
+                    Li e aceito a{" "}
+                    <button type="button" onClick={() => setShowPrivacy(true)} style={{background:"none",border:"none",color:T.brand||"#65B32E",cursor:"pointer",fontSize:12,padding:0,fontFamily:"'Poppins',sans-serif",fontWeight:500,textDecoration:"underline"}}>
+                      Política de Privacidade
+                    </button>
+                    {" "}e consinto com o tratamento dos meus dados (LGPD).
+                  </span>
+                </label>
+              )}
               {anyError && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>{anyError}</p>}
               <button type="submit" disabled={loading} style={{
                 width:"100%",marginTop:16,background:T.brand||"#65B32E",
@@ -895,6 +911,31 @@ function LoginGate({ T, authError, setAuthError }) {
           Livemode · Transmissões · 2026
         </p>
       </div>
+      {showPrivacy && (
+        <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.72)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+          onClick={() => setShowPrivacy(false)}>
+          <div style={{background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:28,width:"100%",maxWidth:500,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}
+            onClick={e => e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <h3 style={{margin:0,fontFamily:FONT.display,fontSize:18,fontWeight:700,color:T.text}}>Política de Privacidade</h3>
+              <button onClick={() => setShowPrivacy(false)} style={{background:"none",border:"none",cursor:"pointer",color:T.textMd,fontSize:20,lineHeight:1,padding:4}}>✕</button>
+            </div>
+            <div style={{fontSize:13,color:T.textMd,lineHeight:1.7,fontFamily:"'Poppins',sans-serif",display:"flex",flexDirection:"column",gap:10}}>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Controlador:</strong> Livemode Transmissões Ltda.</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Contato DPO:</strong> <a href="mailto:privacidade@livemode.com" style={{color:T.brand||"#65B32E"}}>privacidade@livemode.com</a></p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Dados coletados:</strong> nome completo, e-mail, função e entidade vinculada.</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Finalidade:</strong> controle de acesso ao HUB Financeiro Livemode.</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Base legal:</strong> consentimento do titular (Art. 7º, I — Lei 13.709/2018 LGPD).</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Retenção:</strong> dados mantidos enquanto a conta estiver ativa; removidos permanentemente após exclusão.</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Seus direitos (Art. 18 LGPD):</strong> acesso, correção, exclusão, portabilidade e revogação do consentimento. Envie sua solicitação para <a href="mailto:privacidade@livemode.com" style={{color:T.brand||"#65B32E"}}>privacidade@livemode.com</a>.</p>
+              <p style={{margin:0}}><strong style={{color:T.text}}>Segurança:</strong> dados armazenados com criptografia em repouso e em trânsito (TLS 1.2+), com controle de acesso baseado em perfis.</p>
+            </div>
+            <button onClick={() => setShowPrivacy(false)} style={{marginTop:20,width:"100%",background:T.brand||"#65B32E",color:"#fff",border:"none",borderRadius:8,padding:"10px",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"'Poppins',sans-serif"}}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1009,6 +1050,7 @@ export default function App() {
   }, []);
 
   const signOut = async () => { await supabase.auth.signOut(); };
+  useSessionTimeout(signOut, !!user);
 
   useEffect(() => {
     const onHash = () => setCurrentHash(window.location.hash);

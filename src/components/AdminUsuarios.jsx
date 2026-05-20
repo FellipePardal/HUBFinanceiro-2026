@@ -286,7 +286,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
 
   const handleDelete = async (u) => {
     if (!window.confirm(`Excluir o usuário "${u.nome || u.email}"?\n\nEsta ação é irreversível.`)) return;
-    const { error } = await supabase.from('profiles').delete().eq('id', u.id);
+    const { error } = await supabase.rpc('admin_delete_user', { user_id: u.id });
     if (error) { alert(`Erro ao excluir: ${error.message}`); return; }
     setUsers(us => us.filter(x => x.id !== u.id));
   };

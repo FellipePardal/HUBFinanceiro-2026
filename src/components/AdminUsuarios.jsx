@@ -10,6 +10,7 @@ const ROLE_META = {
   admin:        { label: "Admin",        color: "#16A34A", bg: "rgba(22,163,74,0.10)",   border: "rgba(22,163,74,0.25)"  },
   visualizador: { label: "Visualizador", color: "#2563EB", bg: "rgba(37,99,235,0.10)",   border: "rgba(37,99,235,0.25)"  },
   fornecedor:   { label: "Fornecedor",   color: "#D97706", bg: "rgba(217,119,6,0.10)",   border: "rgba(217,119,6,0.25)"  },
+  pendente:     { label: "Pendente",     color: "#9333EA", bg: "rgba(147,51,234,0.10)",  border: "rgba(147,51,234,0.25)" },
 };
 
 function RoleBadge({ role }) {
@@ -229,6 +230,14 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
   const adminCount     = users.filter(u => u.role === 'admin').length;
   const vizCount       = users.filter(u => u.role === 'visualizador').length;
   const fornCount      = users.filter(u => u.role === 'fornecedor').length;
+  const pendCount      = users.filter(u => u.role === 'pendente').length;
+
+  // Pendentes primeiro
+  const sortedUsers = [...users].sort((a, b) => {
+    if (a.role === 'pendente' && b.role !== 'pendente') return -1;
+    if (b.role === 'pendente' && a.role !== 'pendente') return 1;
+    return 0;
+  });
 
   const thStyle = {
     padding: "11px 16px",
@@ -345,7 +354,18 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
             <StatCard label="Admins" value={adminCount} color="#16A34A" T={T}/>
             <StatCard label="Visualizadores" value={vizCount} color="#2563EB" T={T}/>
             <StatCard label="Fornecedores" value={fornCount} color="#D97706" T={T}/>
+            <StatCard label="Pendentes" value={pendCount} color="#9333EA" T={T}/>
           </div>
+
+          {/* Alerta de pendentes */}
+          {pendCount > 0 && (
+            <div style={{ background:"rgba(147,51,234,0.08)", border:"1px solid rgba(147,51,234,0.25)", borderRadius:10, padding:"12px 16px", marginBottom:20, display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:16 }}>⏳</span>
+              <p style={{ margin:0, fontSize:13, color:"#9333EA", fontWeight:500, fontFamily:"'Poppins',sans-serif" }}>
+                {pendCount} usuário{pendCount > 1 ? 's' : ''} aguardando aprovação — altere o perfil na tabela abaixo para liberar o acesso.
+              </p>
+            </div>
+          )}
 
           {/* Table */}
           <div style={{
@@ -377,10 +397,11 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(u => {
+                    {sortedUsers.map(u => {
                       const isMe = u.id === currentUser?.id;
+                      const isPending = u.role === 'pendente';
                       return (
-                        <tr key={u.id} style={{ background: isMe ? (T.brandSoft || "rgba(101,179,46,0.04)") : "transparent" }}>
+                        <tr key={u.id} style={{ background: isPending ? "rgba(147,51,234,0.04)" : isMe ? (T.brandSoft || "rgba(101,179,46,0.04)") : "transparent" }}>
                           <td style={tdStyle}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <div style={{
@@ -430,6 +451,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                                   opacity: roleUpdating[u.id] ? 0.5 : 1,
                                 }}
                               >
+                                <option value="pendente">Pendente</option>
                                 <option value="admin">Admin</option>
                                 <option value="visualizador">Visualizador</option>
                                 <option value="fornecedor">Fornecedor</option>

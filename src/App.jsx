@@ -880,6 +880,27 @@ import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
 import { REGISTRY_KEY } from "./data/customCampeonato";
 import { getState as getStateSb, setState as setStateSb } from "./lib/supabase";
 
+function PendentePage({ T, onSignOut }) {
+  return (
+    <div style={{ minHeight:"100vh", background:T.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Poppins',sans-serif" }}>
+      <div style={{ width:"100%", maxWidth:420, padding:32, textAlign:"center" }}>
+        <div style={{ margin:"0 auto 24px", display:"flex", justifyContent:"center" }}>
+          <LivemodeLogo size={56} radius={12}/>
+        </div>
+        <h1 style={{ fontFamily:FONT.display, fontSize:22, fontWeight:700, color:T.text, margin:"0 0 10px", letterSpacing:"-0.005em" }}>Acesso pendente</h1>
+        <p style={{ color:T.textMd, fontSize:13, margin:"0 0 28px", lineHeight:1.6 }}>
+          Seu cadastro foi recebido. Um administrador precisa aprovar e definir seu perfil de acesso antes de você entrar.
+        </p>
+        <button onClick={onSignOut} style={{
+          background:"transparent", border:`1px solid ${T.border}`,
+          color:T.textMd, borderRadius:7, padding:"9px 20px",
+          fontSize:12, cursor:"pointer", fontFamily:"'Poppins',sans-serif",
+        }}>Sair</button>
+      </div>
+    </div>
+  );
+}
+
 function RoleTestWidget({ roleOverride, onOverride, T }) {
   const [open, setOpen] = useState(false);
   const LABELS = { visualizador: 'Visualizador', fornecedor: 'Fornecedor' };
@@ -1024,6 +1045,9 @@ export default function App() {
 
   // Aguarda role carregar (query de profiles é não-bloqueante)
   if (role === null) return <LoadingScreen T={T}/>;
+
+  // Pendente — aguarda aprovação do admin
+  if (role === 'pendente') return <PendentePage T={T} onSignOut={signOut}/>;
 
   const effectiveRole = roleOverride ?? role;
 

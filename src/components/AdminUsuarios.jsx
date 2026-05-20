@@ -256,7 +256,21 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
     setLoading(false);
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    loadUsers();
+
+    const channel = supabase
+      .channel('profiles-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' },
+        payload => setUsers(prev => [payload.new, ...prev]))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        payload => setUsers(prev => prev.map(u => u.id === payload.new.id ? payload.new : u)))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'profiles' },
+        payload => setUsers(prev => prev.filter(u => u.id !== payload.old.id)))
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleRoleChange = async (userId, newRole) => {
     setRoleUpdating(r => ({ ...r, [userId]: true }));

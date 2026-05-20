@@ -187,12 +187,62 @@ function InviteModal({ T, onClose, onSuccess }) {
   );
 }
 
+// ─── Approval Modal ───────────────────────────────────────────────────────────
+function ApprovalModal({ user, T, onApprove, onDeny, onClose }) {
+  const [role, setRole] = useState("visualizador");
+  const [loading, setLoading] = useState(false);
+
+  const inputStyle = {
+    width:"100%", boxSizing:"border-box",
+    background:T.surfaceAlt||T.bg, border:`1px solid ${T.border}`,
+    borderRadius:8, padding:"10px 14px", fontSize:13, color:T.text,
+    fontFamily:"'Poppins',sans-serif", outline:"none", cursor:"pointer",
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.65)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:T.surface||T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:28, width:"100%", maxWidth:400, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+        <h3 style={{ margin:"0 0 4px", fontFamily:FONT.display, fontSize:18, fontWeight:700, color:T.text }}>Aprovar cadastro</h3>
+        <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui }}>
+          <strong style={{ color:T.text }}>{user.nome || user.email}</strong>
+          {user.entidade && <span> · {user.entidade}</span>}
+        </p>
+
+        <label style={{ display:"block", fontSize:11, fontWeight:600, color:T.textMd, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:6, fontFamily:FONT.ui }}>
+          Perfil de acesso
+        </label>
+        <select value={role} onChange={e => setRole(e.target.value)} style={inputStyle}>
+          <option value="visualizador">Visualizador</option>
+          <option value="fornecedor">Fornecedor</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <div style={{ display:"flex", gap:10, marginTop:20 }}>
+          <button onClick={async () => { setLoading(true); await onDeny(user); onClose(); }} disabled={loading} style={{
+            flex:1, background:"rgba(220,38,38,0.08)", border:"1px solid rgba(220,38,38,0.25)",
+            color:"#DC2626", borderRadius:7, padding:"10px", fontSize:13, fontWeight:500,
+            cursor:"pointer", fontFamily:"'Poppins',sans-serif",
+          }}>Negar</button>
+          <button onClick={async () => { setLoading(true); await onApprove(user.id, role); onClose(); }} disabled={loading} style={{
+            flex:2, background:T.brand||"#65B32E", color:"#fff",
+            border:"none", borderRadius:7, padding:"10px", fontSize:13, fontWeight:500,
+            cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1,
+            fontFamily:"'Poppins',sans-serif",
+          }}>{loading ? "Salvando..." : "Aprovar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSignOut, currentUser }) {
   const [users, setUsers]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState({});
+  const [approving, setApproving]   = useState(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -211,6 +261,11 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
     setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u));
     setRoleUpdating(r => ({ ...r, [userId]: false }));
+  };
+
+  const handleApprove = async (userId, newRole) => {
+    await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u));
   };
 
   const handleDelete = async (u) => {
@@ -391,6 +446,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                     <tr style={{ background: T.surfaceAlt || T.bg }}>
                       <th style={thStyle}>Nome</th>
                       <th style={thStyle}>E-mail</th>
+                      <th style={thStyle}>Entidade</th>
                       <th style={thStyle}>Perfil</th>
                       <th style={thStyle}>Criado em</th>
                       <th style={{ ...thStyle, textAlign: "center" }}>Ações</th>
@@ -433,9 +489,22 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
                             {u.email || "—"}
                           </td>
+                          <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
+                            {u.entidade ? (
+                              <span style={{ background:T.surfaceAlt||T.bg, border:`1px solid ${T.border}`, borderRadius:6, padding:"2px 8px", fontSize:11 }}>
+                                {u.entidade === "brasileirao-2026" ? "Brasileirão 2026" : u.entidade === "paulistao-feminino-2026" ? "Paulistão F 2026" : u.entidade}
+                              </span>
+                            ) : "—"}
+                          </td>
                           <td style={tdStyle}>
                             {isMe ? (
                               <RoleBadge role={u.role}/>
+                            ) : isPending ? (
+                              <button onClick={() => setApproving(u)} style={{
+                                background:"rgba(147,51,234,0.1)", border:"1px solid rgba(147,51,234,0.3)",
+                                color:"#9333EA", borderRadius:7, padding:"5px 12px",
+                                fontSize:12, fontWeight:500, cursor:"pointer", fontFamily:"'Poppins',sans-serif",
+                              }}>Revisar ▸</button>
                             ) : (
                               <select
                                 value={u.role || "visualizador"}
@@ -494,10 +563,15 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
       </div>
 
       {showInvite && (
-        <InviteModal
+        <InviteModal T={T} onClose={() => setShowInvite(false)} onSuccess={loadUsers}/>
+      )}
+      {approving && (
+        <ApprovalModal
+          user={approving}
           T={T}
-          onClose={() => setShowInvite(false)}
-          onSuccess={loadUsers}
+          onApprove={handleApprove}
+          onDeny={handleDelete}
+          onClose={() => setApproving(null)}
         />
       )}
     </div>

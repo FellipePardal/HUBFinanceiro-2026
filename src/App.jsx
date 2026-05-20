@@ -738,27 +738,38 @@ function FornecedorPage({ T, onSignOut }) {
   );
 }
 
-function LoginGate({ T, authError, setAuthError }) {
-  const [modo, setModo]       = useState("login"); // "login" | "cadastro"
-  const [email, setEmail]     = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro]       = useState("");
-  const [sucesso, setSucesso] = useState("");
+const ENTIDADES = [
+  { id: "brasileirao-2026",        label: "Brasileirão 2026" },
+  { id: "paulistao-feminino-2026", label: "Paulistão F 2026" },
+  { id: "outro",                   label: "Outro" },
+];
 
-  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); };
+function LoginGate({ T, authError, setAuthError }) {
+  const [modo, setModo]         = useState("login"); // "login" | "cadastro"
+  const [entidade, setEntidade] = useState("");
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [erro, setErro]         = useState("");
+  const [sucesso, setSucesso]   = useState("");
+
+  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); setEntidade(""); };
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setLoading(true);
     setErro(""); setAuthError(""); setSucesso("");
+    if (modo === "cadastro" && !entidade) { setErro("Selecione a entidade antes de continuar."); return; }
+    setLoading(true);
     if (modo === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setErro(error.message || "Credenciais inválidas"); setLoading(false); }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { entidade } },
+      });
       if (error) { setErro(error.message || "Erro ao criar conta"); setLoading(false); }
-      else { setSucesso("Conta criada! Aguarde a aprovação de um administrador para acessar o hub."); setLoading(false); }
+      else { setSucesso("Cadastro enviado! Aguarde a aprovação de um administrador para acessar o hub."); setLoading(false); }
     }
   };
 
@@ -811,6 +822,26 @@ function LoginGate({ T, authError, setAuthError }) {
         ) : (
           <>
             <form onSubmit={handleSubmit}>
+              {modo === "cadastro" && (
+                <div style={{marginBottom:10}}>
+                  <p style={{fontSize:11,fontWeight:600,color:T.textMd,letterSpacing:"0.06em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Poppins',sans-serif"}}>Entidade</p>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {ENTIDADES.map(en => (
+                      <label key={en.id} style={{
+                        display:"flex", alignItems:"center", gap:10,
+                        padding:"10px 14px", borderRadius:8, cursor:"pointer",
+                        border:`1px solid ${entidade===en.id ? (T.brand||"#65B32E") : T.border}`,
+                        background: entidade===en.id ? (T.brandSoft||"rgba(101,179,46,0.07)") : (T.surface||T.card),
+                        transition:"all 0.15s",
+                      }}>
+                        <input type="radio" name="entidade" value={en.id} checked={entidade===en.id} onChange={() => setEntidade(en.id)} style={{accentColor:T.brand||"#65B32E"}}/>
+                        <span style={{fontSize:13,color:T.text,fontFamily:"'Poppins',sans-serif",fontWeight: entidade===en.id ? 600 : 400}}>{en.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{height:1,background:T.border,margin:"14px 0 10px"}}/>
+                </div>
+              )}
               <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(""); }} placeholder="E-mail" autoFocus required style={inputStyle}/>
               <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthError(""); }} placeholder={modo==="cadastro" ? "Criar senha" : "Senha"} required style={{...inputStyle, marginBottom:0}}/>
               {anyError && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>{anyError}</p>}

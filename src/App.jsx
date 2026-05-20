@@ -966,6 +966,7 @@ export default function App() {
   const [hubFiltro, setHubFiltro] = useState("todos"); // filtro pré-aplicado ao abrir o Hub de Fornecedores
   const [user,        setUser]        = useState(null);
   const [role,        setRole]        = useState(null);
+  const [entidade,    setEntidade]    = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [customCampeonatos, setCustomCampeonatos] = useState([]);
   const [showNovoCampModal, setShowNovoCampModal] = useState(false);
@@ -978,9 +979,14 @@ export default function App() {
     let mounted = true;
 
     const loadRole = (userId) => {
-      supabase.from('profiles').select('role').eq('id', userId).single()
-        .then(({ data }) => { if (mounted) setRole(data?.role ?? 'visualizador'); })
-        .catch(() => { if (mounted) setRole('visualizador'); });
+      supabase.from('profiles').select('role, entidade').eq('id', userId).single()
+        .then(({ data }) => {
+          if (mounted) {
+            setRole(data?.role ?? 'visualizador');
+            setEntidade(data?.entidade ?? null);
+          }
+        })
+        .catch(() => { if (mounted) { setRole('visualizador'); setEntidade(null); } });
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -1093,8 +1099,23 @@ export default function App() {
   // Visualizador não acessa hub-fornecedores
   const paginaEfetiva = (effectiveRole === 'visualizador' && pagina === 'hub-fornecedores') ? 'home' : pagina;
 
-  if(paginaEfetiva==="brasileirao-2026") return <>{<Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
-  if(paginaEfetiva==="paulistao-feminino-2026") return <>{<Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
+  // Bloqueio por entidade para visualizador
+  const podeVerCamp = (campId) => {
+    if (effectiveRole !== 'visualizador') return true;
+    if (!entidade || entidade === 'outro') return true;
+    if (entidade === 'brasileirao-2026') return campId === 'brasileirao-2026';
+    if (entidade === 'paulistao-feminino-2026') return campId !== 'brasileirao-2026';
+    return true;
+  };
+
+  if(paginaEfetiva==="brasileirao-2026") {
+    if (!podeVerCamp('brasileirao-2026')) { setPagina("home"); return null; }
+    return <>{<Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
+  }
+  if(paginaEfetiva==="paulistao-feminino-2026") {
+    if (!podeVerCamp('paulistao-feminino-2026')) { setPagina("home"); return null; }
+    return <>{<Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
+  }
   if(paginaEfetiva?.startsWith("custom:")) {
     const id = paginaEfetiva.slice(7);
     const config = customCampeonatos.find(c => c.id === id);
@@ -1112,6 +1133,7 @@ export default function App() {
         T={T} darkMode={darkMode} setDarkMode={toggleDark}
         customCampeonatos={customCampeonatos}
         role={effectiveRole}
+        entidade={entidade}
         onSignOut={signOut}
         onCriarCampeonato={effectiveRole === 'admin' ? ()=>setShowNovoCampModal(true) : undefined}
         onExcluirCampeonato={effectiveRole === 'admin' ? excluirCampeonato : undefined}

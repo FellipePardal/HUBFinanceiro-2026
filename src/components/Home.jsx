@@ -219,8 +219,19 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
   );
 }
 
-export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, customCampeonatos = [], onCriarCampeonato, onExcluirCampeonato, role = 'admin', onSignOut }) {
-  const totalAtivos = CAMPEONATOS.filter(c => !c.emBreve).length + customCampeonatos.filter(c => c.status === "Em andamento").length;
+export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, customCampeonatos = [], onCriarCampeonato, onExcluirCampeonato, role = 'admin', entidade = null, onSignOut }) {
+  const filtroCamp = (c) => {
+    if (role !== 'visualizador') return true;
+    if (!entidade || entidade === 'outro') return true;
+    if (entidade === 'brasileirao-2026') return c.id === 'brasileirao-2026';
+    if (entidade === 'paulistao-feminino-2026') return c.id !== 'brasileirao-2026';
+    return true;
+  };
+  const campVisiveis = CAMPEONATOS.filter(filtroCamp);
+  const customVisiveis = role !== 'visualizador' ? customCampeonatos :
+    (entidade === 'brasileirao-2026' ? [] : customCampeonatos);
+
+  const totalAtivos = campVisiveis.filter(c => !c.emBreve).length + customVisiveis.filter(c => c.status === "Em andamento").length;
 
   return (
     <div className="page-enter" style={{ minHeight: "100vh", background: T.bg, color: T.text }}>
@@ -360,7 +371,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
           gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
           gap: 18,
         }}>
-          {CAMPEONATOS.map(camp => (
+          {campVisiveis.map(camp => (
             <ChampCard
               key={camp.id}
               camp={camp}
@@ -369,7 +380,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
             />
           ))}
 
-          {customCampeonatos.map(camp => (
+          {customVisiveis.map(camp => (
             <ChampCard
               key={camp.id}
               camp={camp}

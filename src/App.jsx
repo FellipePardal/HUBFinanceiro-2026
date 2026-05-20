@@ -880,6 +880,33 @@ import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
 import { REGISTRY_KEY } from "./data/customCampeonato";
 import { getState as getStateSb, setState as setStateSb } from "./lib/supabase";
 
+function RoleTestWidget({ roleOverride, onOverride, T }) {
+  const [open, setOpen] = useState(false);
+  const LABELS = { visualizador: 'Visualizador', fornecedor: 'Fornecedor' };
+  if (roleOverride) return (
+    <div style={{ position:'fixed', bottom:16, right:16, zIndex:9999, background:'#F59E0B', color:'#000', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, fontFamily:"'Poppins',sans-serif", display:'flex', alignItems:'center', gap:10, boxShadow:'0 2px 12px rgba(0,0,0,0.3)' }}>
+      Testando: {LABELS[roleOverride]}
+      <button onClick={() => onOverride(null)} style={{ background:'none', border:'none', cursor:'pointer', fontWeight:700, fontSize:16, lineHeight:1, color:'#000', padding:0 }}>×</button>
+    </div>
+  );
+  return (
+    <div style={{ position:'fixed', bottom:16, right:16, zIndex:9999 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ background:T.surface||T.card, border:`1px solid ${T.border}`, color:T.textMd, borderRadius:8, padding:'6px 12px', fontSize:11, cursor:'pointer', fontFamily:"'Poppins',sans-serif", boxShadow:'0 2px 8px rgba(0,0,0,0.2)' }}>
+        Testar como ▾
+      </button>
+      {open && (
+        <div style={{ position:'absolute', bottom:'calc(100% + 6px)', right:0, background:T.card||T.surface, border:`1px solid ${T.border}`, borderRadius:8, overflow:'hidden', minWidth:150, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>
+          {Object.entries(LABELS).map(([r, l]) => (
+            <button key={r} onClick={() => { onOverride(r); setOpen(false); }} style={{ display:'block', width:'100%', padding:'9px 14px', background:'none', border:'none', color:T.text, fontSize:12, cursor:'pointer', textAlign:'left', fontFamily:"'Poppins',sans-serif" }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => lsGet(LS_DARK, true));
   const [pagina,   setPagina]   = useState("home");
@@ -891,6 +918,7 @@ export default function App() {
   const [showNovoCampModal, setShowNovoCampModal] = useState(false);
   const [authError, setAuthError] = useState("");
   const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [roleOverride, setRoleOverride] = useState(null);
   const T = darkMode ? DARK : LIGHT;
 
   useEffect(() => {
@@ -997,23 +1025,28 @@ export default function App() {
   // Aguarda role carregar (query de profiles é não-bloqueante)
   if (role === null) return <LoadingScreen T={T}/>;
 
+  const effectiveRole = roleOverride ?? role;
+
+  const roleWidget = role === 'admin' && (
+    <RoleTestWidget roleOverride={roleOverride} onOverride={r => { setRoleOverride(r); setPagina("home"); }} T={T}/>
+  );
+
   // Fornecedor — só acessa formulário externo
-  if (role === 'fornecedor') return <FornecedorPage T={T} onSignOut={signOut}/>;
+  if (effectiveRole === 'fornecedor') return <>{<FornecedorPage T={T} onSignOut={roleOverride ? () => setRoleOverride(null) : signOut}/>}{roleWidget}</>;
 
   // Visualizador não acessa hub-fornecedores
-  const paginaEfetiva = (role === 'visualizador' && pagina === 'hub-fornecedores') ? 'home' : pagina;
+  const paginaEfetiva = (effectiveRole === 'visualizador' && pagina === 'hub-fornecedores') ? 'home' : pagina;
 
-  if(paginaEfetiva==="brasileirao-2026") return <Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={role} onSignOut={signOut}/>;
-  if(paginaEfetiva==="paulistao-feminino-2026") return <Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={role} onSignOut={signOut}/>;
+  if(paginaEfetiva==="brasileirao-2026") return <>{<Brasileirao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
+  if(paginaEfetiva==="paulistao-feminino-2026") return <>{<Paulistao onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} onSignOut={signOut}/>}{roleWidget}</>;
   if(paginaEfetiva?.startsWith("custom:")) {
     const id = paginaEfetiva.slice(7);
     const config = customCampeonatos.find(c => c.id === id);
-    if (config) return <CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
-    // Config não encontrado (ex: registry ainda carregando após reload). Volta ao home.
+    if (config) return <>{<CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>}{roleWidget}</>;
     setPagina("home");
     return null;
   }
-  if(paginaEfetiva==="hub-fornecedores") return <HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>;
+  if(paginaEfetiva==="hub-fornecedores") return <>{<HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>}{roleWidget}</>;
   if(paginaEfetiva==="admin-usuarios" && role==='admin') return <AdminUsuarios onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark} onSignOut={signOut} currentUser={user}/>;
   return (
     <>
@@ -1022,10 +1055,10 @@ export default function App() {
         onOpenHub={abrirHubFornecedores}
         T={T} darkMode={darkMode} setDarkMode={toggleDark}
         customCampeonatos={customCampeonatos}
-        role={role}
+        role={effectiveRole}
         onSignOut={signOut}
-        onCriarCampeonato={role === 'admin' ? ()=>setShowNovoCampModal(true) : undefined}
-        onExcluirCampeonato={role === 'admin' ? excluirCampeonato : undefined}
+        onCriarCampeonato={effectiveRole === 'admin' ? ()=>setShowNovoCampModal(true) : undefined}
+        onExcluirCampeonato={effectiveRole === 'admin' ? excluirCampeonato : undefined}
       />
       {role === 'admin' && showNovoCampModal && (
         <NovoCampeonatoModal
@@ -1034,6 +1067,7 @@ export default function App() {
           onSave={criarCampeonato}
         />
       )}
+      {roleWidget}
     </>
   );
 }

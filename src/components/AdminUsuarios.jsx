@@ -204,9 +204,11 @@ function ApprovalModal({ user, T, onApprove, onDeny, onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:T.surface||T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:28, width:"100%", maxWidth:400, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
         <h3 style={{ margin:"0 0 4px", fontFamily:FONT.display, fontSize:18, fontWeight:700, color:T.text }}>Aprovar cadastro</h3>
-        <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui }}>
+        <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui, lineHeight:1.8 }}>
           <strong style={{ color:T.text }}>{user.nome || user.email}</strong>
-          {user.entidade && <span> · {user.entidade}</span>}
+          {user.funcao && <span> · {user.funcao}</span>}
+          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "Brasileirão 2026" : user.entidade === "paulistao-feminino-2026" ? "Paulistão F 2026" : user.entidade}</span></>}
+          <br/><span style={{ color:T.textSm }}>{user.email}</span>
         </p>
 
         <label style={{ display:"block", fontSize:11, fontWeight:600, color:T.textMd, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:6, fontFamily:FONT.ui }}>
@@ -445,6 +447,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                   <thead>
                     <tr style={{ background: T.surfaceAlt || T.bg }}>
                       <th style={thStyle}>Nome</th>
+                      <th style={thStyle}>Função</th>
                       <th style={thStyle}>E-mail</th>
                       <th style={thStyle}>Entidade</th>
                       <th style={thStyle}>Perfil</th>
@@ -485,6 +488,9 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                                 }}>você</span>
                               )}
                             </div>
+                          </td>
+                          <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
+                            {u.funcao || <span style={{ fontStyle:"italic", color:T.textSm }}>—</span>}
                           </td>
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
                             {u.email || "—"}

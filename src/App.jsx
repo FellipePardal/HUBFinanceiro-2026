@@ -746,6 +746,8 @@ const ENTIDADES = [
 
 function LoginGate({ T, authError, setAuthError }) {
   const [modo, setModo]         = useState("login"); // "login" | "cadastro"
+  const [nome, setNome]         = useState("");
+  const [funcao, setFuncao]     = useState("");
   const [entidade, setEntidade] = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -753,7 +755,7 @@ function LoginGate({ T, authError, setAuthError }) {
   const [erro, setErro]         = useState("");
   const [sucesso, setSucesso]   = useState("");
 
-  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); setEntidade(""); };
+  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); setEntidade(""); setNome(""); setFuncao(""); };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -766,7 +768,7 @@ function LoginGate({ T, authError, setAuthError }) {
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { entidade } },
+        options: { data: { nome, funcao, entidade } },
       });
       if (error) { setErro(error.message || "Erro ao criar conta"); setLoading(false); }
       else { setSucesso("Cadastro enviado! Aguarde a aprovação de um administrador para acessar o hub."); setLoading(false); }
@@ -842,7 +844,11 @@ function LoginGate({ T, authError, setAuthError }) {
                   <div style={{height:1,background:T.border,margin:"14px 0 10px"}}/>
                 </div>
               )}
-              <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(""); }} placeholder="E-mail" autoFocus required style={inputStyle}/>
+              {modo === "cadastro" && <>
+                <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome completo *" required style={inputStyle}/>
+                <input type="text" value={funcao} onChange={e => setFuncao(e.target.value)} placeholder="Função (ex: Contador, Diretor Financeiro)" style={inputStyle}/>
+              </>}
+              <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(""); }} placeholder="E-mail" autoFocus={modo==="login"} required style={inputStyle}/>
               <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthError(""); }} placeholder={modo==="cadastro" ? "Criar senha" : "Senha"} required style={{...inputStyle, marginBottom:0}}/>
               {anyError && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>{anyError}</p>}
               <button type="submit" disabled={loading} style={{

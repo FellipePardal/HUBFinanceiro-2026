@@ -739,36 +739,45 @@ function FornecedorPage({ T, onSignOut }) {
 }
 
 function LoginGate({ T, authError, setAuthError }) {
+  const [modo, setModo]       = useState("login"); // "login" | "cadastro"
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro]       = useState("");
+  const [sucesso, setSucesso] = useState("");
+
+  const reset = (m) => { setModo(m); setErro(""); setSucesso(""); setAuthError(""); setEmail(""); setPassword(""); };
 
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
-    setErro(""); setAuthError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setErro(error.message || "Credenciais inválidas");
-      setLoading(false);
+    setErro(""); setAuthError(""); setSucesso("");
+    if (modo === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { setErro(error.message || "Credenciais inválidas"); setLoading(false); }
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) { setErro(error.message || "Erro ao criar conta"); setLoading(false); }
+      else { setSucesso("Conta criada! Aguarde a aprovação de um administrador para acessar o hub."); setLoading(false); }
     }
-    // On success, onAuthStateChange in App() handles state update.
   };
 
   const handleGoogleLogin = async () => {
     setErro(""); setAuthError("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-        queryParams: { hd: 'livemode.com' },
-      },
+      options: { redirectTo: window.location.origin, queryParams: { hd: 'livemode.com' } },
     });
     if (error) setErro(error.message);
   };
 
   const anyError = authError || erro;
+  const inputStyle = {
+    width:"100%", boxSizing:"border-box", marginBottom:10,
+    background:T.surface||T.card, border:`1px solid ${anyError ? (T.danger||"#DC2626") : T.borderStrong||T.muted||T.border}`,
+    borderRadius:8, padding:"12px 16px", fontSize:14, color:T.text,
+    fontFamily:"'Poppins',sans-serif", outline:"none",
+  };
 
   return (
     <div className="page-enter" style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Poppins',sans-serif"}}>
@@ -777,87 +786,68 @@ function LoginGate({ T, authError, setAuthError }) {
           <LivemodeLogo size={56} radius={12}/>
         </div>
         <h1 style={{textAlign:"center",fontFamily:FONT.display,fontSize:26,fontWeight:700,color:T.text,margin:"0 0 6px",letterSpacing:"-0.005em"}}>HUB FINANCEIRO</h1>
-        <p style={{textAlign:"center",color:T.textMd,fontSize:13,margin:"0 0 28px"}}>Acesso restrito — faça login com seu e-mail</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            value={email}
-            onChange={e => { setEmail(e.target.value); setAuthError(""); }}
-            placeholder="E-mail"
-            autoFocus
-            required
-            style={{
-              width:"100%",boxSizing:"border-box",marginBottom:10,
-              background:T.surface||T.card,border:`1px solid ${T.borderStrong||T.muted||T.border}`,
-              borderRadius:8,padding:"12px 16px",fontSize:14,color:T.text,
-              fontFamily:"'Poppins',sans-serif",
-              outline:"none",
-            }}
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setAuthError(""); }}
-            placeholder="Senha"
-            required
-            style={{
-              width:"100%",boxSizing:"border-box",
-              background:T.surface||T.card,border:`1px solid ${anyError ? (T.danger||"#DC2626") : T.borderStrong||T.muted||T.border}`,
-              borderRadius:8,padding:"12px 16px",fontSize:14,color:T.text,
-              fontFamily:"'Poppins',sans-serif",
-              transition:"border-color 0.2s",
-              outline:"none",
-            }}
-          />
-          {anyError && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>{anyError}</p>}
-          <button type="submit" disabled={loading} style={{
-            width:"100%",marginTop:16,
-            background: T.brand || "#65B32E",
-            color:"#fff",border:"none",borderRadius:7,padding:"10px",height:38,
-            cursor:loading?"not-allowed":"pointer",fontWeight:500,fontSize:13,fontFamily:"'Poppins',sans-serif",
-            opacity:loading?0.7:1,
-          }}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
 
-        {/* Divider */}
-        <div style={{display:"flex",alignItems:"center",gap:10,margin:"18px 0"}}>
-          <div style={{flex:1,height:1,background:T.border}}/>
-          <span style={{color:T.textSm,fontSize:11,whiteSpace:"nowrap",fontFamily:"'Poppins',sans-serif"}}>ou</span>
-          <div style={{flex:1,height:1,background:T.border}}/>
+        {/* Tabs */}
+        <div style={{display:"flex",background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:9,padding:3,margin:"16px 0 24px",gap:3}}>
+          {[["login","Entrar"],["cadastro","Criar conta"]].map(([m,l]) => (
+            <button key={m} onClick={() => reset(m)} style={{
+              flex:1, padding:"7px", borderRadius:7, border:"none", cursor:"pointer",
+              fontFamily:"'Poppins',sans-serif", fontSize:13, fontWeight:500,
+              background: modo===m ? (T.brand||"#65B32E") : "transparent",
+              color: modo===m ? "#fff" : T.textMd,
+              transition:"all 0.15s",
+            }}>{l}</button>
+          ))}
         </div>
 
-        {/* Google button */}
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          style={{
-            width:"100%",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-            background:"#fff",
-            color:"#3c4043",
-            border:"1px solid #dadce0",
-            borderRadius:7,
-            padding:"9px 16px",height:38,
-            cursor:"pointer",
-            fontWeight:500,fontSize:13,
-            fontFamily:"'Poppins',sans-serif",
-            boxShadow:"0 1px 2px rgba(60,64,67,0.12)",
-            transition:"box-shadow 0.15s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.boxShadow="0 2px 6px rgba(60,64,67,0.2)"}
-          onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 2px rgba(60,64,67,0.12)"}
-        >
-          {/* Google G SVG */}
-          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#EA4335" d="M24 9.5c3.1 0 5.9 1.1 8.1 2.9l6-6C34.5 3.1 29.5 1 24 1 14.8 1 7 6.6 3.4 14.4l7 5.4C12.2 13.6 17.6 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 2.9-2.2 5.4-4.6 7.1l7.1 5.5c4.2-3.9 6.3-9.6 6.3-16.6z"/>
-            <path fill="#FBBC05" d="M10.4 28.2A14.6 14.6 0 0 1 9.5 24c0-1.5.2-2.9.5-4.2l-7-5.4A23 23 0 0 0 1 24c0 3.7.9 7.2 2.5 10.3l6.9-6.1z"/>
-            <path fill="#34A853" d="M24 47c5.4 0 10-1.8 13.3-4.8l-7.1-5.5c-1.9 1.3-4.3 2-6.2 2-6.4 0-11.8-4.3-13.6-10.1l-6.9 6.1C7 40.5 14.8 47 24 47z"/>
-          </svg>
-          Entrar com Google
-        </button>
+        {sucesso ? (
+          <div style={{textAlign:"center",padding:"24px 0"}}>
+            <p style={{color:T.brand||"#65B32E",fontSize:14,fontWeight:500,margin:"0 0 16px",lineHeight:1.6}}>{sucesso}</p>
+            <button onClick={() => reset("login")} style={{
+              background:"transparent",border:`1px solid ${T.border}`,color:T.textMd,
+              borderRadius:7,padding:"8px 20px",fontSize:12,cursor:"pointer",fontFamily:"'Poppins',sans-serif",
+            }}>Voltar ao login</button>
+          </div>
+        ) : (
+          <>
+            <form onSubmit={handleSubmit}>
+              <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(""); }} placeholder="E-mail" autoFocus required style={inputStyle}/>
+              <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthError(""); }} placeholder={modo==="cadastro" ? "Criar senha" : "Senha"} required style={{...inputStyle, marginBottom:0}}/>
+              {anyError && <p style={{color:T.danger||"#DC2626",fontSize:12,textAlign:"center",margin:"8px 0 0",fontWeight:500}}>{anyError}</p>}
+              <button type="submit" disabled={loading} style={{
+                width:"100%",marginTop:16,background:T.brand||"#65B32E",
+                color:"#fff",border:"none",borderRadius:7,padding:"10px",height:38,
+                cursor:loading?"not-allowed":"pointer",fontWeight:500,fontSize:13,fontFamily:"'Poppins',sans-serif",
+                opacity:loading?0.7:1,
+              }}>{loading ? (modo==="cadastro" ? "Criando..." : "Entrando...") : (modo==="cadastro" ? "Criar conta" : "Entrar")}</button>
+            </form>
+
+            {modo === "login" && <>
+              <div style={{display:"flex",alignItems:"center",gap:10,margin:"18px 0"}}>
+                <div style={{flex:1,height:1,background:T.border}}/>
+                <span style={{color:T.textSm,fontSize:11,whiteSpace:"nowrap",fontFamily:"'Poppins',sans-serif"}}>ou</span>
+                <div style={{flex:1,height:1,background:T.border}}/>
+              </div>
+              <button type="button" onClick={handleGoogleLogin} style={{
+                width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                background:"#fff",color:"#3c4043",border:"1px solid #dadce0",borderRadius:7,
+                padding:"9px 16px",height:38,cursor:"pointer",fontWeight:500,fontSize:13,
+                fontFamily:"'Poppins',sans-serif",boxShadow:"0 1px 2px rgba(60,64,67,0.12)",transition:"box-shadow 0.15s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow="0 2px 6px rgba(60,64,67,0.2)"}
+                onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 2px rgba(60,64,67,0.12)"}
+              >
+                <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#EA4335" d="M24 9.5c3.1 0 5.9 1.1 8.1 2.9l6-6C34.5 3.1 29.5 1 24 1 14.8 1 7 6.6 3.4 14.4l7 5.4C12.2 13.6 17.6 9.5 24 9.5z"/>
+                  <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 2.9-2.2 5.4-4.6 7.1l7.1 5.5c4.2-3.9 6.3-9.6 6.3-16.6z"/>
+                  <path fill="#FBBC05" d="M10.4 28.2A14.6 14.6 0 0 1 9.5 24c0-1.5.2-2.9.5-4.2l-7-5.4A23 23 0 0 0 1 24c0 3.7.9 7.2 2.5 10.3l6.9-6.1z"/>
+                  <path fill="#34A853" d="M24 47c5.4 0 10-1.8 13.3-4.8l-7.1-5.5c-1.9 1.3-4.3 2-6.2 2-6.4 0-11.8-4.3-13.6-10.1l-6.9 6.1C7 40.5 14.8 47 24 47z"/>
+                </svg>
+                Entrar com Google
+              </button>
+            </>}
+          </>
+        )}
 
         <p style={{textAlign:"center",color:T.textSm,fontSize:10,margin:"24px 0 0",letterSpacing:"0.08em",textTransform:"uppercase"}}>
           Livemode · Transmissões · 2026

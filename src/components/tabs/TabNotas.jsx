@@ -1133,7 +1133,8 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
   );
 }
 
-export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false }) {
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false, role = 'admin' }) {
+  const canEdit = role === 'admin';
   const subsExcluir = subsExcluirExtra.length ? new Set([...SUBS_EXCLUIR, ...subsExcluirExtra]) : SUBS_EXCLUIR;
   const { portal: _portalRaw } = usePortalLink('brasileirao');
   const portal = usarPortal ? _portalRaw : null;
@@ -1406,7 +1407,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         <Segmented T={T} value={tab} onChange={setTab} options={TABS_NF}/>
         <div style={{display:"flex",gap:8}}>
           <Button T={T} variant="secondary" size="md" icon={FileText} onClick={()=>setShowLivemode(true)}>NF Livemode</Button>
-          <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowAvulsa(true)}>NF Avulsa</Button>
+          {canEdit && <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowAvulsa(true)}>NF Avulsa</Button>}
         </div>
       </div>
 
@@ -1426,7 +1427,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               <Chip key={r} active={rodadaEfetiva===r} onClick={()=>setRodadaSel(r)} T={T} color={purple}>{r}</Chip>
             ))}
           </div>
-          <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowRegistrar(true)}>Registrar NF (Rd {rodadaEfetiva})</Button>
+          {canEdit && <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowRegistrar(true)}>Registrar NF (Rd {rodadaEfetiva})</Button>}
         </div>
 
         {jogosRodada.map(jogo => {
@@ -1616,7 +1617,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                   {nota.hasFile
                                     ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(nota)}/>
                                     : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
-                                  <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(nota.id)}/>
+                                  {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(nota.id)}/>}
                                 </span>
                               )}
                           </td>
@@ -1649,7 +1650,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                           {n.hasFile
                             ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
                             : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
-                          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                          {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                         </span>
                       </div>
                     );
@@ -1757,7 +1758,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                         {n.hasFile
                           ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
                           : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
-                        <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                        {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                       </div>
                     </td>
                   </tr>

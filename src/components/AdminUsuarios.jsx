@@ -207,7 +207,7 @@ function ApprovalModal({ user, T, onApprove, onDeny, onClose }) {
         <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui, lineHeight:1.8 }}>
           <strong style={{ color:T.text }}>{user.nome || user.email}</strong>
           {user.funcao && <span> · {user.funcao}</span>}
-          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "Brasileirão 2026" : user.entidade === "paulistao-feminino-2026" ? "Paulistão F 2026" : user.entidade}</span></>}
+          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "FFU — Campeonato Brasileiro" : user.entidade === "paulistao-feminino-2026" ? "FPF — Campeonato Paulista F" : user.entidade}</span></>}
           <br/><span style={{ color:T.textSm }}>{user.email}</span>
         </p>
 
@@ -493,7 +493,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
                             {u.entidade ? (
                               <span style={{ background:T.surfaceAlt||T.bg, border:`1px solid ${T.border}`, borderRadius:6, padding:"2px 8px", fontSize:11 }}>
-                                {u.entidade === "brasileirao-2026" ? "Brasileirão 2026" : u.entidade === "paulistao-feminino-2026" ? "Paulistão F 2026" : u.entidade}
+                                {u.entidade === "brasileirao-2026" ? "FFU" : u.entidade === "paulistao-feminino-2026" ? "FPF" : u.entidade}
                               </span>
                             ) : "—"}
                           </td>

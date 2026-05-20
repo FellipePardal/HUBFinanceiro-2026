@@ -682,7 +682,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T} role={role}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
@@ -739,8 +739,8 @@ function FornecedorPage({ T, onSignOut }) {
 }
 
 const ENTIDADES = [
-  { id: "brasileirao-2026",        label: "Brasileirão 2026" },
-  { id: "paulistao-feminino-2026", label: "Paulistão F 2026" },
+  { id: "brasileirao-2026",        label: "FFU — Campeonato Brasileiro" },
+  { id: "paulistao-feminino-2026", label: "FPF — Campeonato Paulista F" },
   { id: "outro",                   label: "Outro" },
 ];
 
@@ -760,7 +760,12 @@ function LoginGate({ T, authError, setAuthError }) {
   const handleSubmit = async e => {
     e.preventDefault();
     setErro(""); setAuthError(""); setSucesso("");
-    if (modo === "cadastro" && !entidade) { setErro("Selecione a entidade antes de continuar."); return; }
+    if (modo === "cadastro") {
+      if (!entidade) { setErro("Selecione a entidade antes de continuar."); return; }
+      if (password.length < 8) { setErro("Senha deve ter no mínimo 8 caracteres."); return; }
+      if (!/[A-Z]/.test(password)) { setErro("Senha deve ter pelo menos 1 letra maiúscula."); return; }
+      if (!/[^A-Za-z0-9]/.test(password)) { setErro("Senha deve ter pelo menos 1 caractere especial."); return; }
+    }
     setLoading(true);
     if (modo === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });

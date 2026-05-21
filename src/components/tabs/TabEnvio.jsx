@@ -14,7 +14,8 @@ const makePublicToken = () => {
   return `envio_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 };
 
-export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [], servicos, envios, setEnvios, T, enviosKey = "envios", dedupeNotasPorNF = false }) {
+export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [], servicos, envios, setEnvios, T, enviosKey = "envios", dedupeNotasPorNF = false, role = 'admin' }) {
+  const canEdit = role === 'admin';
   const [view, setView] = useState("lista");
   const [envioDetalheId, setEnvioDetalheId] = useState(null);
 
@@ -714,10 +715,14 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                       <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
                       <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataPagamento||"—"}</td>
                       <td style={TS.td}>
-                        <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(envioDetalhe.id, n.id, "mensal", e.target.value)}
-                          style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
-                          {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
-                        </select>
+                        {canEdit ? (
+                          <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(envioDetalhe.id, n.id, "mensal", e.target.value)}
+                            style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                            {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
+                          </select>
+                        ) : (
+                          <span style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700}}>{n.statusNota||"Pendente"}</span>
+                        )}
                       </td>
                       <td style={TS.td}>{n.hasFile && (
                         <div style={{display:"flex",gap:4}}>
@@ -726,7 +731,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                         </div>
                       )}</td>
                       <td style={TS.td}>
-                        <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "mensal")}/>
+                        {canEdit && <Button T={T} variant="danger" size="sm" icon={X} onClick={()=>removerNotaDoEnvio(envioDetalhe.id, n.id, "mensal")}/>}
                       </td>
                     </tr>
                   ))}

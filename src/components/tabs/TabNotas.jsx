@@ -1395,7 +1395,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     {value:"rodada", label:"Por Rodada"},
     {value:"planilha", label:"Planilha"},
     {value:"resumo", label:"Resumo"},
-    {value:"recebidas", label:"Recebidas"},
+    ...(canEdit ? [{value:"recebidas", label:"Recebidas"}] : []),
   ];
   const TS = tableStyles(T);
   const purple = "#a855f7";

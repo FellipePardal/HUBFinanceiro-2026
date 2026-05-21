@@ -373,7 +373,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
   const TABS_NF   = role === 'visualizador' ? ["notas fiscais","mensal"] : ["notas fiscais","mensal","serviços livemode"];
-  const TABS_REL  = role === 'visualizador' ? ["apresentações"] : ["apresentações","envio"];
+  const TABS_REL  = role === 'visualizador' ? ["envio"] : ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "logistica" ? TABS_LOG : TABS_REL;
 
@@ -384,7 +384,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
     else if (s === "logistica") setTab("logística");
-    else if (s === "relatorio") setTab("apresentações");
+    else if (s === "relatorio") setTab(role === 'visualizador' ? "envio" : "apresentações");
   };
 
   if (loading) return (

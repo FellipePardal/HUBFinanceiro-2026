@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { zip } from "fflate";
 import { getState, setState, getNFFile } from "../lib/supabase";
 import { countNotasFiscais, getEnvioMetricas } from "../lib/notasFiscais";
 import { CheckCircle2, Clock, Printer, Download, Radio } from "lucide-react";
@@ -90,11 +91,38 @@ export default function EnvioPublico({ numero, envioRef }) {
       ...(ev.mensaisResumo||[]).filter(n=>n.hasFile).map(n=>({id:n.id, nome: `NF_${n.fornecedor}_${n.mesLabel||n.mes}`})),
       ...(ev.livemodeResumo||[]).filter(n=>n.hasFile).map(n=>({id:n.id, nome: `NF_LM_${n.fornecedor}`})),
     ];
+
+    const files = {};
+    const usedNames = {};
     for (const arq of arquivos) {
-      await downloadNF(arq.id, arq.nome);
-      await new Promise(r => setTimeout(r, 350));
+      const data = await getNFFile(arq.id);
+      if (!data) continue;
+      const commaIdx = data.indexOf(',');
+      const ext = data.slice(0, commaIdx).match(/\/([^;]+)/)?.[1] || 'pdf';
+      const binary = atob(data.slice(commaIdx + 1));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const base = arq.nome.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 60);
+      const count = (usedNames[base] = (usedNames[base] || 0) + 1);
+      files[count > 1 ? `${base}_${count}.${ext}` : `${base}.${ext}`] = [bytes, { level: 0 }];
     }
-    setDownloadingAll(false);
+
+    if (!Object.keys(files).length) {
+      alert('Nenhum arquivo com anexo encontrado');
+      setDownloadingAll(false);
+      return;
+    }
+
+    zip(files, (err, data) => {
+      setDownloadingAll(false);
+      if (err) { alert('Erro ao gerar ZIP'); return; }
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/zip' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `NFs_Envio${ev.numero ? '_' + ev.numero : ''}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
   };
 
   const updateNotaStatus = async (notaId, tipo, novoStatus) => {

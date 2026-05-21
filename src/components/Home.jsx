@@ -386,11 +386,11 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
               camp={camp}
               T={T}
               onEnter={(id) => onEnter(`custom:${camp.id}`)}
-              onDelete={(c) => {
+              onDelete={onExcluirCampeonato ? (c) => {
                 if (window.confirm(`Excluir o campeonato "${c.nome}"? Os dados (jogos, notas, logística) ficam no Supabase mas o campeonato some do portal.`)) {
-                  onExcluirCampeonato && onExcluirCampeonato(c.id);
+                  onExcluirCampeonato(c.id);
                 }
-              }}
+              } : undefined}
             />
           ))}
 
@@ -430,7 +430,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
         </div>
 
         {/* ── Módulos Transversais ────────────────────────────────── */}
-        <div style={{ marginTop: 44, marginBottom: 14 }}>
+        {role !== 'visualizador' && <div style={{ marginTop: 44, marginBottom: 14 }}>
           <h3 style={{
             margin: 0,
             fontFamily: FONT.display,
@@ -448,9 +448,9 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
           <p style={{ color: T.textSm, fontSize: 11, margin: "2px 0 0", fontFamily: FONT.ui }}>
             Ferramentas financeiras transversais a todos os campeonatos
           </p>
-        </div>
+        </div>}
 
-        <div style={{
+        {role !== 'visualizador' && <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
           gap: 18,
@@ -533,7 +533,7 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
               Abrir Hub <ArrowRight size={14} strokeWidth={2.25}/>
             </div>
           </button>
-        </div>
+        </div>}
 
         <div style={{
           marginTop: 56,

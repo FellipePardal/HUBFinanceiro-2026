@@ -358,8 +358,8 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   }, [divulgados]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
-  const TABS_NF   = ["notas fiscais","mensal","serviços livemode"];
-  const TABS_REL  = ["apresentações","envio"];
+  const TABS_NF   = role === 'visualizador' ? ["notas fiscais","mensal"] : ["notas fiscais","mensal","serviços livemode"];
+  const TABS_REL  = role === 'visualizador' ? ["apresentações"] : ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor==="orcamento" ? TABS_ORC : setor==="notas" ? TABS_NF : setor==="logistica" ? TABS_LOG : TABS_REL;
 
@@ -585,7 +585,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} T={T} submissionsKey="paulistao_nf_submissions" historicoKey="paulistao_nf_historico" formHash="#formulario-paulistao" usarPortal={false} subsExcluirExtra={["downlink","distribuicao","maquinas"]} dedupeNotasPorNF={true} role={role}/>}
-        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
+        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T} useOrcadoLivemode={true}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}

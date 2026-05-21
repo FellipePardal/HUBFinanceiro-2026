@@ -1406,7 +1406,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <Segmented T={T} value={tab} onChange={setTab} options={TABS_NF}/>
         <div style={{display:"flex",gap:8}}>
-          <Button T={T} variant="secondary" size="md" icon={FileText} onClick={()=>setShowLivemode(true)}>NF Livemode</Button>
+          {canEdit && <Button T={T} variant="secondary" size="md" icon={FileText} onClick={()=>setShowLivemode(true)}>NF Livemode</Button>}
           {canEdit && <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowAvulsa(true)}>NF Avulsa</Button>}
         </div>
       </div>

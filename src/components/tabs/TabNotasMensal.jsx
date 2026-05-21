@@ -238,7 +238,8 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
   );
 }
 
-export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], T }) {
+export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], T, role = 'admin' }) {
+  const canEdit = role === 'admin';
   const [mesSel, setMesSel] = useState(new Date().getMonth());
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [showNova, setShowNova] = useState(false);
@@ -343,7 +344,7 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
             <Chip key={c} active={filtroCat===c} onClick={()=>setFiltroCat(c)} T={T} color={cyan}>{c}</Chip>
           ))}
         </div>
-        <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowNova(true)}>Nova NF Mensal</Button>
+        {canEdit && <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowNova(true)}>Nova NF Mensal</Button>}
       </div>
 
       {resumoCat.length > 0 && (

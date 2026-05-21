@@ -37,6 +37,7 @@ export default function EnvioPublico({ numero, envioRef }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [payerName, setPayerName] = useState("");
   const [paying, setPaying] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
   const { stateKey, target } = parseEnvioRef(envioRef ?? numero);
   const dedupeNotasPorNF = stateKey === "paulistao_envios";
 
@@ -80,6 +81,20 @@ export default function EnvioPublico({ numero, envioRef }) {
     const data = await getNFFile(id);
     if (!data) { alert("Arquivo não encontrado"); return; }
     const a = document.createElement("a"); a.href = data; a.download = filename; a.click();
+  };
+
+  const downloadAll = async (ev) => {
+    setDownloadingAll(true);
+    const arquivos = [
+      ...(ev.notasResumo||[]).filter(n=>n.hasFile).map(n=>({id:n.id, nome: n.codigo || `NF_${n.fornecedor}`})),
+      ...(ev.mensaisResumo||[]).filter(n=>n.hasFile).map(n=>({id:n.id, nome: `NF_${n.fornecedor}_${n.mesLabel||n.mes}`})),
+      ...(ev.livemodeResumo||[]).filter(n=>n.hasFile).map(n=>({id:n.id, nome: `NF_LM_${n.fornecedor}`})),
+    ];
+    for (const arq of arquivos) {
+      await downloadNF(arq.id, arq.nome);
+      await new Promise(r => setTimeout(r, 350));
+    }
+    setDownloadingAll(false);
   };
 
   const updateNotaStatus = async (notaId, tipo, novoStatus) => {
@@ -162,7 +177,16 @@ export default function EnvioPublico({ numero, envioRef }) {
         </div>
       </div>
 
-      <div style={{maxWidth:960,margin:"0 auto",padding:"20px 24px 0",textAlign:"right"}} className="no-print">
+      <div style={{maxWidth:960,margin:"0 auto",padding:"20px 24px 0",display:"flex",justifyContent:"flex-end",gap:10,flexWrap:"wrap"}} className="no-print">
+        {(() => {
+          const total = [...(envio.notasResumo||[]),...(envio.mensaisResumo||[]),...(envio.livemodeResumo||[])].filter(n=>n.hasFile).length;
+          return total > 0 ? (
+            <button onClick={()=>downloadAll(envio)} disabled={downloadingAll} style={{background:T.info,color:"#fff",border:"none",borderRadius:10,padding:"10px 20px",cursor:downloadingAll?"default":"pointer",fontWeight:600,fontSize:13,display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 1px 3px rgba(15,23,42,0.12)",opacity:downloadingAll?0.7:1}}>
+              <Download size={15} strokeWidth={2.25}/>
+              {downloadingAll ? "Baixando..." : `Baixar todas (${total})`}
+            </button>
+          ) : null;
+        })()}
         <button onClick={() => window.print()} style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 20px",cursor:"pointer",fontWeight:600,fontSize:13,display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 1px 3px rgba(15,23,42,0.06)"}}>
           <Printer size={15} strokeWidth={2.25}/>
           Imprimir / Salvar PDF

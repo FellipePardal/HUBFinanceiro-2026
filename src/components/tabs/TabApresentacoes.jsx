@@ -587,7 +587,10 @@ return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll, provTotalAnua
 const [overrides, setOverrides] = usePersistedState(storagePrefix + "_apres_fix_overrides", {});
 const setSecField = (secao, field, val) =>
 setOverrides(prev => ({...prev, [secao]: {...prev[secao], [field]: val}}));
-const resetOverrides = () => setOverrides({});
+const [orcTotOvr,   setOrcTotOvr]   = usePersistedState(storagePrefix + "_apres_fix_orcTot",   "");
+const [provTotOvr,  setProvTotOvr]  = usePersistedState(storagePrefix + "_apres_fix_provTot",  "");
+const [gastoTotOvr, setGastoTotOvr] = usePersistedState(storagePrefix + "_apres_fix_gastoTot", "");
+const resetOverrides = () => { setOverrides({}); setOrcTotOvr(""); setProvTotOvr(""); setGastoTotOvr(""); };
 
 // View aplicando overrides
 const sectionsView = computed.sections.map(s => ({
@@ -652,7 +655,11 @@ useDonut(canvasRef, nfRecV, nfPend);
 const [expandedSecs, setExpandedSecs] = useState({});
 const toggleSec = secao => setExpandedSecs(prev => ({...prev, [secao]: !prev[secao]}));
 
-const orcTotalFmt = fmtNum(orcTotal);
+const orcTotEff   = orcTotOvr   !== "" ? parseBR(orcTotOvr)   : orcTotal;
+const provTotEff  = provTotOvr  !== "" ? parseBR(provTotOvr)  : provTotal;
+const gastoTotEff = gastoTotOvr !== "" ? parseBR(gastoTotOvr) : gastoTotal;
+const saldoTotEff = orcTotEff - provTotEff;
+const orcTotalFmt = fmtNum(orcTotEff);
 const IS    = {...iSty(T), width:"100%"};
 const IS_RO = {...IS, background:T.bg, cursor:"default"};
 const grid3  = {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20};
@@ -692,12 +699,12 @@ async function gerarPPTX() {
     const kW = 3.1, kH = 1.0, kY = 0.94, kGap = 0.077;
     const kpis = [
       { num: "1", label: "ORÇAMENTO TOTAL (CAMPEONATO)",            val: fmtBRL(computed.orcAnualTotal), valColor: "9CA3AF", accent: false },
-      { num: "2", label: `ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val: fmtBRL(orcTotal),        valColor: "111827", accent: false },
-      { num: "3", label: `REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,     val: fmtBRL(provTotal),       valColor: "111827", accent: false },
+      { num: "2", label: `ORÇADO ACUM. (ATÉ ${mesLabel.toUpperCase()})`, val: fmtBRL(orcTotEff),        valColor: "111827", accent: false },
+      { num: "3", label: `REALIZADO (ATÉ ${mesLabel.toUpperCase()})`,     val: fmtBRL(provTotEff),       valColor: "111827", accent: false },
       {
         num: "4", label: "SALDO ACUMULADO",
-        val: (saldoTotal >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saldoTotal)),
-        valColor: saldoTotal >= 0 ? "16A34A" : "DC2626",
+        val: (saldoTotEff >= 0 ? "▲ " : "▼ ") + fmtBRL(Math.abs(saldoTotEff)),
+        valColor: saldoTotEff >= 0 ? "16A34A" : "DC2626",
         accent: true
       },
     ];
@@ -871,25 +878,26 @@ return (
         <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Itens "por rodada" acumulam {Math.round(Math.min(rodadaAtual, 13)/13*100)}% / {Math.round(Math.min(rodadaAtual, 7)/7*100)}% do orçado</p>
       </div>}
       <div style={{marginBottom:16}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={orcTotalFmt} style={{...IS_RO}} title={`Anual: ${fmtR(computed.orcAnualTotal)} — lineares ÷ 12 × ${mesesDecorridos}; pontuais integrais`}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} · lineares ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"} · pontuais integrais</p>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até {MESES_FIX[mesAtual]} {orcTotOvr===""&&<span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span>}</label>
+        <input value={orcTotOvr===""?fmtNum(orcTotal):orcTotOvr} onChange={e=>setOrcTotOvr(e.target.value)} onFocus={e=>{if(orcTotOvr==="")setOrcTotOvr(fmtNum(orcTotal));}} style={{...IS}} title={`Auto: ${fmtR(orcTotal)}`}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.orcAnualTotal)} · auto: {fmtR(orcTotal)}{orcTotOvr!==""&&<span style={{color:"#f59e0b"}}> · override ativo</span>}</p>
       </div>
       <div style={{marginBottom:16}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Realizado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={fmtNum(provTotal)} style={{...IS_RO,color:"#3b82f6"}} title={`Anual: ${fmtR(computed.provTotalAnualAll)} — lineares ÷ 12 × ${mesesDecorridos}; pontuais integrais`}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provTotalAnualAll)} · lineares ÷ 12 × {mesesDecorridos} {mesesDecorridos===1?"mês":"meses"} · pontuais integrais</p>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Realizado Acumulado até {MESES_FIX[mesAtual]} {provTotOvr===""&&<span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span>}</label>
+        <input value={provTotOvr===""?fmtNum(provTotal):provTotOvr} onChange={e=>setProvTotOvr(e.target.value)} onFocus={e=>{if(provTotOvr==="")setProvTotOvr(fmtNum(provTotal));}} style={{...IS,color:"#3b82f6"}} title={`Auto: ${fmtR(provTotal)}`}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Anual: {fmtR(computed.provTotalAnualAll)} · auto: {fmtR(provTotal)}{provTotOvr!==""&&<span style={{color:"#f59e0b"}}> · override ativo</span>}</p>
       </div>
     </div>
     <div style={grid3}>
       <div style={{marginBottom:0}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={fmtNum(gastoTotal)} style={{...IS_RO,color:"#22c55e"}}/>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Gasto Acumulado até {MESES_FIX[mesAtual]} {gastoTotOvr===""&&<span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span>}</label>
+        <input value={gastoTotOvr===""?fmtNum(gastoTotal):gastoTotOvr} onChange={e=>setGastoTotOvr(e.target.value)} onFocus={e=>{if(gastoTotOvr==="")setGastoTotOvr(fmtNum(gastoTotal));}} style={{...IS,color:"#22c55e"}} title={`Auto: ${fmtR(gastoTotal)}`}/>
+        {gastoTotOvr!==""&&<p style={{fontSize:10,color:"#f59e0b",margin:"4px 0 0"}}>override ativo · auto: {fmtR(gastoTotal)}</p>}
       </div>
       <div style={{marginBottom:0}}>
         <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − Realizado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
-        <input readOnly value={fmtNum(saldoTotal)} style={{...IS_RO, color: saldoTotal >= 0 ? "#a3e635" : "#ef4444"}}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotal)} (orç.) − {fmtR(provTotal)} (real.) = {saldoTotal >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotal))}</p>
+        <input readOnly value={fmtNum(saldoTotEff)} style={{...IS_RO, color: saldoTotEff >= 0 ? "#a3e635" : "#ef4444"}}/>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotEff)} (orç.) − {fmtR(provTotEff)} (real.) = {saldoTotEff >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotEff))}</p>
       </div>
     </div>
   </div>

@@ -480,7 +480,7 @@ return (
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
 const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra", mesInicio = 0, jogos = []}) {
+function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra", mesInicio = 0, jogos = [], saldoUsaGasto = false}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
 const [mesAtual, setMesAtual] = usePersistedState(storagePrefix + "_apres_fix_mes", () => new Date().getMonth());
@@ -605,14 +605,13 @@ const rows = sectionsView.map(s => {
 const orc   = parseBR(s.orc);
 const prov  = parseBR(s.prov);
 const gasto = parseBR(s.gasto);
-// "Outros Mensais" não tem provisionado — saldo compara orçado com gasto real
-const saldo = s.secao === "Outros Mensais" ? orc - gasto : orc - prov;
+const saldo = (saldoUsaGasto || s.secao === "Outros Mensais") ? orc - gasto : orc - prov;
 return { secao: s.secao, orc, prov, gasto, saldo };
 });
 const orcTotal   = rows.reduce((s, r) => s + r.orc, 0);
 const provTotal  = rows.reduce((s, r) => s + r.prov, 0);
 const gastoTotal = rows.reduce((s, r) => s + r.gasto, 0);
-const saldoTotal = orcTotal - provTotal;
+const saldoTotal = saldoUsaGasto ? orcTotal - gastoTotal : orcTotal - provTotal;
 return { rows, orcTotal, provTotal, gastoTotal, saldoTotal };
 }, [sectionsView]);
 
@@ -658,7 +657,7 @@ const toggleSec = secao => setExpandedSecs(prev => ({...prev, [secao]: !prev[sec
 const orcTotEff   = orcTotOvr   !== "" ? parseBR(orcTotOvr)   : orcTotal;
 const provTotEff  = provTotOvr  !== "" ? parseBR(provTotOvr)  : provTotal;
 const gastoTotEff = gastoTotOvr !== "" ? parseBR(gastoTotOvr) : gastoTotal;
-const saldoTotEff = orcTotEff - provTotEff;
+const saldoTotEff = saldoUsaGasto ? orcTotEff - gastoTotEff : orcTotEff - provTotEff;
 const orcTotalFmt = fmtNum(orcTotEff);
 const IS    = {...iSty(T), width:"100%"};
 const IS_RO = {...IS, background:T.bg, cursor:"default"};
@@ -895,7 +894,7 @@ return (
         {gastoTotOvr!==""&&<p style={{fontSize:10,color:"#f59e0b",margin:"4px 0 0"}}>override ativo · auto: {fmtR(gastoTotal)}</p>}
       </div>
       <div style={{marginBottom:0}}>
-        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − Realizado) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − {saldoUsaGasto?"Gasto":"Realizado"}) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
         <input readOnly value={fmtNum(saldoTotEff)} style={{...IS_RO, color: saldoTotEff >= 0 ? "#a3e635" : "#ef4444"}}/>
         <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotEff)} (orç.) − {fmtR(provTotEff)} (real.) = {saldoTotEff >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotEff))}</p>
       </div>
@@ -918,7 +917,7 @@ return (
           {sectionsView.map((s, i) => {
             const orcVal   = parseBR(s.orc);
             const provVal  = parseBR(s.prov);
-            const sav      = orcVal - provVal;
+            const sav      = saldoUsaGasto ? orcVal - parseBR(s.gasto) : orcVal - provVal;
             const debug    = computed.sections.find(x => x.secao === s.secao)?.itensDebug || [];
             const MESES_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
             const expanded = !!expandedSecs[s.secao];
@@ -1356,7 +1355,7 @@ function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
 const MESES_DEFAULT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const VAR_CATS_FIX_DEFAULT = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
 
-export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = [], storagePrefix = "bra", orcGlobal = 10130480, mesInicio = 0}) {
+export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = [], storagePrefix = "bra", orcGlobal = 10130480, mesInicio = 0, saldoUsaGasto = false}) {
   const [tipo, setTipo] = useState(null);
   const [dadosVar, setDadosVar] = usePersistedState(storagePrefix + "_apres_var_dados", null);
   const [dadosFix, setDadosFix] = usePersistedState(storagePrefix + "_apres_fix_dados", null);
@@ -1509,7 +1508,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "fixos")
     return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
-              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio} jogos={jogos}/>;
+              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio} jogos={jogos} saldoUsaGasto={saldoUsaGasto}/>;
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}

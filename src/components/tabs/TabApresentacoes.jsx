@@ -620,6 +620,10 @@ const provTotalAnual    = computed.provTotalAnualAll;
 // Pendente de NF ignora serviços encerrados: exclui do prov anual e desconta seu gasto.
 const provAtivoBase     = computed.provTotalAnualAtivos;
 const gastoAtivo        = Math.max(0, gastoTotal - (computed.gastoEncerradosTotal || 0));
+const orcTotEff   = orcTotOvr   !== "" ? parseBR(orcTotOvr)   : orcTotal;
+const provTotEff  = provTotOvr  !== "" ? parseBR(provTotOvr)  : provTotal;
+const gastoTotEff = gastoTotOvr !== "" ? parseBR(gastoTotOvr) : gastoTotal;
+const saldoTotEff = saldoUsaGasto ? orcTotEff - gastoTotEff : orcTotEff - provTotEff;
 const nfRecV = gastoAtivo;
 const nfPend = saldoUsaGasto
   ? Math.max(0, gastoTotEff - nfRecV)
@@ -657,10 +661,6 @@ useDonut(canvasRef, nfRecV, nfPend);
 const [expandedSecs, setExpandedSecs] = useState({});
 const toggleSec = secao => setExpandedSecs(prev => ({...prev, [secao]: !prev[secao]}));
 
-const orcTotEff   = orcTotOvr   !== "" ? parseBR(orcTotOvr)   : orcTotal;
-const provTotEff  = provTotOvr  !== "" ? parseBR(provTotOvr)  : provTotal;
-const gastoTotEff = gastoTotOvr !== "" ? parseBR(gastoTotOvr) : gastoTotal;
-const saldoTotEff = saldoUsaGasto ? orcTotEff - gastoTotEff : orcTotEff - provTotEff;
 const orcTotalFmt = fmtNum(orcTotEff);
 const IS    = {...iSty(T), width:"100%"};
 const IS_RO = {...IS, background:T.bg, cursor:"default"};

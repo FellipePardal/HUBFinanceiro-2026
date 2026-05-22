@@ -1133,9 +1133,9 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
   );
 }
 
-export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false, role = 'admin' }) {
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], subsExcluirRemover = [], dedupeNotasPorNF = false, role = 'admin' }) {
   const canEdit = role === 'admin';
-  const subsExcluir = subsExcluirExtra.length ? new Set([...SUBS_EXCLUIR, ...subsExcluirExtra]) : SUBS_EXCLUIR;
+  const subsExcluir = new Set([...SUBS_EXCLUIR, ...subsExcluirExtra].filter(k => !subsExcluirRemover.includes(k)));
   const { portal: _portalRaw } = usePortalLink('brasileirao');
   const portal = usarPortal ? _portalRaw : null;
 
@@ -1250,7 +1250,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     setJogos(js => js.map(j => {
       const realizado = {...(j.realizado || {})};
       CATS.forEach(cat => cat.subs.forEach(sub => {
-        if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
+        if (!subsExcluir.has(sub.key)) realizado[sub.key] = 0;
       }));
       // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
       // antes do alias sng_host->sng / sng_premiere->sng_extra)

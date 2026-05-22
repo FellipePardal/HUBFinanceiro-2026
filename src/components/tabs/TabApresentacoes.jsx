@@ -78,9 +78,7 @@ return (
 }
 
 // ─── FORM VARIÁVEIS ───────────────────────────────────────────────────────────
-const ORC_GLOBAL_FIXO = 10130480; // Orçado total variáveis do campeonato (travado)
-
-function FormVariaveis({T, onBack, jogos = [], onDadosCalculados}) {
+function FormVariaveis({T, onBack, jogos = [], onDadosCalculados, storagePrefix = "bra", orcGlobal = 10130480}) {
 const [status,      setStatus]      = useState({msg:"Pronto para gerar",cls:""});
 const [loading,     setLoading]     = useState(false);
 const canvasRef = useRef(null);
@@ -90,7 +88,7 @@ const rodadasDisp = useMemo(() =>
 Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b),
 [jogos]);
 
-const [rodadaAtual, setRodadaAtual] = usePersistedState("apres_var_rodada", () => rodadasDisp[rodadasDisp.length-1] || 1);
+const [rodadaAtual, setRodadaAtual] = usePersistedState(storagePrefix + "_apres_var_rodada", () => rodadasDisp[rodadasDisp.length-1] || 1);
 useEffect(() => {
 if (rodadasDisp.length && !rodadasDisp.includes(rodadaAtual)) {
 setRodadaAtual(rodadasDisp[rodadasDisp.length-1]);
@@ -118,13 +116,13 @@ return { orcAteRod, realAteRod, provAteRod, rodadasAuto };
 }, [jogos, rodadaAtual, rodadasDisp]);
 
 // Overrides por linha (rodada → {orcado?, realizado?})
-const [overrides, setOverrides] = usePersistedState("apres_var_overrides", {});
+const [overrides, setOverrides] = usePersistedState(storagePrefix + "_apres_var_overrides", {});
 const setRodadaField = (rodada, field, val) =>
 setOverrides(prev => ({...prev, [rodada]: {...prev[rodada], [field]: val}}));
 
 // Overrides do bloco "Notas Fiscais" — vazio = usar valor automático da tabela
-const [nfEspOverride, setNfEspOverride] = usePersistedState("apres_var_nfEsp", "");
-const [nfRecOverride, setNfRecOverride] = usePersistedState("apres_var_nfRec", "");
+const [nfEspOverride, setNfEspOverride] = usePersistedState(storagePrefix + "_apres_var_nfEsp", "");
+const [nfRecOverride, setNfRecOverride] = usePersistedState(storagePrefix + "_apres_var_nfRec", "");
 const resetOverrides = () => { setOverrides({}); setNfEspOverride(""); setNfRecOverride(""); };
 
 // View da tabela aplicando overrides
@@ -158,14 +156,14 @@ const grid3  = {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20};
 const secHdr = {fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:T.text,marginBottom:16};
 const secNum = {fontSize:10,color:T.textSm,fontWeight:700,marginRight:8};
 const {rows, totOrc, totReal, saving, savPct, nfPend, pctRec, nfRecV, nfEspV, autoNfEspV, autoNfRecV} = parsed;
-const orcGlobalFmt = fmtNum(ORC_GLOBAL_FIXO);
+const orcGlobalFmt = fmtNum(orcGlobal);
 // Orçado acumulado = total da coluna Orçado da tabela (com overrides)
 const orcAteRodFmt = fmtNum(totOrc);
 
 useEffect(() => {
   if (onDadosCalculados) {
     onDadosCalculados({
-      orcGlobal:   ORC_GLOBAL_FIXO,
+      orcGlobal:   orcGlobal,
       orcAteRod:   totOrc,
       realizado:   totReal,
       saving:      saving,
@@ -219,7 +217,7 @@ async function gerarPPTX() {
     // ── 4 KPI Cards numerados ───────────────────────────────────────────────
     const kW = 3.1, kH = 1.0, kY = 0.94, kGap = 0.077;
     const kpis = [
-      { num: "1", label: "ORÇADO TOTAL",                  val: fmtBRL(ORC_GLOBAL_FIXO), valColor: "9CA3AF", accent: false },
+      { num: "1", label: "ORÇADO TOTAL",                  val: fmtBRL(orcGlobal), valColor: "9CA3AF", accent: false },
       { num: "2", label: `ORÇADO ATÉ R${rodadaAtual}`,    val: fmtBRL(totOrc),          valColor: "111827", accent: false },
       { num: "3", label: `REALIZADO ATÉ R${rodadaAtual}`, val: fmtBRL(totReal),         valColor: "111827", accent: false },
       {
@@ -482,10 +480,10 @@ return (
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
 const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados}) {
+function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra"}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
-const [mesAtual, setMesAtual] = usePersistedState("apres_fix_mes", () => new Date().getMonth());
+const [mesAtual, setMesAtual] = usePersistedState(storagePrefix + "_apres_fix_mes", () => new Date().getMonth());
 
 // Categorias variáveis (excluídas dos "Outros Mensais" fixos)
 const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
@@ -575,7 +573,7 @@ return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll, provTotalAnua
 }, [servicos, notasMensais, mesAtual, mesesDecorridos]);
 
 // Overrides por seção (secao → {orc?, gasto?})
-const [overrides, setOverrides] = usePersistedState("apres_fix_overrides", {});
+const [overrides, setOverrides] = usePersistedState(storagePrefix + "_apres_fix_overrides", {});
 const setSecField = (secao, field, val) =>
 setOverrides(prev => ({...prev, [secao]: {...prev[secao], [field]: val}}));
 const resetOverrides = () => setOverrides({});
@@ -1332,10 +1330,10 @@ function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
 const MESES_DEFAULT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const VAR_CATS_FIX_DEFAULT = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
 
-export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = []}) {
+export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = [], storagePrefix = "bra", orcGlobal = 10130480}) {
   const [tipo, setTipo] = useState(null);
-  const [dadosVar, setDadosVar] = usePersistedState("apres_var_dados", null);
-  const [dadosFix, setDadosFix] = usePersistedState("apres_fix_dados", null);
+  const [dadosVar, setDadosVar] = usePersistedState(storagePrefix + "_apres_var_dados", null);
+  const [dadosFix, setDadosFix] = usePersistedState(storagePrefix + "_apres_fix_dados", null);
 
   // Lê rodada/mês/overrides persistidos pelos formulários — assim, mesmo sem
   // abrir Variáveis/Fixos nesta sessão, a Visão Geral reflete a última config.
@@ -1348,11 +1346,11 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
   const defaultDadosVar = useMemo(() => {
     const rodadasDisp     = Array.from(new Set(jogos.map(j => j.rodada))).sort((a,b) => a-b);
     const ultima          = rodadasDisp[rodadasDisp.length-1] || 1;
-    const rodadaPersist   = readPersisted("apres_var_rodada", ultima);
+    const rodadaPersist   = readPersisted(storagePrefix + "_apres_var_rodada", ultima);
     const rodadaAtual     = rodadasDisp.includes(rodadaPersist) ? rodadaPersist : ultima;
-    const ovr             = readPersisted("apres_var_overrides", {}) || {};
-    const nfEspOverride   = readPersisted("apres_var_nfEsp", "");
-    const nfRecOverride   = readPersisted("apres_var_nfRec", "");
+    const ovr             = readPersisted(storagePrefix + "_apres_var_overrides", {}) || {};
+    const nfEspOverride   = readPersisted(storagePrefix + "_apres_var_nfEsp", "");
+    const nfRecOverride   = readPersisted(storagePrefix + "_apres_var_nfRec", "");
     const rowsAuto        = rodadasDisp.filter(r => r <= rodadaAtual).map(r => {
       const jr = jogos.filter(j => j.rodada === r);
       return {
@@ -1378,16 +1376,16 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const nfPend    = Math.max(0, nfEspV - nfRecV);
     const pctRec    = nfEspV > 0 ? nfRecV / nfEspV * 100 : 0;
     return {
-      orcGlobal: ORC_GLOBAL_FIXO,
+      orcGlobal: orcGlobal,
       orcAteRod, realizado, saving, savPct, rows,
       nfEspV, nfRecV, nfPend, pctRec, rodadaAtual,
     };
   }, [jogos]);
 
   const defaultDadosFix = useMemo(() => {
-    const mesAtual        = readPersisted("apres_fix_mes", new Date().getMonth());
+    const mesAtual        = readPersisted(storagePrefix + "_apres_fix_mes", new Date().getMonth());
     const mesesDecorridos = mesAtual + 1;
-    const ovr             = readPersisted("apres_fix_overrides", {}) || {};
+    const ovr             = readPersisted(storagePrefix + "_apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
       const idsItens  = sec.itens.map(it => it.id);
       const idsEncerrados = sec.itens.filter(it => it.status === "encerrado").map(it => it.id);
@@ -1477,11 +1475,11 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "variaveis")
     return <FormVariaveis T={T} onBack={()=>setTipo(null)} jogos={jogos}
-              onDadosCalculados={setDadosVar}/>;
+              onDadosCalculados={setDadosVar} storagePrefix={storagePrefix} orcGlobal={orcGlobal}/>;
 
   if (tipo === "fixos")
     return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
-              onDadosCalculados={setDadosFix}/>;
+              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix}/>;
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}

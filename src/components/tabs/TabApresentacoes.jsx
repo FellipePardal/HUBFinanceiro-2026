@@ -480,10 +480,15 @@ return (
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
 const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra", mesInicio = 0}) {
+function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra", mesInicio = 0, jogos = []}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
 const [mesAtual, setMesAtual] = usePersistedState(storagePrefix + "_apres_fix_mes", () => new Date().getMonth());
+const rodadasDisp = useMemo(() => Array.from(new Set(jogos.map(j=>j.rodada))).sort((a,b)=>a-b), [jogos]);
+const [rodadaAtual, setRodadaAtual] = usePersistedState(storagePrefix + "_apres_fix_rodada", () => rodadasDisp[rodadasDisp.length-1] || 1);
+useEffect(() => {
+  if (rodadasDisp.length && !rodadasDisp.includes(rodadaAtual)) setRodadaAtual(rodadasDisp[rodadasDisp.length-1]);
+}, [rodadasDisp]); // eslint-disable-line react-hooks/exhaustive-deps
 
 // Categorias variáveis (excluídas dos "Outros Mensais" fixos)
 const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
@@ -512,6 +517,7 @@ const pontualRatio = (it, mes) => {
 const orcAuto = sec.itens.reduce((s, it) => {
   const orc = it.orcado || 0;
   const tipo = it.tipo || "linear";
+  if (tipo === "por_rodada") { const tot = it.rodadasTotal || 1; return s + orc * Math.min(rodadaAtual, tot) / tot; }
   if (tipo === "pontual") return s + orc * pontualRatio(it, mesAtual);
   if (tipo === "misto") {
     const pl = it.parcelaLinear || 0;
@@ -529,6 +535,11 @@ const itensDebug = sec.itens.map(it => {
   if (it.status === "encerrado") return { nome: it.nome, tipo: "encerrado", prov: it.realAoEncerrar || 0, ratio: null, contribui: it.realAoEncerrar || 0, mesesAlocacao: [] };
   const prov = it.provisionado || 0;
   const tipo = it.tipo || "linear";
+  if (tipo === "por_rodada") {
+    const tot = it.rodadasTotal || 1;
+    const ratio = Math.min(rodadaAtual, tot) / tot;
+    return { nome: it.nome, tipo, prov, ratio, contribui: prov * ratio, rodadasTotal: tot };
+  }
   if (tipo === "pontual") {
     const ratio = pontualRatio(it, mesAtual);
     return { nome: it.nome, tipo, prov, ratio, contribui: prov * ratio, mesesAlocacao: it.mesesAlocacao || [] };
@@ -570,7 +581,7 @@ const gastoEncerradosTotal  = sections.reduce((s, x) => s + (x.gastoEncerrados |
 const orcTotalAuto          = sections.reduce((s, x) => s + x.orcAuto, 0);
 return { sections, orcTotalAuto, orcAnualTotal, provTotalAnualAll, provTotalAnualAtivos, gastoEncerradosTotal };
 
-}, [servicos, notasMensais, mesAtual, mesesDecorridos]);
+}, [servicos, notasMensais, mesAtual, mesesDecorridos, rodadaAtual]);
 
 // Overrides por seção (secao → {orc?, gasto?})
 const [overrides, setOverrides] = usePersistedState(storagePrefix + "_apres_fix_overrides", {});
@@ -852,6 +863,13 @@ return (
           {MESES_FIX.map((m,i) => <option key={i} value={i}>{m}</option>)}
         </select>
       </div>
+      {rodadasDisp.length > 0 && <div style={{marginBottom:16}}>
+        <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Rodada de Referência <span style={{background:"#1e40af",color:"#93c5fd",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>POR RODADA</span></label>
+        <select value={rodadaAtual} onChange={e=>setRodadaAtual(parseInt(e.target.value))} style={{...IS}}>
+          {rodadasDisp.map(r => <option key={r} value={r}>Rodada {r}</option>)}
+        </select>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>Itens "por rodada" acumulam {Math.round(Math.min(rodadaAtual, 13)/13*100)}% / {Math.round(Math.min(rodadaAtual, 7)/7*100)}% do orçado</p>
+      </div>}
       <div style={{marginBottom:16}}>
         <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Orçado Acumulado até {MESES_FIX[mesAtual]} <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
         <input readOnly value={orcTotalFmt} style={{...IS_RO}} title={`Anual: ${fmtR(computed.orcAnualTotal)} — lineares ÷ 12 × ${mesesDecorridos}; pontuais integrais`}/>
@@ -1385,6 +1403,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
   const defaultDadosFix = useMemo(() => {
     const mesAtual        = readPersisted(storagePrefix + "_apres_fix_mes", new Date().getMonth());
     const mesesDecorridos = Math.max(0, mesAtual - mesInicio + 1);
+    const rodadasDispDef  = Array.from(new Set(jogos.map(j=>j.rodada))).sort((a,b)=>a-b);
+    const rodadaAtual     = readPersisted(storagePrefix + "_apres_fix_rodada", rodadasDispDef[rodadasDispDef.length-1] || 1);
     const ovr             = readPersisted(storagePrefix + "_apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
       const idsItens  = sec.itens.map(it => it.id);
@@ -1403,6 +1423,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const orcAuto = sec.itens.reduce((s, it) => {
         const orc = it.orcado || 0;
         const tipo = it.tipo || "linear";
+        if (tipo === "por_rodada") { const tot = it.rodadasTotal || 1; return s + orc * Math.min(rodadaAtual, tot) / tot; }
         if (tipo === "pontual") return s + orc * pontualRatio(it);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
@@ -1420,6 +1441,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
         if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
         const prov = it.provisionado || 0;
         const tipo = it.tipo || "linear";
+        if (tipo === "por_rodada") { const tot = it.rodadasTotal || 1; return s + prov * Math.min(rodadaAtual, tot) / tot; }
         if (tipo === "pontual") return s + prov * pontualRatio(it);
         if (tipo === "misto") {
           const pl = it.parcelaLinear || 0;
@@ -1469,7 +1491,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       nfRecV, nfPend, pctRec, rows: sections,
       mesAtual, mesLabel: MESES_DEFAULT[mesAtual],
     };
-  }, [servicos, notasMensais]);
+  }, [servicos, notasMensais, jogos]);
 
   if (!tipo) return <SeletorTipo T={T} onSelect={setTipo}/>;
 
@@ -1479,7 +1501,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "fixos")
     return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
-              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio}/>;
+              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio} jogos={jogos}/>;
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}

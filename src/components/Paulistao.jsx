@@ -97,13 +97,17 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
           setServicosRaw(PAULISTAO_SERVICOS_INIT);
           setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
         } else {
-          // v2: adiciona tipo pontual + mesesAlocacao em itens 1,2,3 (por rodada)
-          const TIPO_MAP = { 1:{tipo:"pontual",mesesAlocacao:[4,6,7,10,11]}, 2:{tipo:"pontual",mesesAlocacao:[4,6,7,10,11]}, 3:{tipo:"pontual",mesesAlocacao:[4,6,7]} };
+          // v2: itens 1,2,3 passam a tipo por_rodada com rodadasTotal
+          const TIPO_MAP = { 1:{tipo:"por_rodada",rodadasTotal:13}, 2:{tipo:"por_rodada",rodadasTotal:13}, 3:{tipo:"por_rodada",rodadasTotal:7} };
           const pessoal = Array.isArray(s) ? (s.find(sec=>sec.secao==="Pessoal")?.itens||[]) : [];
-          const precisaMigrar = pessoal.some(it => TIPO_MAP[it.id] && !it.tipo);
+          const precisaMigrar = pessoal.some(it => TIPO_MAP[it.id] && it.tipo !== "por_rodada");
           if (precisaMigrar) {
             const migrado = s.map(sec => sec.secao !== "Pessoal" ? sec : {
-              ...sec, itens: sec.itens.map(it => TIPO_MAP[it.id] ? {...it, ...TIPO_MAP[it.id]} : it)
+              ...sec, itens: sec.itens.map(it => {
+                if (!TIPO_MAP[it.id]) return it;
+                const {mesesAlocacao: _, ...rest} = it;
+                return {...rest, ...TIPO_MAP[it.id]};
+              })
             });
             setServicosRaw(migrado);
             setSupabaseState(K.servicos, migrado);

@@ -650,10 +650,11 @@ const nfPend = saldoUsaGasto
 const nfBase = saldoUsaGasto ? gastoTotEff : provAtivoBase;
 const pctRec = nfBase > 0 ? nfRecV / nfBase * 100 : 0;
 
-// Realizado da Visão Geral segue a mesma regra da tabela do slide:
-// Outros Mensais usa gasto (prov=0), demais usam prov.
-const realizadoVG = rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
-const saldoVG     = orcTotal - realizadoVG;
+// Realizado da Visão Geral: Paulistão F usa gasto (saldoUsaGasto); demais usam prov (Outros Mensais usa gasto).
+const realizadoVG = saldoUsaGasto
+  ? gastoTotEff
+  : rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
+const saldoVG = orcTotEff - realizadoVG;
 
 useEffect(() => {
   if (onDadosCalculados) {
@@ -1490,7 +1491,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       const orc   = o.orc   != null ? parseBR(o.orc)   : orcAuto;
       const prov  = o.prov  != null ? parseBR(o.prov)  : provAuto;
       const gasto = o.gasto != null ? parseBR(o.gasto) : gastoAuto;
-      const saldo = sec.secao === "Outros Mensais" ? orc - gasto : orc - prov;
+      const saldo = (saldoUsaGasto || sec.secao === "Outros Mensais") ? orc - gasto : orc - prov;
       return { secao: sec.secao, orcAnual, provAnual, provAnualAtivos, gastoEncerrados, orc, prov, gasto, saldo };
     });
     const outrosGasto = notasMensais
@@ -1504,9 +1505,11 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const orcAnualTotal  = sections.reduce((s, x) => s + x.orcAnual, 0);
     const provAnualTotal = sections.reduce((s, x) => s + x.provAnual, 0);
     const orcAcumulado   = sections.reduce((s, x) => s + x.orc, 0);
-    // Realizado da Visão Geral: Outros Mensais usa gasto (prov=0); demais usam prov.
-    const provAcumulado  = sections.reduce((s, x) => s + (x.secao === "Outros Mensais" ? x.gasto : x.prov), 0);
     const gastoAcumulado = sections.reduce((s, x) => s + x.gasto, 0);
+    // Realizado da VG: Paulistão F usa gasto total; Brasileirão usa prov (Outros Mensais usa gasto).
+    const provAcumulado  = saldoUsaGasto
+      ? gastoAcumulado
+      : sections.reduce((s, x) => s + (x.secao === "Outros Mensais" ? x.gasto : x.prov), 0);
     const saldo          = orcAcumulado - provAcumulado;
     // Pendente de NF exclui serviços encerrados
     const provAnualAtivosTotal = sections.reduce((s, x) => s + (x.provAnualAtivos ?? x.provAnual ?? 0), 0);
@@ -1521,7 +1524,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
       nfRecV, nfPend, pctRec, rows: sections,
       mesAtual, mesLabel: MESES_DEFAULT[mesAtual],
     };
-  }, [servicos, notasMensais, jogos]);
+  }, [servicos, notasMensais, jogos, saldoUsaGasto]);
 
   if (!tipo) return <SeletorTipo T={T} onSelect={setTipo}/>;
 

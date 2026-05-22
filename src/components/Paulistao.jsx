@@ -98,7 +98,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
           setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
         } else {
           // v2: itens 1,2,3 passam a tipo por_rodada com rodadasTotal
-          const TIPO_MAP = { 1:{tipo:"por_rodada",rodadasTotal:13}, 2:{tipo:"por_rodada",rodadasTotal:13}, 3:{tipo:"por_rodada",rodadasTotal:7} };
+          const TIPO_MAP = { 1:{tipo:"por_rodada",rodadasTotal:13}, 2:{tipo:"por_rodada",rodadasTotal:13}, 3:{tipo:"por_rodada",rodadasTotal:13} };
           const pessoal = Array.isArray(s) ? (s.find(sec=>sec.secao==="Pessoal")?.itens||[]) : [];
           const precisaMigrar = pessoal.some(it => TIPO_MAP[it.id] && it.tipo !== "por_rodada");
           if (precisaMigrar) {

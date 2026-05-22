@@ -184,7 +184,7 @@ export const PAULISTAO_SERVICOS_INIT = [
       obs:"R$ 1k/semana",
       mensal:{ mai:3000, jun:0, jul:2000, ago:2000, set:0, out:0, nov:2000, dez:2000 } },
     { id:3, nome:"Editor de Vídeos 2",               orcado:7000,  provisionado:0, realizado:0,
-      tipo:"por_rodada", rodadasTotal:7,
+      tipo:"por_rodada", rodadasTotal:13,
       obs:"R$ 1k/semana",
       mensal:{ mai:3000, jun:0, jul:2000, ago:2000, set:0, out:0, nov:0, dez:0 } },
     { id:4, nome:"Desenvolvimento/Suporte Operacional VMIX", orcado:20000, provisionado:0, realizado:0,

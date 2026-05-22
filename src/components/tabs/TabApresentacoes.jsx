@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment, Component } from "react";
 import PptxGenJS from "pptxgenjs";
 import { btnStyle, iSty, ORC_PADRAO, REAL_PADRAO, RADIUS } from "../../constants";
 import { parseBR, fmtNum, fmtR, fmtRs, subTotal } from "../../utils";
@@ -6,6 +6,24 @@ import { Card, Button } from "../ui";
 import { BarChart3, Lock, ArrowRight, ArrowLeft, FileDown, LayoutGrid, ChevronDown, ChevronRight } from "lucide-react";
 
 const fmtBRL = v => "R$ " + Number(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+// Error Boundary para capturar erros de render e exibir mensagem em vez de tela branca
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{padding:32,color:"#ef4444",background:"#1e1e2e",borderRadius:12,margin:24,fontFamily:"monospace"}}>
+          <p style={{fontWeight:700,marginBottom:8}}>Erro ao carregar — copie e envie para suporte:</p>
+          <pre style={{whiteSpace:"pre-wrap",fontSize:12}}>{this.state.error?.stack || String(this.state.error)}</pre>
+          <button onClick={()=>this.setState({error:null})} style={{marginTop:16,padding:"6px 16px",background:"#ef4444",color:"#fff",border:"none",borderRadius:6,cursor:"pointer"}}>Tentar novamente</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Estado persistido em localStorage
 function usePersistedState(key, initial) {
@@ -498,9 +516,10 @@ const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"])
 const mesesDecorridos = Math.max(0, mesAtual - mesInicio + 1);
 const computed = useMemo(() => {
 const sections = servicos.map(sec => {
-const idsItens = sec.itens.map(it => it.id);
-const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
-const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
+const itens = sec.itens || [];
+const idsItens = itens.map(it => it.id);
+const orcAnual  = itens.reduce((s, it) => s + (it.orcado || 0), 0);
+const provAnual = itens.reduce((s, it) => s + (it.provisionado || 0), 0);
 // Orçado e provisionado mensais por-item conforme flag "tipo":
 //   linear  → total / 12 * mesesDecorridos
 //   pontual → total integral a partir do mês alocado
@@ -514,7 +533,7 @@ const pontualRatio = (it, mes) => {
   const decorridos = list.filter(m => m <= mes).length;
   return decorridos / list.length;
 };
-const orcAuto = sec.itens.reduce((s, it) => {
+const orcAuto = itens.reduce((s, it) => {
   const orc = it.orcado || 0;
   const tipo = it.tipo || "linear";
   if (tipo === "por_rodada") { const tot = it.rodadasTotal || 1; return s + orc * Math.min(rodadaAtual, tot) / tot; }
@@ -531,7 +550,7 @@ const orcAuto = sec.itens.reduce((s, it) => {
   }
   return s + (orc / 12) * mesesDecorridos;
 }, 0);
-const itensDebug = sec.itens.map(it => {
+const itensDebug = itens.map(it => {
   if (it.status === "encerrado") return { nome: it.nome, tipo: "encerrado", prov: it.realAoEncerrar || 0, ratio: null, contribui: it.realAoEncerrar || 0, mesesAlocacao: [] };
   const prov = it.provisionado || 0;
   const tipo = it.tipo || "linear";
@@ -553,10 +572,10 @@ const itensDebug = sec.itens.map(it => {
 const provAuto = itensDebug.reduce((s, it) => s + it.contribui, 0);
 const provTotalAnual = provAnual;
 // prov anual apenas de itens ativos (encerrados saem da expectativa de NFs)
-const provAnualAtivos = sec.itens
+const provAnualAtivos = itens
   .filter(it => it.status !== "encerrado")
   .reduce((s, it) => s + (it.provisionado || 0), 0);
-const idsEncerrados = sec.itens.filter(it => it.status === "encerrado").map(it => it.id);
+const idsEncerrados = itens.filter(it => it.status === "encerrado").map(it => it.id);
 const gastoAuto = notasMensais
 .filter(n => n.servicoId && idsItens.includes(n.servicoId) && n.mes <= mesAtual)
 .reduce((s, n) => s + (n.valor || 0), 0);
@@ -1417,11 +1436,12 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
     const rodadaAtual     = readPersisted(storagePrefix + "_apres_fix_rodada", rodadasDispDef[rodadasDispDef.length-1] || 1);
     const ovr             = readPersisted(storagePrefix + "_apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
-      const idsItens  = sec.itens.map(it => it.id);
-      const idsEncerrados = sec.itens.filter(it => it.status === "encerrado").map(it => it.id);
-      const orcAnual  = sec.itens.reduce((s, it) => s + (it.orcado || 0), 0);
-      const provAnual = sec.itens.reduce((s, it) => s + (it.provisionado || 0), 0);
-      const provAnualAtivos = sec.itens
+      const itens = sec.itens || [];
+      const idsItens  = itens.map(it => it.id);
+      const idsEncerrados = itens.filter(it => it.status === "encerrado").map(it => it.id);
+      const orcAnual  = itens.reduce((s, it) => s + (it.orcado || 0), 0);
+      const provAnual = itens.reduce((s, it) => s + (it.provisionado || 0), 0);
+      const provAnualAtivos = itens
         .filter(it => it.status !== "encerrado")
         .reduce((s, it) => s + (it.provisionado || 0), 0);
       const pontualRatio = it => {
@@ -1430,7 +1450,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
         if (!list.length) return mesAtual >= 0 ? 1 : 0;
         return list.filter(m => m <= mesAtual).length / list.length;
       };
-      const orcAuto = sec.itens.reduce((s, it) => {
+      const orcAuto = itens.reduce((s, it) => {
         const orc = it.orcado || 0;
         const tipo = it.tipo || "linear";
         if (tipo === "por_rodada") { const tot = it.rodadasTotal || 1; return s + orc * Math.min(rodadaAtual, tot) / tot; }
@@ -1447,7 +1467,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
         }
         return s + (orc / 12) * mesesDecorridos;
       }, 0);
-      const provAuto  = sec.itens.reduce((s, it) => {
+      const provAuto  = itens.reduce((s, it) => {
         if (it.status === "encerrado") return s + (it.realAoEncerrar || 0);
         const prov = it.provisionado || 0;
         const tipo = it.tipo || "linear";
@@ -1510,8 +1530,8 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
               onDadosCalculados={setDadosVar} storagePrefix={storagePrefix} orcGlobal={orcGlobal}/>;
 
   if (tipo === "fixos")
-    return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
-              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio} jogos={jogos} saldoUsaGasto={saldoUsaGasto}/>;
+    return <ErrorBoundary><FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
+              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio} jogos={jogos} saldoUsaGasto={saldoUsaGasto}/></ErrorBoundary>;
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}

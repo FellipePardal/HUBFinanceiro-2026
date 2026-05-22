@@ -97,7 +97,19 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
           setServicosRaw(PAULISTAO_SERVICOS_INIT);
           setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
         } else {
-          setServicosRaw(s);
+          // v2: adiciona tipo pontual + mesesAlocacao em itens 1,2,3 (por rodada)
+          const TIPO_MAP = { 1:{tipo:"pontual",mesesAlocacao:[4,6,7,10,11]}, 2:{tipo:"pontual",mesesAlocacao:[4,6,7,10,11]}, 3:{tipo:"pontual",mesesAlocacao:[4,6,7]} };
+          const pessoal = Array.isArray(s) ? (s.find(sec=>sec.secao==="Pessoal")?.itens||[]) : [];
+          const precisaMigrar = pessoal.some(it => TIPO_MAP[it.id] && !it.tipo);
+          if (precisaMigrar) {
+            const migrado = s.map(sec => sec.secao !== "Pessoal" ? sec : {
+              ...sec, itens: sec.itens.map(it => TIPO_MAP[it.id] ? {...it, ...TIPO_MAP[it.id]} : it)
+            });
+            setServicosRaw(migrado);
+            setSupabaseState(K.servicos, migrado);
+          } else {
+            setServicosRaw(s);
+          }
         }
       } else { setServicosRaw(PAULISTAO_SERVICOS_INIT); setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT); }
       seedIfMissing(n,   K.notas,             [],                  setNotasRaw);

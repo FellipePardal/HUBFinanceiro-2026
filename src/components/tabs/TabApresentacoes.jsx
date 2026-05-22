@@ -480,7 +480,7 @@ return (
 // ─── FORM FIXOS ───────────────────────────────────────────────────────────────
 const MESES_FIX = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra"}) {
+function FormFixos({T, onBack, servicos = [], notasMensais = [], onDadosCalculados, storagePrefix = "bra", mesInicio = 0}) {
 const [status,  setStatus]  = useState({msg:"Pronto para gerar", cls:""});
 const [loading, setLoading] = useState(false);
 const [mesAtual, setMesAtual] = usePersistedState(storagePrefix + "_apres_fix_mes", () => new Date().getMonth());
@@ -490,7 +490,7 @@ const VAR_CATS_FIX = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"])
 
 // Auto: orçado anual ÷ 12 × meses decorridos (acumulado até o mês selecionado)
 //       gasto = NFs mensais até o mês selecionado
-const mesesDecorridos = mesAtual + 1; // jan=1, fev=2, ...
+const mesesDecorridos = Math.max(0, mesAtual - mesInicio + 1);
 const computed = useMemo(() => {
 const sections = servicos.map(sec => {
 const idsItens = sec.itens.map(it => it.id);
@@ -1330,7 +1330,7 @@ function FormVisaoGeral({ T, onBack, dadosVar, dadosFix }) {
 const MESES_DEFAULT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const VAR_CATS_FIX_DEFAULT = new Set(["Transporte","Uber","Hospedagem","Seg. Espacial"]);
 
-export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = [], storagePrefix = "bra", orcGlobal = 10130480}) {
+export default function TabApresentacoes({T, jogos = [], servicos = [], notasMensais = [], storagePrefix = "bra", orcGlobal = 10130480, mesInicio = 0}) {
   const [tipo, setTipo] = useState(null);
   const [dadosVar, setDadosVar] = usePersistedState(storagePrefix + "_apres_var_dados", null);
   const [dadosFix, setDadosFix] = usePersistedState(storagePrefix + "_apres_fix_dados", null);
@@ -1384,7 +1384,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   const defaultDadosFix = useMemo(() => {
     const mesAtual        = readPersisted(storagePrefix + "_apres_fix_mes", new Date().getMonth());
-    const mesesDecorridos = mesAtual + 1;
+    const mesesDecorridos = Math.max(0, mesAtual - mesInicio + 1);
     const ovr             = readPersisted(storagePrefix + "_apres_fix_overrides", {}) || {};
     const sections = servicos.map(sec => {
       const idsItens  = sec.itens.map(it => it.id);
@@ -1479,7 +1479,7 @@ export default function TabApresentacoes({T, jogos = [], servicos = [], notasMen
 
   if (tipo === "fixos")
     return <FormFixos T={T} onBack={()=>setTipo(null)} servicos={servicos} notasMensais={notasMensais}
-              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix}/>;
+              onDadosCalculados={setDadosFix} storagePrefix={storagePrefix} mesInicio={mesInicio}/>;
 
   if (tipo === "visaogeral")
     return <FormVisaoGeral T={T} onBack={()=>setTipo(null)}

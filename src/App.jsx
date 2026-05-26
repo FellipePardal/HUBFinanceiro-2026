@@ -40,6 +40,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [cotacoes, setCotacoesRaw]         = useState(COTACAO_INIT);
   const [livemode, setLivemodeRaw]       = useState([]);
   const [notasLivemode, setNotasLivemodeRaw] = useState([]);
+  const [notasLiveU, setNotasLiveURaw]   = useState([]);
   const [logistica, setLogisticaRaw]     = useState([]);
   const [eventosLog, setEventosLogRaw]   = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
@@ -47,7 +48,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
+      const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
       // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
       // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
       // dados existentes — assim um getState com falha transitória/null não zera
@@ -77,6 +78,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
       seedIfMissing(ev,  'envios',            [],                  setEnviosRaw);
       seedIfMissing(lm,  'livemode',          [],                  setLivemodeRaw);
       seedIfMissing(nlm, 'notas_livemode',    [],                  setNotasLivemodeRaw);
+      seedIfMissing(nlu, 'notas_liveu',       [],                  setNotasLiveURaw);
       seedIfMissing(co,  'cotacoes',          COTACAO_INIT,        setCotacoesRaw);
       seedIfMissing(fj,  'fornecedores_jogo', {},                  setFornecedoresJogoRaw);
       seedIfMissing(lg,  'logistica',         [],                  setLogisticaRaw);
@@ -96,6 +98,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         if (payload.new.key === 'envios')        setEnviosRaw(payload.new.value);
         if (payload.new.key === 'livemode')      setLivemodeRaw(payload.new.value);
         if (payload.new.key === 'notas_livemode') setNotasLivemodeRaw(payload.new.value);
+        if (payload.new.key === 'notas_liveu')   setNotasLiveURaw(payload.new.value);
         if (payload.new.key === 'cotacoes')       setCotacoesRaw(payload.new.value);
         if (payload.new.key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
         if (payload.new.key === 'logistica')     setLogisticaRaw(payload.new.value);
@@ -137,6 +140,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const setNotasLivemode = fn => setNotasLivemodeRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('notas_livemode', next); return next;
+  });
+  const setNotasLiveU = fn => setNotasLiveURaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('notas_liveu', next); return next;
   });
   const setCotacoes = fn => setCotacoesRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
@@ -685,7 +692,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T} role={role}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T} role={role}/>}
-        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}

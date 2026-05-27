@@ -49,7 +49,11 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
       if (j)  setJogosRaw(j);
       if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
       if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
-      if (im) setItensMasterRaw(im); else setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
+      const OLD_IDS = new Set(["eq-b1","eq-b2","eq-b3","coord-prod","dir-tv"]);
+      const needsMigration = !im || (im.some(x => OLD_IDS.has(x.id)));
+      const imFinal = needsMigration ? ITENS_MASTER_INIT : im;
+      if (needsMigration) setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
+      setItensMasterRaw(imFinal);
       if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
       if (jf) setJogosFornRaw(jf);   else setSupabaseState('forn_jogos', JOGOS_FORN_INIT);
       setLoading(false);

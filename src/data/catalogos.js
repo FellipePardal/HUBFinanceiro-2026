@@ -411,19 +411,22 @@ export const categoriaItemLabel = key =>
   CATEGORIAS_ITEM.find(c=>c.key===key)?.label ?? key;
 
 export const ITENS_MASTER_INIT = [
+  // Periféricos — equipamentos contratados por jogo
+  { id:"um-b1",      nome:"UM B1",                  unidade:"jogo",   categoria:"periferico" },
+  { id:"um-b2",      nome:"UM B2",                  unidade:"jogo",   categoria:"periferico" },
+  { id:"um-b3",      nome:"UM B3",                  unidade:"jogo",   categoria:"periferico" },
   { id:"drone",      nome:"Drone",                  unidade:"jogo",   categoria:"periferico" },
   { id:"minidrone",  nome:"Minidrone",              unidade:"jogo",   categoria:"periferico" },
   { id:"grua",       nome:"Grua",                   unidade:"jogo",   categoria:"periferico" },
   { id:"goalcam",    nome:"Goal Cam",               unidade:"jogo",   categoria:"periferico" },
   { id:"carrinho",   nome:"Carrinho",               unidade:"jogo",   categoria:"periferico" },
-  { id:"um-b1",      nome:"UM B1",                  unidade:"jogo",   categoria:"equipe" },
-  { id:"um-b2",      nome:"UM B2",                  unidade:"jogo",   categoria:"equipe" },
-  { id:"um-b3",      nome:"UM B3",                  unidade:"jogo",   categoria:"equipe" },
-  { id:"eq-b1",      nome:"Equipe Operacional B1",  unidade:"jogo",   categoria:"equipe" },
-  { id:"eq-b2",      nome:"Equipe Operacional B2",  unidade:"jogo",   categoria:"equipe" },
-  { id:"eq-b3",      nome:"Equipe Operacional B3",  unidade:"jogo",   categoria:"equipe" },
-  { id:"coord-prod", nome:"Coordenador de Produção",unidade:"diaria", categoria:"equipe" },
-  { id:"dir-tv",     nome:"Diretor de TV",          unidade:"diaria", categoria:"equipe" },
+  // Equipe Operacional — profissionais do pessoal dos jogos
+  { id:"coord-um",   nome:"Coordenador de UM",      unidade:"diaria", categoria:"equipe" },
+  { id:"prod-um",    nome:"Produtor de UM",         unidade:"diaria", categoria:"equipe" },
+  { id:"prod-campo", nome:"Produtor de Campo",      unidade:"diaria", categoria:"equipe" },
+  { id:"supervisor", nome:"Supervisor de Operações",unidade:"diaria", categoria:"equipe" },
+  { id:"dtv",        nome:"DTV",                    unidade:"diaria", categoria:"equipe" },
+  { id:"vmix",       nome:"Operador de Vmix",       unidade:"diaria", categoria:"equipe" },
 ];
 
 export const novoItemMaster = (nome = "", unidade = "jogo", categoria = "periferico") => ({

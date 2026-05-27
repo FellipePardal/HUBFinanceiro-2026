@@ -15,7 +15,7 @@ import Dashboard     from "./fornecedores/Dashboard";
 const SUBTABS = [
   { key:"cadastro",  label:"Cadastro",      icon:Users },
   { key:"catalogos", label:"Catálogos",     icon:Library },
-  { key:"tabelas",   label:"Tabelas",       icon:Table2 },
+  { key:"tabelas",   label:"Negociações",   icon:Table2 },
   { key:"jogos",     label:"Próximos Jogos",icon:CalendarDays },
   { key:"cotacoes",  label:"Cotações",      icon:FileSpreadsheet },
   { key:"dashboard", label:"Dashboard",     icon:LineChart },
@@ -85,7 +85,7 @@ export default function TabFornecedores({
       {sub === "cadastro"  && <Cadastro      fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
       {sub === "catalogos" && <Catalogos     cidades={cidades} setCidades={setCidades} campeonatos={campeonatos} setCampeonatos={setCampeonatos} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "tabelas"   && <Tabelas       fornecedores={fornecedores} cidades={cidades} campeonatos={campeonatos} tabelas={tabelas} setTabelas={setTabelas} filtroCampeonato={filtroCampeonato} T={T}/>}
-      {sub === "jogos"     && <ProximosJogos jogosForn={jogosForn} setJogosForn={setJogosForn} cidades={cidades} campeonatos={campeonatos} cotacoes={cotacoes} filtroCampeonato={filtroCampeonato} T={T}/>}
+      {sub === "jogos"     && <ProximosJogos jogosForn={jogosForn} setJogosForn={setJogosForn} cidades={cidades} campeonatos={campeonatos} cotacoes={cotacoes} tabelas={tabelas} fornecedores={fornecedores} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "cotacoes"  && <Cotacoes      fornecedores={fornecedores} cotacoes={cotacoes} setCotacoes={setCotacoes} jogosForn={jogosForn} cidades={cidades} campeonatos={campeonatos} tabelas={tabelas} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "dashboard" && <Dashboard     fornecedores={fornecedores} cotacoes={cotacoes} cidades={cidades} campeonatos={campeonatos} tabelas={tabelas} filtroCampeonato={filtroCampeonato} T={T}/>}
     </>

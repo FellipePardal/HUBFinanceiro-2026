@@ -402,26 +402,35 @@ export function migrarTabelaLegada(tabela) {
 // Lista global de serviços que podem ser precificados nas negociações.
 // Gerenciada em Catálogos e persistida em app_state['forn_itens_master'].
 // Campeonatos selecionam um subconjunto dessa lista.
-export const ITENS_MASTER_INIT = [
-  { id:"um-b1",      nome:"UM B1",                  unidade:"jogo" },
-  { id:"um-b2",      nome:"UM B2",                  unidade:"jogo" },
-  { id:"um-b3",      nome:"UM B3",                  unidade:"jogo" },
-  { id:"drone",      nome:"Drone",                  unidade:"jogo" },
-  { id:"minidrone",  nome:"Minidrone",              unidade:"jogo" },
-  { id:"grua",       nome:"Grua",                   unidade:"jogo" },
-  { id:"goalcam",    nome:"Goal Cam",               unidade:"jogo" },
-  { id:"carrinho",   nome:"Carrinho",               unidade:"jogo" },
-  { id:"eq-b1",      nome:"Equipe Operacional B1",  unidade:"jogo" },
-  { id:"eq-b2",      nome:"Equipe Operacional B2",  unidade:"jogo" },
-  { id:"eq-b3",      nome:"Equipe Operacional B3",  unidade:"jogo" },
-  { id:"coord-prod", nome:"Coordenador de Produção",unidade:"diaria" },
-  { id:"dir-tv",     nome:"Diretor de TV",          unidade:"diaria" },
+export const CATEGORIAS_ITEM = [
+  { key:"periferico", label:"Periférico",          color:"#3b82f6" },
+  { key:"equipe",     label:"Equipe Operacional",  color:"#f59e0b" },
 ];
 
-export const novoItemMaster = (nome = "", unidade = "jogo") => ({
+export const categoriaItemLabel = key =>
+  CATEGORIAS_ITEM.find(c=>c.key===key)?.label ?? key;
+
+export const ITENS_MASTER_INIT = [
+  { id:"drone",      nome:"Drone",                  unidade:"jogo",   categoria:"periferico" },
+  { id:"minidrone",  nome:"Minidrone",              unidade:"jogo",   categoria:"periferico" },
+  { id:"grua",       nome:"Grua",                   unidade:"jogo",   categoria:"periferico" },
+  { id:"goalcam",    nome:"Goal Cam",               unidade:"jogo",   categoria:"periferico" },
+  { id:"carrinho",   nome:"Carrinho",               unidade:"jogo",   categoria:"periferico" },
+  { id:"um-b1",      nome:"UM B1",                  unidade:"jogo",   categoria:"equipe" },
+  { id:"um-b2",      nome:"UM B2",                  unidade:"jogo",   categoria:"equipe" },
+  { id:"um-b3",      nome:"UM B3",                  unidade:"jogo",   categoria:"equipe" },
+  { id:"eq-b1",      nome:"Equipe Operacional B1",  unidade:"jogo",   categoria:"equipe" },
+  { id:"eq-b2",      nome:"Equipe Operacional B2",  unidade:"jogo",   categoria:"equipe" },
+  { id:"eq-b3",      nome:"Equipe Operacional B3",  unidade:"jogo",   categoria:"equipe" },
+  { id:"coord-prod", nome:"Coordenador de Produção",unidade:"diaria", categoria:"equipe" },
+  { id:"dir-tv",     nome:"Diretor de TV",          unidade:"diaria", categoria:"equipe" },
+];
+
+export const novoItemMaster = (nome = "", unidade = "jogo", categoria = "periferico") => ({
   id: `it-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
   nome: nome.trim(),
   unidade,
+  categoria,
 });
 
 // Kept for backward compat

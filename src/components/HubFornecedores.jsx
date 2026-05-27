@@ -3,7 +3,7 @@ import { RADIUS, FONT } from "../constants";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
-import { CIDADES_INIT, CAMPEONATOS_FORN_INIT } from "../data/catalogos";
+import { CIDADES_INIT, CAMPEONATOS_FORN_INIT, ITENS_MASTER_INIT } from "../data/catalogos";
 import { JOGOS_FORN_INIT } from "../data/jogosFornecedores";
 import { ALL_JOGOS } from "../data";
 import { fmt, fmtK } from "../utils";
@@ -25,6 +25,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [jogosForn,    setJogosFornRaw]    = useState(JOGOS_FORN_INIT);
   const [cidades,      setCidadesRaw]      = useState(CIDADES_INIT);
   const [campeonatos,  setCampeonatosRaw]  = useState(CAMPEONATOS_FORN_INIT);
+  const [itensMaster,  setItensMasterRaw]  = useState(ITENS_MASTER_INIT);
   const [tabelas,      setTabelasRaw]      = useState([]);
   const [loading,      setLoading]         = useState(true);
   const [ocultar,      setOcultar]         = useState(false);
@@ -33,12 +34,13 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   // Carga inicial + realtime
   useEffect(() => {
     async function load() {
-      const [f, c, j, ci, ca, tb, jf] = await Promise.all([
+      const [f, c, j, ci, ca, im, tb, jf] = await Promise.all([
         getState('fornecedores'),
         getState('cotacoes'),
         getState('jogos'),
         getState('forn_cidades'),
         getState('forn_campeonatos'),
+        getState('forn_itens_master'),
         getState('forn_tabelas_preco'),
         getState('forn_jogos'),
       ]);
@@ -47,6 +49,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
       if (j)  setJogosRaw(j);
       if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
       if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
+      if (im) setItensMasterRaw(im); else setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
       if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
       if (jf) setJogosFornRaw(jf);   else setSupabaseState('forn_jogos', JOGOS_FORN_INIT);
       setLoading(false);
@@ -61,6 +64,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
         if (payload.new.key === 'jogos')              setJogosRaw(payload.new.value);
         if (payload.new.key === 'forn_cidades')       setCidadesRaw(payload.new.value);
         if (payload.new.key === 'forn_campeonatos')   setCampeonatosRaw(payload.new.value);
+        if (payload.new.key === 'forn_itens_master')  setItensMasterRaw(payload.new.value);
         if (payload.new.key === 'forn_tabelas_preco') setTabelasRaw(payload.new.value);
         if (payload.new.key === 'forn_jogos')         setJogosFornRaw(payload.new.value);
       })
@@ -84,6 +88,10 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const setCampeonatos = fn => setCampeonatosRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
     setSupabaseState('forn_campeonatos', next); return next;
+  });
+  const setItensMaster = fn => setItensMasterRaw(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    setSupabaseState('forn_itens_master', next); return next;
   });
   const setTabelas = fn => setTabelasRaw(prev => {
     const next = typeof fn === "function" ? fn(prev) : fn;
@@ -287,6 +295,8 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
             setCidades={setCidades}
             campeonatos={campeonatos}
             setCampeonatos={setCampeonatos}
+            itensMaster={itensMaster}
+            setItensMaster={setItensMaster}
             tabelas={tabelas}
             setTabelas={setTabelas}
             filtroCampeonato={filtroCamp}

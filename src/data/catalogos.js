@@ -398,12 +398,31 @@ export function migrarTabelaLegada(tabela) {
   };
 }
 
-// ── Item de serviço do campeonato ──────────────────────────────────────────
-// Gera id estável para um novo item de campeonato
-export const novoItemCampeonato = (nome = "", unidade = "jogo") => ({
+// ── Catálogo master de itens de serviço ───────────────────────────────────
+// Lista global de serviços que podem ser precificados nas negociações.
+// Gerenciada em Catálogos e persistida em app_state['forn_itens_master'].
+// Campeonatos selecionam um subconjunto dessa lista.
+export const ITENS_MASTER_INIT = [
+  { id:"um-b1",      nome:"UM B1",                  unidade:"jogo" },
+  { id:"um-b2",      nome:"UM B2",                  unidade:"jogo" },
+  { id:"um-b3",      nome:"UM B3",                  unidade:"jogo" },
+  { id:"drone",      nome:"Drone",                  unidade:"jogo" },
+  { id:"minidrone",  nome:"Minidrone",              unidade:"jogo" },
+  { id:"grua",       nome:"Grua",                   unidade:"jogo" },
+  { id:"goalcam",    nome:"Goal Cam",               unidade:"jogo" },
+  { id:"carrinho",   nome:"Carrinho",               unidade:"jogo" },
+  { id:"eq-b1",      nome:"Equipe Operacional B1",  unidade:"jogo" },
+  { id:"eq-b2",      nome:"Equipe Operacional B2",  unidade:"jogo" },
+  { id:"eq-b3",      nome:"Equipe Operacional B3",  unidade:"jogo" },
+  { id:"coord-prod", nome:"Coordenador de Produção",unidade:"diaria" },
+  { id:"dir-tv",     nome:"Diretor de TV",          unidade:"diaria" },
+];
+
+export const novoItemMaster = (nome = "", unidade = "jogo") => ({
   id: `it-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
   nome: nome.trim(),
-  descricao: "",
   unidade,
-  ativo: true,
 });
+
+// Kept for backward compat
+export const novoItemCampeonato = novoItemMaster;

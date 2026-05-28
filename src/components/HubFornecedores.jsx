@@ -50,7 +50,8 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
       if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
       if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
       const OLD_IDS = new Set(["eq-b1","eq-b2","eq-b3","coord-prod","dir-tv"]);
-      const needsMigration = !im || (im.some(x => OLD_IDS.has(x.id)));
+      const REQUIRED_IDS = ["supervisor2"];
+      const needsMigration = !im || im.some(x => OLD_IDS.has(x.id)) || REQUIRED_IDS.some(id => !im.find(x => x.id === id));
       const imFinal = needsMigration ? ITENS_MASTER_INIT : im;
       if (needsMigration) setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
       setItensMasterRaw(imFinal);

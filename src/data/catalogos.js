@@ -424,7 +424,8 @@ export const ITENS_MASTER_INIT = [
   { id:"coord-um",   nome:"Coordenador de UM",      unidade:"diaria", categoria:"equipe" },
   { id:"prod-um",    nome:"Produtor de UM",         unidade:"diaria", categoria:"equipe" },
   { id:"prod-campo", nome:"Produtor de Campo",      unidade:"diaria", categoria:"equipe" },
-  { id:"supervisor", nome:"Supervisor de Operações",unidade:"diaria", categoria:"equipe" },
+  { id:"supervisor",  nome:"Supervisor de Operações",  unidade:"diaria", categoria:"equipe" },
+  { id:"supervisor2", nome:"Supervisor de Operações 2",unidade:"diaria", categoria:"equipe" },
   { id:"dtv",        nome:"DTV",                    unidade:"diaria", categoria:"equipe" },
   { id:"vmix",       nome:"Operador de Vmix",       unidade:"diaria", categoria:"equipe" },
 ];

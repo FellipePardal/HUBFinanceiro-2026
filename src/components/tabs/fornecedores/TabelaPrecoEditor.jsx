@@ -1,462 +1,433 @@
 import { useState, useMemo, useEffect } from "react";
 import { iSty, RADIUS } from "../../../constants";
 import { fmt } from "../../../utils";
-import { Card, PanelTitle, Button, Badge } from "../../ui";
+import { Button, Badge } from "../../ui";
 import {
-  statusNegociacaoInfo,
-  setCelula, getCelula,
-  contarCelulasPreenchidas,
-  unidadeLabel,
-  gerarTokenTabela,
-  revogarTokenTabela,
-  statusTokenTabela,
-  adicionarRodada,
-  getRodadaAtual,
-  deltaCelula,
-  calcularDeltaRodadas,
-  setCelulaRodada,
+  statusNegociacaoInfo, setCelula, getCelula,
+  contarCelulasPreenchidas, unidadeLabel,
+  gerarTokenTabela, revogarTokenTabela, statusTokenTabela,
+  adicionarRodada, getRodadaAtual, deltaCelula, calcularDeltaRodadas,
+  setCelulaRodada, CATEGORIAS_ITEM,
 } from "../../../data/catalogos";
 import {
-  X, Save, Send, CheckCircle2, Archive, RotateCcw, Package,
-  AlertCircle, MapPin, Tag, Link2, Copy, Check, Ban,
-  RefreshCw, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
+  Save, Send, CheckCircle2, Archive, RotateCcw, AlertCircle,
+  Link2, Copy, Check, Ban, RefreshCw, TrendingDown, TrendingUp,
+  ChevronRight, MapPin, Camera, Users, Trash2, Plus, ChevronDown,
 } from "lucide-react";
 
+const CAT_META = {
+  periferico: { label:"Periféricos", color:"#3b82f6", icon:Camera },
+  equipe:     { label:"Equipe Operacional", color:"#f59e0b", icon:Users },
+};
+
 const cellSty = (T, preenchido, delta) => {
-  let bg = preenchido ? (T.brandSoft||"rgba(16,185,129,0.10)") : T.bg;
+  let bg = preenchido ? (T.brandSoft||"rgba(16,185,129,0.08)") : "transparent";
   let border = T.border;
   if (delta !== null && delta !== undefined) {
-    if (delta > 0)  { bg = "rgba(16,185,129,0.12)";  border = T.brand||"#10b981"; }
-    if (delta < 0)  { bg = "rgba(239,68,68,0.10)";   border = T.danger||"#ef4444"; }
+    if (delta > 0) { bg="rgba(16,185,129,0.12)"; border=T.brand||"#10b981"; }
+    if (delta < 0) { bg="rgba(239,68,68,0.10)";  border=T.danger||"#ef4444"; }
   }
   return {
-    background: bg,
-    border: `1px solid ${border}`,
-    borderRadius: RADIUS.sm,
-    color: T.text,
-    padding: "8px 10px",
-    fontSize: 13,
-    fontWeight: preenchido ? 700 : 500,
-    width: "100%",
-    textAlign: "right",
-    boxSizing: "border-box",
-    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-    outline: "none",
+    background:bg, border:`1px solid ${border}`, borderRadius:RADIUS.sm,
+    color:T.text, padding:"6px 8px", fontSize:12, fontWeight:preenchido?700:400,
+    width:"100%", textAlign:"right", boxSizing:"border-box",
+    fontFamily:"'JetBrains Mono',ui-monospace,monospace", outline:"none",
+    minWidth:72,
   };
 };
 
 export default function TabelaPrecoEditor({
-  tabela: negInicial,
-  fornecedor,
-  campeonato,
-  cidades,
-  onSave,
-  onClose,
-  T,
+  tabela: negInicial, fornecedor, itensMaster=[], cidades, onSave, onRemove, T,
 }) {
-  const [neg, setNeg]           = useState(negInicial);
-  const [dirty, setDirty]       = useState(false);
+  const [neg, setNeg]             = useState(negInicial);
+  const [dirty, setDirty]         = useState(false);
   const [linkCopiado, setLinkCopiado] = useState(false);
-  const [rodadaViz, setRodadaViz] = useState(null); // null = última
+  const [rodadaViz, setRodadaViz] = useState(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [novaCatCod, setNovaCatCod] = useState("");
 
-  useEffect(() => { setNeg(negInicial); setDirty(false); setRodadaViz(null); }, [negInicial?.id]);
+  useEffect(()=>{ setNeg(negInicial); setDirty(false); setRodadaViz(null); },[negInicial?.id]);
 
-  const rodadas    = neg?.rodadas || [];
-  const rodadaAtual = getRodadaAtual(neg);
+  const rodadas      = neg?.rodadas || [];
+  const rodadaAtual  = getRodadaAtual(neg);
   const rodadaExibida = rodadaViz !== null
-    ? (rodadas.find(r => r.numero === rodadaViz) || rodadaAtual)
+    ? (rodadas.find(r=>r.numero===rodadaViz)||rodadaAtual)
     : rodadaAtual;
-  const isUltimaRodada = !rodadaViz || rodadaViz === rodadaAtual?.numero;
+  const isUltimaRodada = !rodadaViz || rodadaViz===rodadaAtual?.numero;
   const verComparativo = rodadas.length > 1 && isUltimaRodada;
+  const readOnly = !isUltimaRodada || neg.status==="arquivada";
 
-  // Itens: campeonato.itens tem prioridade; fallback para fornecedor.catalogo
-  const itens = useMemo(() => {
-    const src = (campeonato?.itens?.length)
-      ? campeonato.itens
-      : (fornecedor?.catalogo || []);
-    return src.filter(i => i.ativo !== false);
-  }, [campeonato, fornecedor]);
+  const categorias  = neg.categorias?.length ? neg.categorias : [{codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"},{codigo:"B3",nome:"B3"}];
+  const cidadesDaTabela = useMemo(()=>
+    (neg.cidadeIds||[]).map(id=>cidades.find(c=>c.id===id)).filter(Boolean),
+  [neg.cidadeIds, cidades]);
 
-  const cidadesDoCamp = useMemo(
-    () => (campeonato?.cidadeIds||[]).map(id=>cidades.find(c=>c.id===id)).filter(Boolean),
-    [campeonato, cidades]
-  );
-  const categorias = campeonato?.categorias || [];
+  const itensPorCat = useMemo(()=>{
+    const map = { periferico:[], equipe:[] };
+    itensMaster.forEach(it=>{ const k=it.categoria||"equipe"; (map[k]??(map[k]=[])).push(it); });
+    return map;
+  },[itensMaster]);
 
-  const totalCelulas = itens.length * cidadesDoCamp.length * categorias.length;
-  const preenchidas  = contarCelulasPreenchidas({ valores: rodadaExibida?.valores || {} });
-  const pct = totalCelulas ? Math.round((preenchidas / totalCelulas) * 100) : 0;
+  const totalCelulas = itensMaster.length * cidadesDaTabela.length * categorias.length;
+  const preenchidas  = contarCelulasPreenchidas({valores: rodadaExibida?.valores||{}});
+  const pct = totalCelulas ? Math.round((preenchidas/totalCelulas)*100) : 0;
+  const deltaGeral   = calcularDeltaRodadas(neg);
+  const status       = statusNegociacaoInfo(neg.status);
 
-  const deltaGeral = calcularDeltaRodadas(neg);
-  const status = statusNegociacaoInfo(neg.status);
-  const readOnly = !isUltimaRodada || ["arquivada"].includes(neg.status);
+  // ── Link público ─────────────────────────────────────────────────────────
+  const tokenStatus = statusTokenTabela(neg);
+  const linkPublico = neg.token ? `${window.location.origin}${window.location.pathname}#tabela/${neg.token}` : null;
+  const gerarLink   = ()=>{ const n=gerarTokenTabela(neg); setNeg(n); onSave(n); setDirty(false); };
+  const revogarLink = ()=>{ if(!confirm("Revogar link?"))return; const n=revogarTokenTabela(neg); setNeg(n); onSave(n); };
+  const copiarLink  = ()=>{ navigator.clipboard?.writeText(linkPublico||""); setLinkCopiado(true); setTimeout(()=>setLinkCopiado(false),2000); };
 
-  // ── Link público ──────────────────────────────────────────────────────────
-  const tokenStatus  = statusTokenTabela(neg);
-  const linkPublico  = neg.token ? `${window.location.origin}${window.location.pathname}#tabela/${neg.token}` : null;
-
-  const gerarLink = () => { const n = gerarTokenTabela(neg); setNeg(n); onSave(n); setDirty(false); };
-  const revogarLink = () => {
-    if (!confirm("Revogar este link?")) return;
-    const n = revogarTokenTabela(neg); setNeg(n); onSave(n);
-  };
-  const copiarLink = () => {
-    if (!linkPublico) return;
-    navigator.clipboard?.writeText(linkPublico);
-    setLinkCopiado(true);
-    setTimeout(()=>setLinkCopiado(false), 2000);
-  };
-
-  // ── Edição de células ─────────────────────────────────────────────────────
-  const updateCelula = (itemId, cidadeId, categoria, raw) => {
+  // ── Edição ────────────────────────────────────────────────────────────────
+  const updateCelula = (itemId, cidadeId, cat, raw) => {
     if (readOnly) return;
-    const valor = raw === "" ? null : parseFloat(raw);
-    setNeg(n => setCelulaRodada(n, itemId, cidadeId, categoria, valor));
+    const v = raw===""?null:parseFloat(raw);
+    setNeg(n=>setCelulaRodada(n,itemId,cidadeId,cat,v));
     setDirty(true);
   };
 
-  // ── Salvar ────────────────────────────────────────────────────────────────
   const salvar = (statusNovo) => {
-    const next = {
-      ...neg,
-      status: statusNovo || neg.status,
-      atualizadoEm: new Date().toISOString(),
-    };
-    onSave(next);
-    setDirty(false);
+    const next = {...neg, status:statusNovo||neg.status, atualizadoEm:new Date().toISOString()};
+    onSave(next); setDirty(false); setNeg(next);
   };
 
-  // ── Nova rodada (contra-proposta) ─────────────────────────────────────────
-  const novaRodada = (propostaPor = "livemode") => {
-    const n = adicionarRodada(neg, propostaPor);
-    setNeg(n);
-    setRodadaViz(null);
-    setDirty(true);
+  const novaRodada = (propostaPor="livemode") => {
+    const n=adicionarRodada(neg,propostaPor); setNeg(n); setRodadaViz(null); setDirty(true);
   };
 
-  // ── Atualizar obs da rodada atual ─────────────────────────────────────────
   const updateObs = obs => {
-    if (!neg.rodadas?.length) return;
-    const rodadas = [...neg.rodadas];
-    rodadas[rodadas.length-1] = { ...rodadas[rodadas.length-1], observacoes: obs };
-    setNeg(n => ({...n, rodadas, atualizadoEm: new Date().toISOString()}));
-    setDirty(true);
+    const rs=[...neg.rodadas]; rs[rs.length-1]={...rs[rs.length-1],observacoes:obs};
+    setNeg(n=>({...n,rodadas:rs})); setDirty(true);
   };
 
-  if (!itens.length) return (
-    <Wrapper T={T} onClose={onClose}>
-      <Empty T={T} icon={Package} title="Sem itens de serviço"
-        msg="Este campeonato ainda não tem itens cadastrados. Vá em Catálogos → edite o campeonato e adicione os itens que serão orçados (UM, drone, equipe...)."/>
-    </Wrapper>
-  );
-  if (!cidadesDoCamp.length || !categorias.length) return (
-    <Wrapper T={T} onClose={onClose}>
-      <Empty T={T} icon={MapPin} title="Campeonato incompleto"
-        msg="O campeonato precisa ter pelo menos uma cidade-sede e uma categoria."/>
-    </Wrapper>
-  );
+  // ── Config helpers ────────────────────────────────────────────────────────
+  const toggleCidade = id => {
+    const ids = neg.cidadeIds||[];
+    setNeg(n=>({...n,cidadeIds:ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]}));
+    setDirty(true);
+  };
+  const addCategoria = () => {
+    const cod=novaCatCod.trim().toUpperCase();
+    if(!cod||categorias.some(c=>c.codigo===cod))return;
+    setNeg(n=>({...n,categorias:[...categorias,{codigo:cod,nome:cod}]}));
+    setNovaCatCod(""); setDirty(true);
+  };
+  const removeCat = i => {
+    setNeg(n=>({...n,categorias:categorias.filter((_,idx)=>idx!==i)})); setDirty(true);
+  };
+
+  const IS = iSty(T);
 
   return (
-    <Wrapper T={T} onClose={onClose}>
+    <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{padding:"20px 24px",borderBottom:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
           <div style={{minWidth:0,flex:1}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
               <Badge T={T} color={status.color} size="md">{status.label}</Badge>
-              {deltaGeral !== null && (
-                <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700,
+              {deltaGeral!==null&&(
+                <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:RADIUS.pill,fontSize:10,fontWeight:800,
                   background:deltaGeral>0?"rgba(16,185,129,0.12)":"rgba(239,68,68,0.10)",
                   color:deltaGeral>0?(T.brand||"#10b981"):(T.danger||"#ef4444")}}>
-                  {deltaGeral>0?<TrendingDown size={11}/>:<TrendingUp size={11}/>}
+                  {deltaGeral>0?<TrendingDown size={10}/>:<TrendingUp size={10}/>}
                   {deltaGeral>0?"-":"+"}{Math.abs(deltaGeral).toFixed(1)}% vs R1
                 </span>
               )}
-              <span style={{fontSize:11,color:T.textSm,fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+              <span style={{fontSize:10,color:T.textSm,fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
                 {rodadas.length} rodada{rodadas.length!==1?"s":""}
               </span>
             </div>
-            <h2 style={{margin:0,fontSize:20,fontWeight:800,color:T.text,letterSpacing:"-0.02em"}}>
-              {fornecedor?.apelido || "Fornecedor"}
+            <h2 style={{margin:"0 0 2px",fontSize:18,fontWeight:800,color:T.text,letterSpacing:"-0.02em"}}>
+              {fornecedor?.apelido||"Fornecedor"}
             </h2>
-            <p style={{margin:"4px 0 0",fontSize:13,color:T.textMd}}>
-              {campeonato?.nome} · {cidadesDoCamp.length} cidades × {categorias.length} categorias × {itens.length} itens
+            <p style={{margin:0,fontSize:12,color:T.textMd}}>
+              {cidadesDaTabela.length} cidade{cidadesDaTabela.length!==1?"s":""} · {categorias.length} categoria{categorias.length!==1?"s":""} · {itensMaster.length} serviços ·{" "}
+              <span style={{fontWeight:700,color:pct===100?(T.brand||"#10b981"):T.text}}>{preenchidas}/{totalCelulas} ({pct}%)</span>
             </p>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{textAlign:"right",marginRight:8}}>
-              <div style={{fontSize:11,color:T.textSm,letterSpacing:"0.04em",textTransform:"uppercase",fontWeight:700}}>Preenchimento</div>
-              <div style={{fontSize:18,color:T.text,fontWeight:800,fontFamily:"'JetBrains Mono',ui-monospace,monospace"}}>
-                {preenchidas}/{totalCelulas}
-                <span style={{fontSize:11,color:T.textMd,marginLeft:6}}>({pct}%)</span>
-              </div>
-            </div>
-            <button onClick={onClose} style={{background:"transparent",border:`1px solid ${T.border}`,color:T.textMd,borderRadius:RADIUS.md,width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <X size={18}/>
-            </button>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            {dirty&&(
+              <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",color:T.warning||"#f59e0b",borderRadius:RADIUS.pill,fontSize:10,fontWeight:700}}>
+                <AlertCircle size={11}/> Não salvo
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Indicadores de estado */}
-        <div style={{marginTop:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          {dirty && (
-            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"5px 11px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",color:T.warning||"#f59e0b",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700}}>
-              <AlertCircle size={12}/> Alterações não salvas
-            </span>
-          )}
-          {tokenStatus==="ativo" && (
-            <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"5px 11px",background:T.brandSoft||"rgba(16,185,129,0.12)",color:T.brand||"#10b981",borderRadius:RADIUS.pill,fontSize:11,fontWeight:700}}>
-              <Link2 size={12}/> Link público ativo
-            </span>
-          )}
-        </div>
+        {/* Round history */}
+        {rodadas.length>0&&(
+          <div style={{marginTop:10,display:"flex",alignItems:"center",gap:6,overflowX:"auto"}}>
+            <span style={{fontSize:10,fontWeight:700,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>Rodadas:</span>
+            {rodadas.map((r,idx)=>{
+              const isAtual=r.numero===rodadaAtual?.numero;
+              const isViz=rodadaViz===r.numero||(!rodadaViz&&isAtual);
+              const prevR=idx>0?rodadas[idx-1]:null;
+              const deltaR=prevR?(()=>{
+                const cells=v=>Object.values(v||{}).flatMap(i=>Object.values(i||{}).flatMap(c=>Object.values(c||{}))).filter(x=>x>0);
+                const cp=cells(prevR.valores),cc=cells(r.valores);
+                if(!cp.length||!cc.length)return null;
+                const med=a=>a.reduce((x,y)=>x+y,0)/a.length;
+                const p=med(cp); return p?((p-med(cc))/p)*100:null;
+              })():null;
+              return (
+                <button key={r.numero} onClick={()=>setRodadaViz(isViz?null:r.numero)} style={{
+                  display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",
+                  borderRadius:RADIUS.pill,border:`1px solid ${isViz?(T.brand||"#10b981"):T.border}`,
+                  background:isViz?(T.brandSoft||"rgba(16,185,129,0.12)"):"transparent",
+                  color:isViz?(T.brand||"#10b981"):T.textMd,fontSize:10,fontWeight:700,cursor:"pointer",flexShrink:0,
+                }}>
+                  R{r.numero}
+                  <span style={{fontSize:9,color:isViz?(T.brand||"#10b981"):T.textSm}}>
+                    {r.propostaPor==="livemode"?"Livemode":"Forn."}
+                  </span>
+                  {deltaR!==null&&(
+                    <span style={{fontSize:9,fontWeight:800,color:deltaR>0?(T.brand||"#10b981"):(T.danger||"#ef4444")}}>
+                      {deltaR>0?"-":"+"}{Math.abs(deltaR).toFixed(0)}%
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {!isUltimaRodada&&(
+              <button onClick={()=>setRodadaViz(null)} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:RADIUS.pill,border:`1px solid ${T.border}`,background:"transparent",color:T.textMd,fontSize:10,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+                <ChevronRight size={11}/> Ver atual
+              </button>
+            )}
+          </div>
+        )}
 
-        {/* Link público ativo */}
-        {tokenStatus==="ativo" && linkPublico && (
-          <div style={{marginTop:12,padding:"10px 14px",background:T.surface||T.card,border:`1px solid ${T.brandBorder||T.border}`,borderRadius:RADIUS.md,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <Link2 size={14} color={T.brand||"#10b981"}/>
-            <input readOnly value={linkPublico} onClick={e=>e.target.select()} style={{flex:1,minWidth:240,background:"transparent",border:"none",outline:"none",color:T.text,fontSize:12,fontFamily:"'JetBrains Mono',ui-monospace,monospace"}}/>
+        {/* Link público */}
+        {tokenStatus==="ativo"&&linkPublico&&(
+          <div style={{marginTop:10,padding:"8px 12px",background:T.surface||T.card,border:`1px solid ${T.brandBorder||T.border}`,borderRadius:RADIUS.md,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <Link2 size={12} color={T.brand||"#10b981"}/>
+            <input readOnly value={linkPublico} onClick={e=>e.target.select()} style={{flex:1,minWidth:200,background:"transparent",border:"none",outline:"none",color:T.text,fontSize:11,fontFamily:"'JetBrains Mono',ui-monospace,monospace"}}/>
             <Button T={T} variant="secondary" size="sm" icon={linkCopiado?Check:Copy} onClick={copiarLink}>{linkCopiado?"Copiado":"Copiar"}</Button>
             <Button T={T} variant="danger" size="sm" icon={Ban} onClick={revogarLink}>Revogar</Button>
           </div>
         )}
       </div>
 
-      {/* ── Histórico de rodadas ───────────────────────────────────────────── */}
-      {rodadas.length > 0 && (
-        <div style={{padding:"12px 24px",borderBottom:`1px solid ${T.border}`,background:T.bg,display:"flex",alignItems:"center",gap:8,overflowX:"auto"}}>
-          <span style={{fontSize:11,fontWeight:700,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>Rodadas:</span>
-          {rodadas.map((r, idx) => {
-            const isAtual = r.numero === rodadaAtual?.numero;
-            const isViz   = rodadaViz === r.numero || (!rodadaViz && isAtual);
-            const prevR   = idx > 0 ? rodadas[idx-1] : null;
-            const deltaR  = prevR ? (() => {
-              const cells = v => Object.values(v||{}).flatMap(i=>Object.values(i||{}).flatMap(c=>Object.values(c||{}))).filter(x=>x>0);
-              const cp = cells(prevR.valores); const cc = cells(r.valores);
-              if (!cp.length || !cc.length) return null;
-              const med = a => a.reduce((x,y)=>x+y,0)/a.length;
-              const prim = med(cp); if (!prim) return null;
-              return ((prim-med(cc))/prim)*100;
-            })() : null;
-            return (
-              <button key={r.numero} onClick={()=>setRodadaViz(isViz?null:r.numero)} style={{
-                display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",
-                borderRadius:RADIUS.pill,border:`1px solid ${isViz?(T.brand||"#10b981"):T.border}`,
-                background:isViz?(T.brandSoft||"rgba(16,185,129,0.12)"):"transparent",
-                color:isViz?(T.brand||"#10b981"):T.textMd,
-                fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0,
-              }}>
-                R{r.numero}
-                <span style={{fontSize:10,color:isViz?(T.brand||"#10b981"):T.textSm}}>
-                  {r.propostaPor==="livemode"?"Livemode":"Fornecedor"}
-                </span>
-                {deltaR !== null && (
-                  <span style={{fontSize:10,fontWeight:800,color:deltaR>0?(T.brand||"#10b981"):(T.danger||"#ef4444")}}>
-                    {deltaR>0?"-":"+"}{Math.abs(deltaR).toFixed(0)}%
-                  </span>
-                )}
-                {isAtual && !isViz && <span style={{fontSize:9,color:T.textSm}}>atual</span>}
-              </button>
-            );
-          })}
-          {!isUltimaRodada && (
-            <button onClick={()=>setRodadaViz(null)} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"6px 10px",borderRadius:RADIUS.pill,border:`1px solid ${T.border}`,background:"transparent",color:T.textMd,fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0}}>
-              <ChevronRight size={12}/> Ver atual
-            </button>
-          )}
-        </div>
-      )}
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
 
-      {/* ── Corpo: matriz por item ─────────────────────────────────────────── */}
-      <div style={{padding:"20px 24px",overflowY:"auto",flex:1}}>
-        {!isUltimaRodada && (
-          <div style={{padding:"10px 14px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",border:`1px solid ${T.warning||"#f59e0b"}`,borderRadius:RADIUS.md,marginBottom:16,display:"flex",gap:8,alignItems:"center"}}>
-            <AlertCircle size={14} color={T.warning||"#f59e0b"} style={{flexShrink:0}}/>
+        {!isUltimaRodada&&(
+          <div style={{padding:"8px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",border:`1px solid ${T.warning||"#f59e0b"}`,borderRadius:RADIUS.md,marginBottom:14,display:"flex",gap:8,alignItems:"center"}}>
+            <AlertCircle size={13} color={T.warning||"#f59e0b"} style={{flexShrink:0}}/>
             <span style={{fontSize:12,color:T.text}}>Visualizando R{rodadaExibida?.numero} (somente leitura). Clique em "Ver atual" para editar.</span>
           </div>
         )}
 
-        {itens.map(item => (
-          <Card key={item.id} T={T} padding={0} style={{marginBottom:16}}>
-            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                <div style={{width:32,height:32,borderRadius:8,background:T.brandSoft||"rgba(16,185,129,0.12)",border:`1px solid ${T.brandBorder||T.border}`,color:T.brand||"#10b981",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <Package size={15} strokeWidth={2.25}/>
+        {/* Config: cidades + categorias */}
+        <div style={{marginBottom:16,border:`1px solid ${T.border}`,borderRadius:RADIUS.md,overflow:"hidden"}}>
+          <div onClick={()=>setShowConfig(o=>!o)} style={{padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:T.surfaceAlt||T.bg,userSelect:"none"}}>
+            {showConfig?<ChevronDown size={14} color={T.textSm}/>:<ChevronRight size={14} color={T.textSm}/>}
+            <span style={{fontSize:12,fontWeight:700,color:T.text}}>Configurar cobertura</span>
+            <span style={{fontSize:11,color:T.textSm}}>
+              {cidadesDaTabela.length} cidades · {categorias.length} categorias
+            </span>
+          </div>
+          {showConfig&&(
+            <div style={{padding:"14px 16px",borderTop:`1px solid ${T.border}`}}>
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:T.textMd,letterSpacing:"0.04em",textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                  <MapPin size={11} color="#3b82f6"/> Cidades cobertas
                 </div>
-                <div style={{minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:700,color:T.text}}>{item.nome}</div>
-                  {item.descricao && <div style={{fontSize:11,color:T.textSm,marginTop:2}}>{item.descricao}</div>}
-                </div>
-              </div>
-              <Badge T={T} color={T.info||"#3b82f6"} size="sm">{unidadeLabel(item.unidade)}</Badge>
-            </div>
-
-            <div style={{padding:"4px 8px 12px",overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"6px 4px"}}>
-                <thead>
-                  <tr>
-                    <th style={{textAlign:"left",padding:"8px 10px",fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:"0.04em",textTransform:"uppercase",minWidth:160}}>Cidade</th>
-                    {categorias.map(cat => (
-                      <th key={cat.codigo} style={{textAlign:"center",padding:"8px 10px",fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:4}}><Tag size={10}/>{cat.codigo}</span>
-                      </th>
-                    ))}
-                    <th style={{textAlign:"right",padding:"8px 10px",fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:"0.04em",textTransform:"uppercase",width:120}}>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cidadesDoCamp.map(cid => {
-                    const subtotal = categorias.reduce((s, cat) => s + (getCelula(rodadaExibida, item.id, cid.id, cat.codigo)||0), 0);
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {cidades.map(c=>{
+                    const on=(neg.cidadeIds||[]).includes(c.id);
                     return (
-                      <tr key={cid.id}>
-                        <td style={{padding:"6px 10px",fontSize:13,color:T.text,fontWeight:600}}>
-                          <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
-                            <MapPin size={11} color={T.textSm}/>{cid.nome}
-                            <span style={{color:T.textSm,fontWeight:500,fontSize:11}}>/{cid.uf}</span>
-                          </span>
-                        </td>
-                        {categorias.map(cat => {
-                          const v = getCelula(rodadaExibida, item.id, cid.id, cat.codigo);
-                          const d = verComparativo ? deltaCelula(neg, item.id, cid.id, cat.codigo) : null;
-                          return (
-                            <td key={cat.codigo} style={{padding:"3px 0",minWidth:120,position:"relative"}}>
-                              <input
-                                type="number"
-                                value={v ?? ""}
-                                onChange={e => updateCelula(item.id, cid.id, cat.codigo, e.target.value)}
-                                disabled={readOnly}
-                                placeholder="—"
-                                style={cellSty(T, v != null && v !== "", d)}
-                              />
-                              {d !== null && (
-                                <span style={{
-                                  position:"absolute",top:4,right:6,
-                                  fontSize:9,fontWeight:800,lineHeight:1,
-                                  color:d>0?(T.brand||"#10b981"):(T.danger||"#ef4444"),
-                                }}>
-                                  {d>0?"-":"+"}{Math.abs(d).toFixed(0)}%
-                                </span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td style={{padding:"6px 10px",fontSize:13,fontWeight:700,color:subtotal>0?(T.brand||"#10b981"):T.textSm,textAlign:"right",fontFamily:"'JetBrains Mono',ui-monospace,monospace"}}>
-                          {subtotal>0?fmt(subtotal):"—"}
-                        </td>
-                      </tr>
+                      <button key={c.id} onClick={()=>toggleCidade(c.id)} disabled={readOnly} style={{
+                        display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",
+                        borderRadius:RADIUS.pill,cursor:readOnly?"default":"pointer",
+                        border:`1px solid ${on?"#3b82f6":T.border}`,
+                        background:on?"rgba(59,130,246,0.12)":"transparent",
+                        color:on?"#3b82f6":T.textMd,fontSize:11,fontWeight:600,
+                      }}>
+                        {on?<Check size={10}/>:<MapPin size={10}/>}{c.nome}/{c.uf}
+                      </button>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:T.textMd,letterSpacing:"0.04em",textTransform:"uppercase",marginBottom:8}}>
+                  Categorias de jogo
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:8}}>
+                  {categorias.map((c,i)=>(
+                    <span key={i} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:RADIUS.pill,background:T.brandSoft||"rgba(16,185,129,0.12)",border:`1px solid ${T.brandBorder||T.border}`,color:T.brand||"#10b981",fontSize:11,fontWeight:700}}>
+                      {c.codigo}
+                      {!readOnly&&<button onClick={()=>removeCat(i)} style={{background:"none",border:"none",cursor:"pointer",color:"inherit",padding:0,lineHeight:1,display:"flex"}}>×</button>}
+                    </span>
+                  ))}
+                </div>
+                {!readOnly&&(
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <input value={novaCatCod} onChange={e=>setNovaCatCod(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCategoria()} placeholder="Ex: B4" style={{...IS,width:90,padding:"5px 8px",fontSize:12}}/>
+                    <Button T={T} variant="ghost" size="sm" icon={Plus} onClick={addCategoria}>Adicionar</Button>
+                  </div>
+                )}
+              </div>
             </div>
-          </Card>
-        ))}
+          )}
+        </div>
 
-        {/* Observações da rodada atual */}
-        {isUltimaRodada && (
-          <Card T={T} padding={0}>
-            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`}}>
-              <span style={{fontSize:12,fontWeight:700,color:T.textMd,letterSpacing:"0.04em",textTransform:"uppercase"}}>Observações — R{rodadaAtual?.numero}</span>
+        {/* Price matrix */}
+        {!cidadesDaTabela.length ? (
+          <div style={{padding:"24px",textAlign:"center",color:T.textSm,fontSize:12,border:`1px dashed ${T.border}`,borderRadius:RADIUS.md}}>
+            Nenhuma cidade selecionada. Expanda "Configurar cobertura" para adicionar cidades.
+          </div>
+        ) : (
+          <div style={{overflowX:"auto"}}>
+            <table style={{borderCollapse:"separate",borderSpacing:"3px 2px",width:"max-content",minWidth:"100%"}}>
+              <thead>
+                <tr>
+                  <th style={{textAlign:"left",padding:"6px 10px",fontSize:11,fontWeight:700,color:T.textSm,letterSpacing:"0.04em",textTransform:"uppercase",minWidth:160,position:"sticky",left:0,background:T.surface||T.card,zIndex:2}}>
+                    Serviço
+                  </th>
+                  {cidadesDaTabela.map(c=>(
+                    <th key={c.id} colSpan={categorias.length} style={{textAlign:"center",padding:"6px 8px",fontSize:11,fontWeight:700,color:T.text,background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,borderRadius:RADIUS.sm,whiteSpace:"nowrap"}}>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                        <MapPin size={10} color={T.textSm}/>{c.nome}<span style={{color:T.textSm,fontWeight:400}}>/{c.uf}</span>
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  <th style={{position:"sticky",left:0,background:T.surface||T.card,zIndex:2}}/>
+                  {cidadesDaTabela.flatMap(c=>
+                    categorias.map(cat=>(
+                      <th key={`${c.id}-${cat.codigo}`} style={{textAlign:"center",padding:"4px 6px",fontSize:10,fontWeight:700,color:T.textSm,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
+                        {cat.codigo}
+                      </th>
+                    ))
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(itensPorCat).map(([catKey, items])=>{
+                  if (!items.length) return null;
+                  const Meta = CAT_META[catKey] || { label:catKey, color:T.textMd, icon:Camera };
+                  const Icon = Meta.icon;
+                  return [
+                    <tr key={`group-${catKey}`}>
+                      <td colSpan={1+cidadesDaTabela.length*categorias.length} style={{
+                        padding:"10px 10px 6px",
+                        fontSize:11,fontWeight:800,color:Meta.color,
+                        letterSpacing:"0.04em",textTransform:"uppercase",
+                        background:`${Meta.color}10`,
+                        position:"sticky",left:0,
+                      }}>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
+                          <Icon size={12}/>{Meta.label}
+                          <span style={{fontSize:10,fontWeight:400,color:T.textSm}}>({items.length})</span>
+                        </span>
+                      </td>
+                    </tr>,
+                    ...items.map(item=>(
+                      <tr key={item.id}>
+                        <td style={{padding:"4px 10px",fontSize:12,fontWeight:600,color:T.text,whiteSpace:"nowrap",position:"sticky",left:0,background:T.surface||T.card,zIndex:1}}>
+                          {item.nome}
+                          <span style={{fontSize:9,color:T.textSm,fontWeight:400,marginLeft:4}}>{unidadeLabel(item.unidade)}</span>
+                        </td>
+                        {cidadesDaTabela.flatMap(cid=>
+                          categorias.map(cat=>{
+                            const v=getCelula(rodadaExibida,item.id,cid.id,cat.codigo);
+                            const d=verComparativo?deltaCelula(neg,item.id,cid.id,cat.codigo):null;
+                            return (
+                              <td key={`${cid.id}-${cat.codigo}`} style={{padding:"2px 0",position:"relative"}}>
+                                <input
+                                  type="number"
+                                  value={v??""} placeholder="—"
+                                  onChange={e=>updateCelula(item.id,cid.id,cat.codigo,e.target.value)}
+                                  disabled={readOnly}
+                                  style={cellSty(T,v!=null&&v!=="",d)}
+                                />
+                                {d!==null&&(
+                                  <span style={{position:"absolute",top:3,right:5,fontSize:8,fontWeight:800,lineHeight:1,color:d>0?(T.brand||"#10b981"):(T.danger||"#ef4444")}}>
+                                    {d>0?"-":"+"}{Math.abs(d).toFixed(0)}%
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })
+                        )}
+                      </tr>
+                    )),
+                  ];
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Observações */}
+        {isUltimaRodada&&(
+          <div style={{marginTop:16,border:`1px solid ${T.border}`,borderRadius:RADIUS.md,overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",background:T.surfaceAlt||T.bg,fontSize:11,fontWeight:700,color:T.textMd,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+              Observações — R{rodadaAtual?.numero}
             </div>
-            <div style={{padding:"12px 16px"}}>
+            <div style={{padding:"10px 14px"}}>
               <textarea
-                value={rodadaAtual?.observacoes || ""}
-                onChange={e => updateObs(e.target.value)}
+                value={rodadaAtual?.observacoes||""}
+                onChange={e=>updateObs(e.target.value)}
                 disabled={readOnly}
-                placeholder="Observações sobre esta rodada (condições, prazos, exclusões...)"
-                style={{...iSty(T),minHeight:70,fontFamily:"inherit",resize:"vertical"}}
+                placeholder="Condições, prazos, exclusões desta rodada..."
+                style={{...IS,minHeight:60,fontFamily:"inherit",resize:"vertical",width:"100%",boxSizing:"border-box"}}
               />
             </div>
-          </Card>
+          </div>
         )}
       </div>
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <div style={{padding:"14px 24px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-        <div style={{fontSize:11,color:T.textSm}}>
-          {neg.atualizadoEm && <>Atualizada {new Date(neg.atualizadoEm).toLocaleString("pt-BR")}</>}
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      <div style={{padding:"12px 20px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:11,color:T.textSm}}>
+            {neg.atualizadoEm&&<>Atualizada {new Date(neg.atualizadoEm).toLocaleString("pt-BR")}</>}
+          </span>
+          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>onRemove(neg.id)}/>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {neg.status !== "arquivada" && tokenStatus !== "ativo" && isUltimaRodada && (
-            <Button T={T} variant="secondary" size="md" icon={Link2} onClick={gerarLink}>
-              {tokenStatus==="sem"?"Gerar link público":"Gerar novo link"}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {neg.status!=="arquivada"&&tokenStatus!=="ativo"&&isUltimaRodada&&(
+            <Button T={T} variant="secondary" size="sm" icon={Link2} onClick={gerarLink}>
+              {tokenStatus==="sem"?"Gerar link":"Novo link"}
             </Button>
           )}
-
-          {isUltimaRodada && neg.status !== "arquivada" && (
-            <Button T={T} variant="secondary" size="md" icon={Save} onClick={()=>salvar(neg.status)} disabled={!dirty}>
-              Salvar
-            </Button>
+          {isUltimaRodada&&neg.status!=="arquivada"&&(
+            <Button T={T} variant="secondary" size="sm" icon={Save} onClick={()=>salvar(neg.status)} disabled={!dirty}>Salvar</Button>
           )}
-
-          {/* Contra-proposta: cria nova rodada */}
-          {isUltimaRodada && (neg.status==="em_analise" || neg.status==="aguardando_forn") && (
-            <Button T={T} variant="secondary" size="md" icon={RefreshCw} onClick={()=>{
-              if (!confirm("Criar nova rodada (contra-proposta) copiando os valores atuais?")) return;
-              novaRodada("livemode");
-              salvar("contraproposta");
-            }}>
-              Nova contra-proposta (R{(rodadaAtual?.numero||0)+1})
-            </Button>
+          {isUltimaRodada&&(neg.status==="em_analise"||neg.status==="aguardando_forn")&&(
+            <Button T={T} variant="secondary" size="sm" icon={RefreshCw} onClick={()=>{
+              if(!confirm("Criar nova contra-proposta (copia valores atuais)?"))return;
+              novaRodada("livemode"); salvar("contraproposta");
+            }}>Contra-proposta R{(rodadaAtual?.numero||0)+1}</Button>
           )}
-
-          {/* Registrar resposta do fornecedor: nova rodada como fornecedor */}
-          {isUltimaRodada && neg.status==="contraproposta" && (
-            <Button T={T} variant="secondary" size="md" icon={RefreshCw} onClick={()=>{
-              if (!confirm("Registrar resposta do fornecedor? Cria nova rodada para você inserir os valores respondidos.")) return;
-              novaRodada("fornecedor");
-              salvar("em_analise");
-            }}>
-              Registrar resposta do fornecedor
-            </Button>
+          {isUltimaRodada&&neg.status==="contraproposta"&&(
+            <Button T={T} variant="secondary" size="sm" icon={RefreshCw} onClick={()=>{
+              if(!confirm("Registrar resposta do fornecedor?"))return;
+              novaRodada("fornecedor"); salvar("em_analise");
+            }}>Resposta do fornecedor</Button>
           )}
-
-          {isUltimaRodada && neg.status==="rascunho" && (
-            <Button T={T} variant="primary" size="md" icon={Send} onClick={()=>salvar("aguardando_forn")}>
-              Aguardando fornecedor
-            </Button>
+          {isUltimaRodada&&neg.status==="rascunho"&&(
+            <Button T={T} variant="primary" size="sm" icon={Send} onClick={()=>salvar("aguardando_forn")}>Aguardando fornecedor</Button>
           )}
-          {isUltimaRodada && neg.status==="aguardando_forn" && (
-            <Button T={T} variant="secondary" size="md" icon={RotateCcw} onClick={()=>salvar("em_analise")}>
-              Fornecedor respondeu
-            </Button>
+          {isUltimaRodada&&neg.status==="aguardando_forn"&&(
+            <Button T={T} variant="secondary" size="sm" icon={RotateCcw} onClick={()=>salvar("em_analise")}>Fornecedor respondeu</Button>
           )}
-          {isUltimaRodada && (neg.status==="em_analise"||neg.status==="contraproposta"||neg.status==="rascunho"||neg.status==="aguardando_forn") && (
-            <Button T={T} variant="primary" size="md" icon={CheckCircle2} onClick={()=>salvar("aprovada")}>
-              Aprovar negociação
-            </Button>
+          {isUltimaRodada&&["em_analise","contraproposta","rascunho","aguardando_forn"].includes(neg.status)&&(
+            <Button T={T} variant="primary" size="sm" icon={CheckCircle2} onClick={()=>salvar("aprovada")}>Aprovar</Button>
           )}
-          {isUltimaRodada && neg.status==="aprovada" && (
-            <Button T={T} variant="secondary" size="md" icon={Archive} onClick={()=>salvar("arquivada")}>
-              Arquivar
-            </Button>
+          {isUltimaRodada&&neg.status==="aprovada"&&(
+            <Button T={T} variant="secondary" size="sm" icon={Archive} onClick={()=>salvar("arquivada")}>Arquivar</Button>
           )}
         </div>
       </div>
-    </Wrapper>
-  );
-}
-
-function Wrapper({ T, onClose, children }) {
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)",zIndex:120,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
-      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:T.surface||T.card,borderRadius:RADIUS.xl,width:"100%",maxWidth:1200,height:"94vh",display:"flex",flexDirection:"column",border:`1px solid ${T.border}`,boxShadow:T.shadow,overflow:"hidden"}}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Empty({ T, icon:Icon, title, msg }) {
-  return (
-    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:14,textAlign:"center"}}>
-      <div style={{width:64,height:64,borderRadius:16,background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,color:T.textSm,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <Icon size={28} strokeWidth={2}/>
-      </div>
-      <h3 style={{margin:0,fontSize:18,fontWeight:800,color:T.text,letterSpacing:"-0.02em"}}>{title}</h3>
-      <p style={{margin:0,fontSize:13,color:T.textMd,maxWidth:380,lineHeight:1.5}}>{msg}</p>
     </div>
   );
 }

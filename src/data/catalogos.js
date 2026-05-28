@@ -301,19 +301,17 @@ export function criarRodada({ numero = 1, propostaPor = "livemode", valores = {}
   };
 }
 
-export function criarNegociacao({ fornecedorId, campeonatoId }) {
-  const now = new Date().toISOString();
+export function criarNegociacao({ fornecedorId, campeonatoId = null, categorias = [{codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"},{codigo:"B3",nome:"B3"}], cidadeIds = [] }) {
   return {
-    id: `neg-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    id: `neg-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
     fornecedorId,
     campeonatoId,
+    categorias,
+    cidadeIds,
     status: "rascunho",
     rodadas: [criarRodada({ numero: 1, propostaPor: "livemode" })],
-    token: null,
-    tokenExpiraEm: null,
-    tokenRevogado: false,
-    criadoEm: now,
-    atualizadoEm: now,
+    atualizadoEm: new Date().toISOString(),
+    criadoEm: new Date().toISOString(),
   };
 }
 

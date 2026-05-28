@@ -1,336 +1,277 @@
 import { useState, useMemo } from "react";
 import { iSty, RADIUS } from "../../../constants";
-import { KPI } from "../../shared";
-import { Card, PanelTitle, Button, Badge, Chip, tableStyles } from "../../ui";
+import { Card, Button, Badge, Chip } from "../../ui";
 import {
   STATUS_NEGOCIACAO, statusNegociacaoInfo,
   criarNegociacao, contarCelulasPreenchidas,
-  migrarTabelaLegada, calcularDeltaRodadas, getRodadaAtual,
+  migrarTabelaLegada,
 } from "../../../data/catalogos";
-import {
-  Plus, Search, Trash2, Pencil, Building2, Trophy,
-  CheckCircle2, TrendingDown, TrendingUp, RefreshCw, AlertCircle,
-} from "lucide-react";
+import { Plus, Search, Building2, Trash2, Check, MapPin } from "lucide-react";
 import TabelaPrecoEditor from "./TabelaPrecoEditor";
 
-const FILTRO_TODOS = "todos";
+const lbl = { fontSize:11, fontWeight:600, display:"block", marginBottom:5, letterSpacing:"0.04em", textTransform:"uppercase" };
 
-// ── Modal: nova negociação ────────────────────────────────────────────────
-function NovaNegociacaoModal({ fornecedores, campeonatos, tabelas, onCreate, onClose, T }) {
+// ── Modal: nova tabela de fornecedor ────────────────────────────────────────
+function NovaTabela({ fornecedores, cidades, tabelas, onCreate, onClose, T }) {
   const IS = iSty(T);
   const [fornecedorId, setFornecedorId] = useState("");
-  const [campeonatoId, setCampeonatoId] = useState(
-    campeonatos.find(c=>c.ativo)?.id || campeonatos[0]?.id || ""
-  );
+  const [cidadeIds, setCidadeIds] = useState([]);
+  const [categorias, setCategorias] = useState([
+    {codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"},{codigo:"B3",nome:"B3"},
+  ]);
+  const [novaCatCod, setNovaCatCod] = useState("");
 
-  const fornOrdenados = [...fornecedores].sort((a,b)=>(a.apelido||"").localeCompare(b.apelido||""));
-  const campSelecionado = campeonatos.find(c=>c.id===campeonatoId);
+  const fornSemTabela = useMemo(() => {
+    const comTabela = new Set(tabelas.map(t=>String(t.fornecedorId)));
+    return [...fornecedores].filter(f=>!comTabela.has(String(f.id))).sort((a,b)=>(a.apelido||"").localeCompare(b.apelido||""));
+  },[fornecedores,tabelas]);
 
-  const jaTemAprovada = fornecedorId && campeonatoId && tabelas.some(t =>
-    String(t.fornecedorId)===String(fornecedorId) && t.campeonatoId===campeonatoId && t.status==="aprovada"
-  );
+  const toggleCidade = id => setCidadeIds(prev => prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+
+  const addCategoria = () => {
+    const cod = novaCatCod.trim().toUpperCase();
+    if (!cod || categorias.some(c=>c.codigo===cod)) return;
+    setCategorias(c=>[...c,{codigo:cod,nome:cod}]);
+    setNovaCatCod("");
+  };
+  const removeCategoria = i => setCategorias(c=>c.filter((_,idx)=>idx!==i));
 
   const handleCreate = () => {
-    if (!fornecedorId || !campeonatoId) return;
-    const nova = criarNegociacao({ fornecedorId:Number(fornecedorId), campeonatoId });
+    if (!fornecedorId) return;
+    if (!categorias.length) return alert("Adicione ao menos uma categoria.");
+    const nova = criarNegociacao({ fornecedorId:Number(fornecedorId), cidadeIds, categorias });
     onCreate(nova);
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:T.surface||T.card,borderRadius:RADIUS.xl,padding:28,width:"100%",maxWidth:520,border:`1px solid ${T.border}`,boxShadow:T.shadow}}>
-        <h3 style={{margin:"0 0 6px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Nova negociação</h3>
-        <p style={{margin:"0 0 18px",fontSize:12,color:T.textMd}}>
-          Selecione o fornecedor e o campeonato. Uma matriz vazia será criada com os itens de serviço e cidades-sede do campeonato.
-        </p>
+      <div style={{background:T.surface||T.card,borderRadius:RADIUS.xl,padding:28,width:"100%",maxWidth:680,border:`1px solid ${T.border}`,boxShadow:T.shadow,maxHeight:"90vh",overflowY:"auto"}}>
+        <h3 style={{margin:"0 0 18px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Nova tabela de preços</h3>
 
-        <div style={{marginBottom:14}}>
+        <div style={{marginBottom:16}}>
           <label style={lbl}>Fornecedor</label>
           <select value={fornecedorId} onChange={e=>setFornecedorId(e.target.value)} style={IS}>
             <option value="">— Selecione —</option>
-            {fornOrdenados.map(f => <option key={f.id} value={f.id}>{f.apelido}</option>)}
+            {fornSemTabela.map(f=><option key={f.id} value={f.id}>{f.apelido}{f.funcao?` · ${f.funcao}`:""}</option>)}
           </select>
+          {!fornSemTabela.length && <p style={{fontSize:11,color:T.textSm,margin:"6px 0 0"}}>Todos os fornecedores já têm tabela.</p>}
         </div>
 
-        <div style={{marginBottom:14}}>
-          <label style={lbl}>Campeonato</label>
-          <select value={campeonatoId} onChange={e=>setCampeonatoId(e.target.value)} style={IS}>
-            {campeonatos.filter(c=>c.ativo).map(c => (
-              <option key={c.id} value={c.id}>
-                {c.nome} · {(c.itens||[]).length} itens · {(c.cidadeIds||[]).length} cidades
-              </option>
+        <div style={{marginBottom:16}}>
+          <label style={{...lbl,display:"block",marginBottom:6}}>
+            Categorias de jogo <span style={{fontSize:10,fontWeight:400,color:T.textSm}}>({categorias.length})</span>
+          </label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+            {categorias.map((c,i)=>(
+              <span key={i} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:RADIUS.pill,background:T.brandSoft||"rgba(16,185,129,0.12)",border:`1px solid ${T.brandBorder||T.border}`,color:T.brand||"#10b981",fontSize:12,fontWeight:700}}>
+                {c.codigo}
+                <button onClick={()=>removeCategoria(i)} style={{background:"none",border:"none",cursor:"pointer",color:"inherit",padding:0,lineHeight:1,display:"flex"}}>×</button>
+              </span>
             ))}
-          </select>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input value={novaCatCod} onChange={e=>setNovaCatCod(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCategoria()} placeholder="Ex: B4, B3+" style={{...IS,width:120}} />
+            <Button T={T} variant="ghost" size="sm" icon={Plus} onClick={addCategoria}>Adicionar</Button>
+          </div>
         </div>
 
-        {campSelecionado && !(campSelecionado.itens||[]).length && (
-          <div style={{padding:"10px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",border:`1px solid ${T.warning||"#f59e0b"}`,borderRadius:RADIUS.md,marginBottom:14,display:"flex",gap:8,alignItems:"flex-start"}}>
-            <AlertCircle size={14} color={T.warning||"#f59e0b"} style={{marginTop:2,flexShrink:0}}/>
-            <span style={{fontSize:12,color:T.text,lineHeight:1.5}}>
-              Este campeonato ainda não tem <b>itens de serviço</b> cadastrados. Vá em <b>Catálogos</b> e adicione os serviços que serão orçados (UM B1, drone, equipe...).
-            </span>
+        <div style={{marginBottom:20}}>
+          <label style={{...lbl,display:"block",marginBottom:8}}>
+            Cidades cobertas <span style={{fontSize:10,fontWeight:400,color:T.textSm}}>({cidadeIds.length} selecionadas)</span>
+          </label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {cidades.map(c=>{
+              const on=cidadeIds.includes(c.id);
+              return (
+                <button key={c.id} onClick={()=>toggleCidade(c.id)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:RADIUS.pill,cursor:"pointer",border:`1px solid ${on?"#3b82f6":T.border}`,background:on?"rgba(59,130,246,0.12)":"transparent",color:on?"#3b82f6":T.textMd,fontSize:12,fontWeight:600}}>
+                  {on?<Check size={12}/>:<MapPin size={12}/>}{c.nome}/{c.uf}
+                </button>
+              );
+            })}
+            {!cidades.length && <p style={{color:T.textSm,fontSize:12,margin:0}}>Nenhuma cidade cadastrada.</p>}
           </div>
-        )}
-
-        {jaTemAprovada && (
-          <div style={{padding:"10px 12px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",border:`1px solid ${T.warning||"#f59e0b"}`,borderRadius:RADIUS.md,marginBottom:14,display:"flex",gap:8,alignItems:"flex-start"}}>
-            <AlertCircle size={14} color={T.warning||"#f59e0b"} style={{marginTop:2,flexShrink:0}}/>
-            <span style={{fontSize:12,color:T.text,lineHeight:1.5}}>
-              Já existe uma negociação <b>aprovada</b> para este par. A nova rodará em paralelo e ao ser aprovada substituirá a anterior.
-            </span>
-          </div>
-        )}
+        </div>
 
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <Button T={T} variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
-          <Button T={T} variant="primary" size="md" onClick={handleCreate} disabled={!fornecedorId||!campeonatoId}>Criar negociação</Button>
+          <Button T={T} variant="primary" size="md" onClick={handleCreate} disabled={!fornecedorId||!categorias.length}>Criar tabela</Button>
         </div>
       </div>
     </div>
   );
 }
 
-const lbl = {color:"inherit",fontSize:11,fontWeight:600,display:"block",marginBottom:5,letterSpacing:"0.04em",textTransform:"uppercase"};
-
 // ════════════════════════════════════════════════════════════════════════════
 export default function Tabelas({
   fornecedores, cidades, campeonatos,
   tabelas, setTabelas,
-  filtroCampeonato = FILTRO_TODOS,
+  itensMaster = [],
+  filtroCampeonato = "todos",
   T,
 }) {
   const [showNova, setShowNova]       = useState(false);
-  const [editandoId, setEditandoId]   = useState(null);
+  const [selectedId, setSelectedId]   = useState(null);
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [filtroFornId, setFiltroFornId] = useState("todos");
   const [busca, setBusca]             = useState("");
 
-  const fornById = useMemo(() => Object.fromEntries(fornecedores.map(f=>[f.id,f])), [fornecedores]);
-  const campById = useMemo(() => Object.fromEntries(campeonatos.map(c=>[c.id,c])), [campeonatos]);
+  const fornById = useMemo(()=>Object.fromEntries(fornecedores.map(f=>[String(f.id),f])),[fornecedores]);
 
-  // Migra tabelas no formato antigo para o novo na hora de exibir
-  const tabelasMigradas = useMemo(() => tabelas.map(t => migrarTabelaLegada(t)), [tabelas]);
+  const tabelasMigradas = useMemo(()=>tabelas.map(t=>migrarTabelaLegada(t)),[tabelas]);
 
-  const tabelasFiltradas = useMemo(() => {
+  const tabelasFiltradas = useMemo(()=>{
     return tabelasMigradas
-      .filter(t => filtroCampeonato===FILTRO_TODOS || t.campeonatoId===filtroCampeonato)
-      .filter(t => filtroStatus==="todos" || t.status===filtroStatus)
-      .filter(t => filtroFornId==="todos" || String(t.fornecedorId)===String(filtroFornId))
-      .filter(t => {
+      .filter(t=>filtroStatus==="todos"||t.status===filtroStatus)
+      .filter(t=>{
         if (!busca.trim()) return true;
-        const f = fornById[t.fornecedorId];
-        const c = campById[t.campeonatoId];
-        const q = busca.toLowerCase();
-        return (f?.apelido||"").toLowerCase().includes(q)
-          || (c?.nome||"").toLowerCase().includes(q);
+        const f=fornById[String(t.fornecedorId)];
+        return (f?.apelido||"").toLowerCase().includes(busca.toLowerCase());
       })
       .sort((a,b)=>(b.atualizadoEm||"").localeCompare(a.atualizadoEm||""));
-  }, [tabelasMigradas, filtroCampeonato, filtroStatus, filtroFornId, busca, fornById, campById]);
+  },[tabelasMigradas,filtroStatus,busca,fornById]);
 
-  const kpis = useMemo(() => {
-    const esc = filtroCampeonato===FILTRO_TODOS ? tabelasMigradas : tabelasMigradas.filter(t=>t.campeonatoId===filtroCampeonato);
-    return {
-      total:      esc.length,
-      aprovadas:  esc.filter(t=>t.status==="aprovada").length,
-      emAndamento:esc.filter(t=>["aguardando_forn","em_analise","contraproposta"].includes(t.status)).length,
-      rascunhos:  esc.filter(t=>t.status==="rascunho").length,
-    };
-  }, [tabelasMigradas, filtroCampeonato]);
-
-  // ── CRUD ───────────────────────────────────────────────────────────────
+  // ── CRUD ────────────────────────────────────────────────────────────────
   const criarNeg = nova => {
-    setTabelas(list => [...list, nova]);
+    setTabelas(list=>[...list,nova]);
     setShowNova(false);
-    setEditandoId(nova.id);
+    setSelectedId(nova.id);
   };
 
   const salvarNeg = atualizada => {
-    setTabelas(list => {
-      return list.map(t => {
-        if (t.id===atualizada.id) return atualizada;
-        // Ao aprovar, arquiva a aprovada anterior do mesmo par
-        if (atualizada.status==="aprovada"
-          && t.status==="aprovada"
-          && String(t.fornecedorId)===String(atualizada.fornecedorId)
-          && t.campeonatoId===atualizada.campeonatoId) {
-          return {...t, status:"arquivada", atualizadoEm:new Date().toISOString()};
-        }
-        return t;
-      });
-    });
+    setTabelas(list=>list.map(t=>{
+      if (t.id===atualizada.id) return atualizada;
+      if (atualizada.status==="aprovada"&&t.status==="aprovada"&&String(t.fornecedorId)===String(atualizada.fornecedorId))
+        return {...t,status:"arquivada",atualizadoEm:new Date().toISOString()};
+      return t;
+    }));
   };
 
   const removerNeg = id => {
     if (!confirm("Remover esta negociação permanentemente?")) return;
-    setTabelas(list => list.filter(t=>t.id!==id));
-    if (editandoId===id) setEditandoId(null);
+    setTabelas(list=>list.filter(t=>t.id!==id));
+    if (selectedId===id) setSelectedId(null);
   };
 
-  const negAberta = editandoId ? tabelasMigradas.find(t=>t.id===editandoId) : null;
-  const fornAberto = negAberta ? fornById[negAberta.fornecedorId] : null;
-  const campAberto = negAberta ? campById[negAberta.campeonatoId] : null;
-
-  const TS = tableStyles(T);
+  const negSelecionada = selectedId ? tabelasMigradas.find(t=>t.id===selectedId)||null : null;
 
   return (
-    <>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:20}}>
-        <KPI label="Total" value={String(kpis.total)} sub={filtroCampeonato===FILTRO_TODOS?"Todos os campeonatos":campById[filtroCampeonato]?.nome||""} color={T.info||"#3b82f6"} T={T}/>
-        <KPI label="Aprovadas" value={String(kpis.aprovadas)} sub="Valores vigentes para cotação" color={T.brand||"#10b981"} T={T}/>
-        <KPI label="Em andamento" value={String(kpis.emAndamento)} sub="Aguardando / em análise / contra-proposta" color={T.warning||"#f59e0b"} T={T}/>
-        <KPI label="Rascunhos" value={String(kpis.rascunhos)} sub="Não enviadas ainda" color="#64748b" T={T}/>
-      </div>
+    <div style={{display:"grid",gridTemplateColumns:"280px 1fr",border:`1px solid ${T.border}`,borderRadius:RADIUS.lg,overflow:"hidden",minHeight:"72vh",background:T.surface||T.card}}>
 
-      {/* Filtros */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <div style={{position:"relative"}}>
-            <Search size={14} color={T.textSm} style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
-            <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar fornecedor ou campeonato..." style={{...iSty(T),width:280,padding:"8px 12px 8px 34px"}}/>
-          </div>
-          <div style={{width:1,height:24,background:T.border}}/>
-          <Chip active={filtroStatus==="todos"} onClick={()=>setFiltroStatus("todos")} T={T}>Todos</Chip>
-          {STATUS_NEGOCIACAO.map(s => (
-            <Chip key={s.key} active={filtroStatus===s.key} onClick={()=>setFiltroStatus(s.key)} T={T} color={s.color}>{s.label}</Chip>
-          ))}
-          <div style={{width:1,height:24,background:T.border}}/>
-          <select value={filtroFornId} onChange={e=>setFiltroFornId(e.target.value)} style={{...iSty(T),width:220}}>
-            <option value="todos">Todos os fornecedores</option>
-            {[...fornecedores].sort((a,b)=>(a.apelido||"").localeCompare(b.apelido||"")).map(f=>(
-              <option key={f.id} value={f.id}>{f.apelido}</option>
-            ))}
-          </select>
+      {/* ── Left panel ──────────────────────────────────────────────── */}
+      <div style={{borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+
+        {/* Header */}
+        <div style={{padding:"14px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <span style={{fontSize:13,fontWeight:800,color:T.text,letterSpacing:"-0.01em"}}>Negociações</span>
+          <Button T={T} variant="primary" size="sm" icon={Plus} onClick={()=>setShowNova(true)}>Nova</Button>
         </div>
-        <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowNova(true)}>Nova negociação</Button>
+
+        {/* Search */}
+        <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+          <div style={{position:"relative"}}>
+            <Search size={13} color={T.textSm} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+            <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar fornecedor..." style={{...iSty(T),width:"100%",padding:"7px 10px 7px 30px",fontSize:12}}/>
+          </div>
+        </div>
+
+        {/* Status chips */}
+        <div style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",flexWrap:"wrap",gap:5,flexShrink:0}}>
+          <Chip active={filtroStatus==="todos"} onClick={()=>setFiltroStatus("todos")} T={T} size="xs">Todos</Chip>
+          {STATUS_NEGOCIACAO.filter(s=>s.key!=="arquivada").map(s=>(
+            <Chip key={s.key} active={filtroStatus===s.key} onClick={()=>setFiltroStatus(s.key)} T={T} color={s.color} size="xs">{s.label}</Chip>
+          ))}
+        </div>
+
+        {/* List */}
+        <div style={{flex:1,overflowY:"auto"}}>
+          {tabelasFiltradas.length===0 && (
+            <div style={{padding:"24px 16px",textAlign:"center",color:T.textSm,fontSize:12}}>
+              {tabelas.length===0?"Nenhuma tabela ainda. Clique em Nova.":"Nenhum resultado."}
+            </div>
+          )}
+          {tabelasFiltradas.map(t=>{
+            const f=fornById[String(t.fornecedorId)];
+            const st=statusNegociacaoInfo(t.status);
+            const isSelected=selectedId===t.id;
+            const totalCels=(t.cidadeIds?.length||0)*(t.categorias?.length||0)*itensMaster.length;
+            const pre=contarCelulasPreenchidas({valores:(t.rodadas?.[t.rodadas.length-1]||{}).valores||{}});
+            const pct=totalCels?Math.round((pre/totalCels)*100):0;
+            return (
+              <div
+                key={t.id}
+                onClick={()=>setSelectedId(isSelected?null:t.id)}
+                style={{
+                  padding:"12px 14px",
+                  cursor:"pointer",
+                  borderBottom:`1px solid ${T.border}`,
+                  background:isSelected?(T.brandSoft||"rgba(16,185,129,0.07)"):"transparent",
+                  borderLeft:`3px solid ${isSelected?(T.brand||"#10b981"):"transparent"}`,
+                  transition:"all .1s",
+                }}
+              >
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
+                  <div style={{minWidth:0,flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                      <Building2 size={12} color={T.textSm}/>
+                      <span style={{fontSize:13,fontWeight:700,color:isSelected?(T.brand||"#10b981"):T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {f?.apelido||"(removido)"}
+                      </span>
+                    </div>
+                    {f?.funcao && <div style={{fontSize:11,color:T.textSm,marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.funcao}</div>}
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Badge T={T} color={st.color} size="xs">{st.label}</Badge>
+                      {totalCels>0 && (
+                        <span style={{fontSize:10,color:pct===100?(T.brand||"#10b981"):T.textSm,fontWeight:700}}>
+                          {pct}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{fontSize:10,color:T.textSm,flexShrink:0,textAlign:"right",marginTop:2}}>
+                    {t.atualizadoEm?new Date(t.atualizadoEm).toLocaleDateString("pt-BR"):"—"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Listagem */}
-      <Card T={T} padding={0}>
-        <PanelTitle T={T}
-          title="Negociações de Tabela de Preço"
-          subtitle={`${tabelasFiltradas.length} negociação${tabelasFiltradas.length!==1?"ões":""} · clique para abrir o editor`}
-          color={T.brand||"#10b981"}
-        />
-
-        {tabelasFiltradas.length === 0 ? (
-          <EmptyState T={T} onNew={()=>setShowNova(true)} hasData={tabelas.length>0}/>
+      {/* ── Right panel ─────────────────────────────────────────────── */}
+      <div style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        {negSelecionada ? (
+          <TabelaPrecoEditor
+            key={negSelecionada.id}
+            tabela={negSelecionada}
+            fornecedor={fornById[String(negSelecionada.fornecedorId)]}
+            itensMaster={itensMaster}
+            cidades={cidades}
+            onSave={salvarNeg}
+            onRemove={removerNeg}
+            T={T}
+          />
         ) : (
-          <div style={TS.wrap}>
-            <table style={{...TS.table, minWidth:980}}>
-              <thead>
-                <tr style={TS.thead}>
-                  {["Fornecedor","Campeonato","Status","Rodadas","Preenchido","Variação","Atualizada",""].map(h => (
-                    <th key={h} style={{...TS.th,...TS.thLeft,...(["Rodadas","Preenchido"].includes(h)?{textAlign:"center"}:{}),...(["Variação"].includes(h)?{textAlign:"right"}:{})}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tabelasFiltradas.map(t => {
-                  const f   = fornById[t.fornecedorId];
-                  const c   = campById[t.campeonatoId];
-                  const st  = statusNegociacaoInfo(t.status);
-                  const itens = (c?.itens?.length) ? c.itens : (f?.catalogo||[]);
-                  const cels = (c?.cidadeIds?.length||0) * (c?.categorias?.length||0) * itens.length;
-                  const pre  = contarCelulasPreenchidas(t);
-                  const pct  = cels ? Math.round((pre/cels)*100) : 0;
-                  const delta = calcularDeltaRodadas(t);
-                  const rodadas = t.rodadas?.length || 1;
-                  return (
-                    <tr key={t.id} style={{...TS.tr,cursor:"pointer"}} onClick={()=>setEditandoId(t.id)}>
-                      <td style={{...TS.td,fontWeight:600}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
-                          <Building2 size={13} color={T.textSm}/>
-                          {f?.apelido||<span style={{color:T.textSm}}>(removido)</span>}
-                        </span>
-                      </td>
-                      <td style={{...TS.td,fontSize:12,color:T.textMd}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
-                          <Trophy size={12} color={T.textSm}/>
-                          {c?.nome||<span style={{color:T.textSm}}>(removido)</span>}
-                        </span>
-                      </td>
-                      <td style={TS.td}>
-                        <Badge T={T} color={st.color} size="sm">{st.label}</Badge>
-                      </td>
-                      <td style={{...TS.td,textAlign:"center"}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:T.textMd}}>
-                          <RefreshCw size={11} color={T.textSm}/> {rodadas}
-                        </span>
-                      </td>
-                      <td style={{...TS.td,textAlign:"center"}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,fontWeight:700,color:pct===100?(T.brand||"#10b981"):pct>0?(T.info||"#3b82f6"):T.textSm}}>
-                          {pct===100&&<CheckCircle2 size={12}/>}
-                          {pre}/{cels} ({pct}%)
-                        </span>
-                      </td>
-                      <td style={{...TS.td,textAlign:"right"}}>
-                        {delta !== null ? (
-                          <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,fontWeight:700,color:delta>0?(T.brand||"#10b981"):(T.danger||"#ef4444")}}>
-                            {delta>0?<TrendingDown size={12}/>:<TrendingUp size={12}/>}
-                            {delta>0?"-":"+"}{Math.abs(delta).toFixed(1)}%
-                          </span>
-                        ) : <span style={{color:T.textSm,fontSize:11}}>—</span>}
-                      </td>
-                      <td style={{...TS.td,fontSize:11,color:T.textSm}}>
-                        {t.atualizadoEm?new Date(t.atualizadoEm).toLocaleDateString("pt-BR"):"—"}
-                      </td>
-                      <td style={TS.td} onClick={e=>e.stopPropagation()}>
-                        <div style={{display:"flex",gap:4}}>
-                          <Button T={T} variant="secondary" size="sm" icon={Pencil} onClick={()=>setEditandoId(t.id)}/>
-                          <Button T={T} variant="danger"    size="sm" icon={Trash2} onClick={()=>removerNeg(t.id)}/>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:14,textAlign:"center",color:T.textSm}}>
+            <div style={{width:56,height:56,borderRadius:RADIUS.lg,background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Building2 size={24} strokeWidth={1.75}/>
+            </div>
+            <div>
+              <p style={{margin:"0 0 4px",fontSize:14,fontWeight:700,color:T.text}}>Selecione um fornecedor</p>
+              <p style={{margin:0,fontSize:12}}>Escolha um fornecedor na lista para ver ou editar sua tabela de preços.</p>
+            </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {showNova && (
-        <NovaNegociacaoModal
+        <NovaTabela
           fornecedores={fornecedores}
-          campeonatos={campeonatos}
+          cidades={cidades}
           tabelas={tabelasMigradas}
           onCreate={criarNeg}
           onClose={()=>setShowNova(false)}
           T={T}
         />
       )}
-
-      {negAberta && (
-        <TabelaPrecoEditor
-          tabela={negAberta}
-          fornecedor={fornAberto}
-          campeonato={campAberto}
-          cidades={cidades}
-          onSave={salvarNeg}
-          onClose={()=>setEditandoId(null)}
-          T={T}
-        />
-      )}
-    </>
-  );
-}
-
-function EmptyState({ T, onNew, hasData }) {
-  return (
-    <div style={{padding:"56px 20px",textAlign:"center"}}>
-      <div style={{width:64,height:64,borderRadius:16,background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,color:T.textSm,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14}}>
-        <RefreshCw size={28} strokeWidth={2}/>
-      </div>
-      <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:800,color:T.text}}>
-        {hasData?"Nenhuma negociação nos filtros":"Sem negociações ainda"}
-      </h3>
-      <p style={{margin:"0 0 16px",fontSize:13,color:T.textMd,maxWidth:420,marginLeft:"auto",marginRight:"auto",lineHeight:1.5}}>
-        {hasData
-          ?"Ajuste os filtros para ver outras negociações."
-          :"Crie a primeira negociação selecionando um fornecedor e um campeonato. Você precisará ter os itens de serviço configurados no campeonato (em Catálogos)."}
-      </p>
-      {!hasData && <Button T={T} variant="primary" size="md" icon={Plus} onClick={onNew}>Nova negociação</Button>}
     </div>
   );
 }

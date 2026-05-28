@@ -83,7 +83,7 @@ export default function TabFornecedores({
     <>
       <SubTabNav active={sub} onChange={setSub} T={T}/>
 
-      {sub === "cadastro"  && <Cadastro      fornecedores={fornecedores} setFornecedores={setFornecedores} T={T}/>}
+      {sub === "cadastro"  && <Cadastro      fornecedores={fornecedores} setFornecedores={setFornecedores} itensMaster={itensMaster} cidades={cidades} T={T}/>}
       {sub === "catalogos" && <Catalogos     cidades={cidades} setCidades={setCidades} campeonatos={campeonatos} setCampeonatos={setCampeonatos} itensMaster={itensMaster} setItensMaster={setItensMaster} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "tabelas"   && <Tabelas       fornecedores={fornecedores} cidades={cidades} campeonatos={campeonatos} tabelas={tabelas} setTabelas={setTabelas} itensMaster={itensMaster} filtroCampeonato={filtroCampeonato} T={T}/>}
       {sub === "jogos"     && <ProximosJogos jogosForn={jogosForn} setJogosForn={setJogosForn} cidades={cidades} campeonatos={campeonatos} cotacoes={cotacoes} tabelas={tabelas} fornecedores={fornecedores} filtroCampeonato={filtroCampeonato} T={T}/>}

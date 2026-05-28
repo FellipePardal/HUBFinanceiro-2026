@@ -3,8 +3,29 @@ import { KPI, Pill } from "../../shared";
 import { CIDADES, iSty, RADIUS } from "../../../constants";
 import { fmt } from "../../../utils";
 import { Card, PanelTitle, Button, Chip, Badge, tableStyles } from "../../ui";
-import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight, DollarSign, MapPin, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight, DollarSign, MapPin, Package, Camera, Users, Check, Mail, Phone, User } from "lucide-react";
 import CatalogoItensModal from "./CatalogoItensModal";
+
+const CAT_META = {
+  periferico: { label:"Periféricos",        color:"#3b82f6", Icon:Camera },
+  equipe:     { label:"Equipe Operacional",  color:"#f59e0b", Icon:Users  },
+};
+
+function SecaoToggle({ title, count, color, children, defaultOpen=true, T }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{borderTop:`1px solid ${T.border}`}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{padding:"10px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,background:T.surfaceAlt||T.bg,userSelect:"none"}}>
+        {open?<ChevronDown size={13} color={T.textSm}/>:<ChevronRight size={13} color={T.textSm}/>}
+        <span style={{fontSize:12,fontWeight:700,color:T.text}}>{title}</span>
+        {count!==undefined&&(
+          <span style={{fontSize:10,fontWeight:800,padding:"1px 7px",borderRadius:RADIUS.pill,background:`${color||T.brand||"#10b981"}18`,color:color||T.brand||"#10b981"}}>{count}</span>
+        )}
+      </div>
+      {open&&<div style={{background:T.surfaceAlt||T.bg}}>{children}</div>}
+    </div>
+  );
+}
 
 const AREAS = ["Todas","Operações","Conteúdo"];
 const TIPOS = ["Todos","Fornecedor","Prestador"];
@@ -433,6 +454,137 @@ function TabelaEquipe({ precos, onUpdate, T }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PAINEL DO FORNECEDOR — dados de contato, serviços, cidades, tabela de preços
+// ═══════════════════════════════════════════════════════════════════════════════
+function FornecedorPainel({ fornecedor, itensMaster, cidades, onUpdate, T }) {
+  const servicosPrestados = useMemo(()=>new Set(fornecedor.servicosPrestados||[]),[fornecedor.servicosPrestados]);
+  const cidadesAtuacao    = fornecedor.cidadesAtuacao||[];
+
+  const itensPorCat = useMemo(()=>{
+    const map={periferico:[],equipe:[]};
+    (itensMaster||[]).forEach(it=>{const k=it.categoria||"equipe";(map[k]??(map[k]=[])).push(it);});
+    return map;
+  },[itensMaster]);
+
+  const toggleServico = id => {
+    const s=new Set(servicosPrestados);
+    s.has(id)?s.delete(id):s.add(id);
+    onUpdate({...fornecedor,servicosPrestados:Array.from(s)});
+  };
+  const toggleCidade = id => {
+    const next=cidadesAtuacao.includes(id)?cidadesAtuacao.filter(x=>x!==id):[...cidadesAtuacao,id];
+    onUpdate({...fornecedor,cidadesAtuacao:next});
+  };
+
+  const isPrestador = fornecedor.tipo==="Prestador";
+  const temContato  = isPrestador&&(fornecedor.email||fornecedor.telefone||fornecedor.nome||fornecedor.cpf);
+
+  return (
+    <div>
+      {/* Dados de contato (só Prestadores) */}
+      {temContato&&(
+        <SecaoToggle title="Dados de Contato" color={T.info||"#3b82f6"} T={T}>
+          <div style={{padding:"12px 20px",display:"flex",flexWrap:"wrap",gap:20}}>
+            {fornecedor.nome&&(
+              <span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,color:T.textMd}}>
+                <User size={12} color={T.textSm}/> <strong style={{color:T.text}}>{fornecedor.nome}</strong>
+              </span>
+            )}
+            {fornecedor.email&&(
+              <span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,color:T.textMd}}>
+                <Mail size={12} color={T.textSm}/> {fornecedor.email}
+              </span>
+            )}
+            {fornecedor.telefone&&(
+              <span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,color:T.textMd}}>
+                <Phone size={12} color={T.textSm}/> {fornecedor.telefone}
+              </span>
+            )}
+            {fornecedor.cpf&&(
+              <span style={{fontSize:11,color:T.textSm}}>CPF: {fornecedor.cpf}</span>
+            )}
+          </div>
+        </SecaoToggle>
+      )}
+
+      {/* Serviços Prestados */}
+      <SecaoToggle title="Serviços Prestados" count={servicosPrestados.size} color="#a855f7" T={T}>
+        {!itensMaster?.length?(
+          <p style={{padding:"12px 20px",margin:0,fontSize:12,color:T.textSm}}>
+            Nenhum serviço no catálogo global. Vá em Catálogos → Periféricos / Equipe.
+          </p>
+        ):(
+          <div style={{padding:"12px 20px",display:"flex",flexDirection:"column",gap:12}}>
+            {Object.entries(itensPorCat).map(([catKey,items])=>{
+              if(!items.length)return null;
+              const {label,color,Icon}=CAT_META[catKey]||{label:catKey,color:T.textMd,Icon:Package};
+              return (
+                <div key={catKey}>
+                  <div style={{fontSize:11,fontWeight:700,color,letterSpacing:"0.04em",textTransform:"uppercase",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+                    <Icon size={11}/>{label}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {items.map(it=>{
+                      const on=servicosPrestados.has(it.id);
+                      return (
+                        <button key={it.id} onClick={()=>toggleServico(it.id)} style={{
+                          display:"inline-flex",alignItems:"center",gap:5,
+                          padding:"5px 11px",borderRadius:RADIUS.pill,cursor:"pointer",
+                          border:`1px solid ${on?color:T.border}`,
+                          background:on?`${color}14`:"transparent",
+                          color:on?color:T.textMd,
+                          fontSize:12,fontWeight:600,transition:"all .1s",
+                        }}>
+                          {on?<Check size={11}/>:<Icon size={11}/>}
+                          {it.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SecaoToggle>
+
+      {/* Cidades de Atuação */}
+      <SecaoToggle title="Cidades de Atuação" count={cidadesAtuacao.length} color="#3b82f6" T={T}>
+        <div style={{padding:"12px 20px"}}>
+          {!cidades?.length?(
+            <p style={{margin:0,fontSize:12,color:T.textSm}}>Nenhuma cidade no catálogo. Vá em Catálogos → Cidades.</p>
+          ):(
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {cidades.map(c=>{
+                const on=cidadesAtuacao.includes(c.id);
+                return (
+                  <button key={c.id} onClick={()=>toggleCidade(c.id)} style={{
+                    display:"inline-flex",alignItems:"center",gap:5,
+                    padding:"5px 11px",borderRadius:RADIUS.pill,cursor:"pointer",
+                    border:`1px solid ${on?"#3b82f6":T.border}`,
+                    background:on?"rgba(59,130,246,0.12)":"transparent",
+                    color:on?"#3b82f6":T.textMd,
+                    fontSize:12,fontWeight:600,
+                  }}>
+                    {on?<Check size={11}/>:<MapPin size={11}/>}
+                    {c.nome}/{c.uf}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </SecaoToggle>
+
+      {/* Tabela de Preços (legado) */}
+      <SecaoToggle title="Tabela de Preços" color={T.brand||"#10b981"} defaultOpen={false} T={T}>
+        <TabelaPrecosFornecedor fornecedor={fornecedor} onUpdate={onUpdate} T={T}/>
+      </SecaoToggle>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE WRAPPER — renderiza a tabela certa conforme tipoTabela
 // ═══════════════════════════════════════════════════════════════════════════════
 function TabelaPrecosFornecedor({ fornecedor, onUpdate, T }) {
@@ -459,7 +611,7 @@ function TabelaPrecosFornecedor({ fornecedor, onUpdate, T }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL — Lista de fornecedores com expand para tabela de preços
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function Cadastro({ fornecedores, setFornecedores, T }) {
+export default function Cadastro({ fornecedores, setFornecedores, itensMaster=[], cidades=[], T }) {
   const [filtroArea, setFiltroArea] = useState("Todas");
   const [filtroTipo, setFiltroTipo] = useState("Todos");
   const [busca, setBusca] = useState("");
@@ -476,8 +628,9 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
 
   const totalFornecedores = fornecedores.filter(f => f.tipo === "Fornecedor").length;
   const totalPrestadores  = fornecedores.filter(f => f.tipo === "Prestador").length;
-  const comPrecos = fornecedores.filter(f => (f.precos || []).length > 0).length;
-  const comTabela = fornecedores.filter(f => f.tipoTabela).length;
+  const comServicos = fornecedores.filter(f => (f.servicosPrestados||[]).length > 0).length;
+  const comCidades  = fornecedores.filter(f => (f.cidadesAtuacao||[]).length > 0).length;
+  const comTabela   = fornecedores.filter(f => f.tipoTabela).length;
 
   const saveFornecedor = f => {
     setFornecedores(fs => {
@@ -514,8 +667,8 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
         <KPI label="Total Cadastrados" value={String(fornecedores.length)} sub="Fornecedores + Prestadores" color={cyan} T={T}/>
         <KPI label="Fornecedores / Prestadores" value={`${totalFornecedores} / ${totalPrestadores}`} sub="Por tipo" color={T.warning} T={T}/>
+        <KPI label="Com Serviços" value={String(comServicos)} sub={`Serviços mapeados · ${comCidades} com cidades`} color="#a855f7" T={T}/>
         <KPI label="Com Classificação" value={String(comTabela)} sub={`de ${fornecedores.length} cadastrados`} color={T.info||"#3b82f6"} T={T}/>
-        <KPI label="Com Preços" value={String(comPrecos)} sub="Tabelas preenchidas" color={T.brand||"#10b981"} T={T}/>
       </div>
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
@@ -585,9 +738,9 @@ export default function Cadastro({ fornecedores, setFornecedores, T }) {
                   </tr>,
 
                   isExpanded && (
-                    <tr key={`${f.id}-precos`}>
+                    <tr key={`${f.id}-painel`}>
                       <td colSpan={10} style={{padding:0}}>
-                        <TabelaPrecosFornecedor fornecedor={f} onUpdate={updateFornecedor} T={T}/>
+                        <FornecedorPainel fornecedor={f} itensMaster={itensMaster} cidades={cidades} onUpdate={updateFornecedor} T={T}/>
                       </td>
                     </tr>
                   ),

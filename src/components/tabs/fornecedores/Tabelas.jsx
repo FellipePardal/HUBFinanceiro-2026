@@ -1,234 +1,180 @@
 import { useState, useMemo } from "react";
-import { iSty, RADIUS } from "../../../constants";
-import { Card, Button, Badge, Chip } from "../../ui";
+import { RADIUS } from "../../../constants";
+import { Button, Badge } from "../../ui";
 import {
-  STATUS_NEGOCIACAO, statusNegociacaoInfo,
-  criarNegociacao, contarCelulasPreenchidas,
-  migrarTabelaLegada,
-} from "../../../data/catalogos";
-import { Plus, Search, Building2, Trash2, Check, MapPin } from "lucide-react";
-import TabelaPrecoEditor from "./TabelaPrecoEditor";
+  Trophy, Building2, Camera, Users,
+} from "lucide-react";
+import { fmt } from "../../../utils";
 
-const lbl = { fontSize:11, fontWeight:600, display:"block", marginBottom:5, letterSpacing:"0.04em", textTransform:"uppercase" };
+const CAT_META = {
+  periferico: { label: "Periféricos",        color: "#3b82f6", Icon: Camera },
+  equipe:     { label: "Equipe Operacional", color: "#f59e0b", Icon: Users  },
+};
 
-// ── Modal: nova tabela de fornecedor ────────────────────────────────────────
-function NovaTabela({ fornecedores, cidades, tabelas, onCreate, onClose, T }) {
-  const IS = iSty(T);
-  const [fornecedorId, setFornecedorId] = useState("");
-  const [cidadeIds, setCidadeIds] = useState([]);
-  const [categorias, setCategorias] = useState([
-    {codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"},{codigo:"B3",nome:"B3"},
-  ]);
-  const [novaCatCod, setNovaCatCod] = useState("");
-
-  const fornSemTabela = useMemo(() => {
-    const comTabela = new Set(tabelas.map(t=>String(t.fornecedorId)));
-    return [...fornecedores].filter(f=>!comTabela.has(String(f.id))).sort((a,b)=>(a.apelido||"").localeCompare(b.apelido||""));
-  },[fornecedores,tabelas]);
-
-  const toggleCidade = id => setCidadeIds(prev => prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
-
-  const addCategoria = () => {
-    const cod = novaCatCod.trim().toUpperCase();
-    if (!cod || categorias.some(c=>c.codigo===cod)) return;
-    setCategorias(c=>[...c,{codigo:cod,nome:cod}]);
-    setNovaCatCod("");
-  };
-  const removeCategoria = i => setCategorias(c=>c.filter((_,idx)=>idx!==i));
-
-  const handleCreate = () => {
-    if (!fornecedorId) return;
-    if (!categorias.length) return alert("Adicione ao menos uma categoria.");
-    const nova = criarNegociacao({ fornecedorId:Number(fornecedorId), cidadeIds, categorias });
-    onCreate(nova);
-  };
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:T.surface||T.card,borderRadius:RADIUS.xl,padding:28,width:"100%",maxWidth:680,border:`1px solid ${T.border}`,boxShadow:T.shadow,maxHeight:"90vh",overflowY:"auto"}}>
-        <h3 style={{margin:"0 0 18px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Nova tabela de preços</h3>
-
-        <div style={{marginBottom:16}}>
-          <label style={lbl}>Fornecedor</label>
-          <select value={fornecedorId} onChange={e=>setFornecedorId(e.target.value)} style={IS}>
-            <option value="">— Selecione —</option>
-            {fornSemTabela.map(f=><option key={f.id} value={f.id}>{f.apelido}{f.funcao?` · ${f.funcao}`:""}</option>)}
-          </select>
-          {!fornSemTabela.length && <p style={{fontSize:11,color:T.textSm,margin:"6px 0 0"}}>Todos os fornecedores já têm tabela.</p>}
-        </div>
-
-        <div style={{marginBottom:16}}>
-          <label style={{...lbl,display:"block",marginBottom:6}}>
-            Categorias de jogo <span style={{fontSize:10,fontWeight:400,color:T.textSm}}>({categorias.length})</span>
-          </label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-            {categorias.map((c,i)=>(
-              <span key={i} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:RADIUS.pill,background:T.brandSoft||"rgba(16,185,129,0.12)",border:`1px solid ${T.brandBorder||T.border}`,color:T.brand||"#10b981",fontSize:12,fontWeight:700}}>
-                {c.codigo}
-                <button onClick={()=>removeCategoria(i)} style={{background:"none",border:"none",cursor:"pointer",color:"inherit",padding:0,lineHeight:1,display:"flex"}}>×</button>
-              </span>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <input value={novaCatCod} onChange={e=>setNovaCatCod(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCategoria()} placeholder="Ex: B4, B3+" style={{...IS,width:120}} />
-            <Button T={T} variant="ghost" size="sm" icon={Plus} onClick={addCategoria}>Adicionar</Button>
-          </div>
-        </div>
-
-        <div style={{marginBottom:20}}>
-          <label style={{...lbl,display:"block",marginBottom:8}}>
-            Cidades cobertas <span style={{fontSize:10,fontWeight:400,color:T.textSm}}>({cidadeIds.length} selecionadas)</span>
-          </label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {cidades.map(c=>{
-              const on=cidadeIds.includes(c.id);
-              return (
-                <button key={c.id} onClick={()=>toggleCidade(c.id)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:RADIUS.pill,cursor:"pointer",border:`1px solid ${on?"#3b82f6":T.border}`,background:on?"rgba(59,130,246,0.12)":"transparent",color:on?"#3b82f6":T.textMd,fontSize:12,fontWeight:600}}>
-                  {on?<Check size={12}/>:<MapPin size={12}/>}{c.nome}/{c.uf}
-                </button>
-              );
-            })}
-            {!cidades.length && <p style={{color:T.textSm,fontSize:12,margin:0}}>Nenhuma cidade cadastrada.</p>}
-          </div>
-        </div>
-
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <Button T={T} variant="secondary" size="md" onClick={onClose}>Cancelar</Button>
-          <Button T={T} variant="primary" size="md" onClick={handleCreate} disabled={!fornecedorId||!categorias.length}>Criar tabela</Button>
-        </div>
-      </div>
-    </div>
-  );
+// ── helpers ──────────────────────────────────────────────────────────────────
+function getAtrib(atribuicoes, itemId) {
+  return atribuicoes.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function Tabelas({
-  fornecedores, cidades, campeonatos,
-  tabelas, setTabelas,
-  itensMaster = [],
+  fornecedores,
+  cidades,
+  campeonatos,
+  setCampeonatos,
   filtroCampeonato = "todos",
   T,
 }) {
-  const [showNova, setShowNova]       = useState(false);
-  const [selectedId, setSelectedId]   = useState(null);
-  const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [busca, setBusca]             = useState("");
+  const [selectedId, setSelectedId] = useState(() => {
+    if (filtroCampeonato !== "todos") return filtroCampeonato;
+    return campeonatos[0]?.id ?? null;
+  });
 
-  const fornById = useMemo(()=>Object.fromEntries(fornecedores.map(f=>[String(f.id),f])),[fornecedores]);
+  const camp          = campeonatos.find(c => c.id === selectedId) ?? null;
+  const cidadesDoCamp = useMemo(() =>
+    (camp?.cidadeIds ?? []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
+    [camp, cidades]
+  );
+  const categorias = camp?.categorias ?? [];
+  const itens      = camp?.itens ?? [];
+  const atribuicoes = camp?.orcamento?.atribuicoes ?? [];
 
-  const tabelasMigradas = useMemo(()=>tabelas.map(t=>migrarTabelaLegada(t)),[tabelas]);
+  const fornById = useMemo(() =>
+    Object.fromEntries(fornecedores.map(f => [String(f.id), f])),
+    [fornecedores]
+  );
 
-  const tabelasFiltradas = useMemo(()=>{
-    return tabelasMigradas
-      .filter(t=>filtroStatus==="todos"||t.status===filtroStatus)
-      .filter(t=>{
-        if (!busca.trim()) return true;
-        const f=fornById[String(t.fornecedorId)];
-        return (f?.apelido||"").toLowerCase().includes(busca.toLowerCase());
-      })
-      .sort((a,b)=>(b.atualizadoEm||"").localeCompare(a.atualizadoEm||""));
-  },[tabelasMigradas,filtroStatus,busca,fornById]);
+  const itensPorCat = useMemo(() => {
+    const map = { periferico: [], equipe: [] };
+    itens.forEach(it => {
+      const k = it.categoria ?? "equipe";
+      if (map[k]) map[k].push(it);
+    });
+    return map;
+  }, [itens]);
 
-  // ── CRUD ────────────────────────────────────────────────────────────────
-  const criarNeg = nova => {
-    setTabelas(list=>[...list,nova]);
-    setShowNova(false);
-    setSelectedId(nova.id);
+  // ── writers (functional updater to avoid stale closure) ──────────────────
+  const setFornecedor = (itemId, val) => {
+    setCampeonatos(list => {
+      const c = list.find(x => x.id === selectedId);
+      if (!c) return list;
+      const prev = c.orcamento?.atribuicoes ?? [];
+      const cur  = prev.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
+      const upd  = { ...cur, fornecedorId: val ? Number(val) : null };
+      const next = prev.some(a => a.itemId === itemId)
+        ? prev.map(a => a.itemId === itemId ? upd : a)
+        : [...prev, upd];
+      return list.map(x => x.id === selectedId ? { ...x, orcamento: { atribuicoes: next } } : x);
+    });
   };
 
-  const salvarNeg = atualizada => {
-    setTabelas(list=>list.map(t=>{
-      if (t.id===atualizada.id) return atualizada;
-      if (atualizada.status==="aprovada"&&t.status==="aprovada"&&String(t.fornecedorId)===String(atualizada.fornecedorId))
-        return {...t,status:"arquivada",atualizadoEm:new Date().toISOString()};
-      return t;
-    }));
+  const setValor = (itemId, cidadeId, catCodigo, raw) => {
+    const v = raw === "" ? null : parseFloat(raw);
+    setCampeonatos(list => {
+      const c = list.find(x => x.id === selectedId);
+      if (!c) return list;
+      const prev   = c.orcamento?.atribuicoes ?? [];
+      const cur    = prev.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
+      const valores = { ...(cur.valores ?? {}) };
+      const byCity  = { ...(valores[cidadeId] ?? {}) };
+      if (v === null || isNaN(v)) delete byCity[catCodigo];
+      else byCity[catCodigo] = v;
+      if (!Object.keys(byCity).length) delete valores[cidadeId];
+      else valores[cidadeId] = byCity;
+      const upd  = { ...cur, valores };
+      const next = prev.some(a => a.itemId === itemId)
+        ? prev.map(a => a.itemId === itemId ? upd : a)
+        : [...prev, upd];
+      return list.map(x => x.id === selectedId ? { ...x, orcamento: { atribuicoes: next } } : x);
+    });
   };
 
-  const removerNeg = id => {
-    if (!confirm("Remover esta negociação permanentemente?")) return;
-    setTabelas(list=>list.filter(t=>t.id!==id));
-    if (selectedId===id) setSelectedId(null);
-  };
+  // ── totais por cidade × categoria ─────────────────────────────────────────
+  const totais = useMemo(() => {
+    const map = {};
+    atribuicoes.forEach(a => {
+      Object.entries(a.valores ?? {}).forEach(([cidadeId, cats]) => {
+        Object.entries(cats).forEach(([cat, val]) => {
+          const k = `${cidadeId}:${cat}`;
+          map[k] = (map[k] ?? 0) + Number(val);
+        });
+      });
+    });
+    return map;
+  }, [atribuicoes]);
 
-  const negSelecionada = selectedId ? tabelasMigradas.find(t=>t.id===selectedId)||null : null;
+  const hasTotais = Object.keys(totais).length > 0;
+
+  // ── styles ────────────────────────────────────────────────────────────────
+  const cellStyle = hasVal => ({
+    background: hasVal ? "rgba(16,185,129,0.08)" : "transparent",
+    border: `1px solid ${hasVal ? "rgba(16,185,129,0.30)" : T.border}`,
+    borderRadius: RADIUS.sm,
+    color: T.text,
+    padding: "4px 6px",
+    fontSize: 12,
+    fontWeight: hasVal ? 700 : 400,
+    width: "100%",
+    minWidth: 76,
+    textAlign: "right",
+    boxSizing: "border-box",
+    fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+    outline: "none",
+  });
+
+  const stickyBg = T.surface || T.card;
+
+  // ── campeonato summary ────────────────────────────────────────────────────
+  const campNAtrib = atribuicoes.filter(a => a.fornecedorId).length;
+  const campNItens  = itens.length;
 
   return (
-    <div style={{display:"grid",gridTemplateColumns:"280px 1fr",border:`1px solid ${T.border}`,borderRadius:RADIUS.lg,overflow:"hidden",minHeight:"72vh",background:T.surface||T.card}}>
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "220px 1fr",
+      border: `1px solid ${T.border}`,
+      borderRadius: RADIUS.lg,
+      overflow: "hidden",
+      minHeight: "72vh",
+      background: T.surface || T.card,
+    }}>
 
-      {/* ── Left panel ──────────────────────────────────────────────── */}
-      <div style={{borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-
-        {/* Header */}
-        <div style={{padding:"14px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-          <span style={{fontSize:13,fontWeight:800,color:T.text,letterSpacing:"-0.01em"}}>Negociações</span>
-          <Button T={T} variant="primary" size="sm" icon={Plus} onClick={()=>setShowNova(true)}>Nova</Button>
+      {/* ── Left: campeonato list ─────────────────────────────────────────── */}
+      <div style={{ borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Campeonatos</span>
         </div>
-
-        {/* Search */}
-        <div style={{padding:"10px 12px",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
-          <div style={{position:"relative"}}>
-            <Search size={13} color={T.textSm} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
-            <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar fornecedor..." style={{...iSty(T),width:"100%",padding:"7px 10px 7px 30px",fontSize:12}}/>
-          </div>
-        </div>
-
-        {/* Status chips */}
-        <div style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",flexWrap:"wrap",gap:5,flexShrink:0}}>
-          <Chip active={filtroStatus==="todos"} onClick={()=>setFiltroStatus("todos")} T={T} size="xs">Todos</Chip>
-          {STATUS_NEGOCIACAO.filter(s=>s.key!=="arquivada").map(s=>(
-            <Chip key={s.key} active={filtroStatus===s.key} onClick={()=>setFiltroStatus(s.key)} T={T} color={s.color} size="xs">{s.label}</Chip>
-          ))}
-        </div>
-
-        {/* List */}
-        <div style={{flex:1,overflowY:"auto"}}>
-          {tabelasFiltradas.length===0 && (
-            <div style={{padding:"24px 16px",textAlign:"center",color:T.textSm,fontSize:12}}>
-              {tabelas.length===0?"Nenhuma tabela ainda. Clique em Nova.":"Nenhum resultado."}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {!campeonatos.length ? (
+            <div style={{ padding: 20, textAlign: "center", color: T.textSm, fontSize: 12 }}>
+              Nenhum campeonato. Crie em Catálogos.
             </div>
-          )}
-          {tabelasFiltradas.map(t=>{
-            const f=fornById[String(t.fornecedorId)];
-            const st=statusNegociacaoInfo(t.status);
-            const isSelected=selectedId===t.id;
-            const totalCels=(t.cidadeIds?.length||0)*(t.categorias?.length||0)*itensMaster.length;
-            const pre=contarCelulasPreenchidas({valores:(t.rodadas?.[t.rodadas.length-1]||{}).valores||{}});
-            const pct=totalCels?Math.round((pre/totalCels)*100):0;
+          ) : campeonatos.map(c => {
+            const isSel  = c.id === selectedId;
+            const nItens = (c.itens ?? []).length;
+            const nAtrib = (c.orcamento?.atribuicoes ?? []).filter(a => a.fornecedorId).length;
             return (
               <div
-                key={t.id}
-                onClick={()=>setSelectedId(isSelected?null:t.id)}
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
                 style={{
-                  padding:"12px 14px",
-                  cursor:"pointer",
-                  borderBottom:`1px solid ${T.border}`,
-                  background:isSelected?(T.brandSoft||"rgba(16,185,129,0.07)"):"transparent",
-                  borderLeft:`3px solid ${isSelected?(T.brand||"#10b981"):"transparent"}`,
-                  transition:"all .1s",
+                  padding: "11px 14px",
+                  cursor: "pointer",
+                  borderBottom: `1px solid ${T.border}`,
+                  borderLeft: `3px solid ${isSel ? (T.brand || "#10b981") : "transparent"}`,
+                  background: isSel ? (T.brandSoft || "rgba(16,185,129,0.06)") : "transparent",
                 }}
               >
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
-                  <div style={{minWidth:0,flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                      <Building2 size={12} color={T.textSm}/>
-                      <span style={{fontSize:13,fontWeight:700,color:isSelected?(T.brand||"#10b981"):T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {f?.apelido||"(removido)"}
-                      </span>
-                    </div>
-                    {f?.funcao && <div style={{fontSize:11,color:T.textSm,marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.funcao}</div>}
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <Badge T={T} color={st.color} size="xs">{st.label}</Badge>
-                      {totalCels>0 && (
-                        <span style={{fontSize:10,color:pct===100?(T.brand||"#10b981"):T.textSm,fontWeight:700}}>
-                          {pct}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{fontSize:10,color:T.textSm,flexShrink:0,textAlign:"right",marginTop:2}}>
-                    {t.atualizadoEm?new Date(t.atualizadoEm).toLocaleDateString("pt-BR"):"—"}
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+                  <Trophy size={12} color={c.ativo ? (T.brand || "#10b981") : T.textSm} />
+                  <span style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: isSel ? (T.brand || "#10b981") : T.text,
+                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{c.nome}</span>
+                </div>
+                <div style={{ fontSize: 11, color: T.textSm }}>
+                  {nItens} item{nItens !== 1 ? "s" : ""} · {nAtrib}/{nItens} com fornecedor
                 </div>
               </div>
             );
@@ -236,41 +182,249 @@ export default function Tabelas({
         </div>
       </div>
 
-      {/* ── Right panel ─────────────────────────────────────────────── */}
-      <div style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        {negSelecionada ? (
-          <TabelaPrecoEditor
-            key={negSelecionada.id}
-            tabela={negSelecionada}
-            fornecedor={fornById[String(negSelecionada.fornecedorId)]}
-            itensMaster={itensMaster}
-            cidades={cidades}
-            onSave={salvarNeg}
-            onRemove={removerNeg}
-            T={T}
-          />
-        ) : (
-          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:14,textAlign:"center",color:T.textSm}}>
-            <div style={{width:56,height:56,borderRadius:RADIUS.lg,background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <Building2 size={24} strokeWidth={1.75}/>
+      {/* ── Right: orçamento editor ───────────────────────────────────────── */}
+      {!camp ? (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: T.textSm }}>
+          <Trophy size={32} color={T.border} />
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Selecione um campeonato</span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+          {/* Header */}
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, background: T.surfaceAlt || T.bg, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+              <Trophy size={16} color={T.brand || "#10b981"} />
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: T.text }}>{camp.nome}</h2>
+              {camp.ativo
+                ? <Badge T={T} color={T.brand || "#10b981"} size="sm">Ativo</Badge>
+                : <Badge T={T} color={T.textSm} size="sm">Inativo</Badge>}
             </div>
-            <div>
-              <p style={{margin:"0 0 4px",fontSize:14,fontWeight:700,color:T.text}}>Selecione um fornecedor</p>
-              <p style={{margin:0,fontSize:12}}>Escolha um fornecedor na lista para ver ou editar sua tabela de preços.</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              {categorias.map(cat => (
+                <span key={cat.codigo} style={{
+                  padding: "2px 7px", borderRadius: RADIUS.pill,
+                  background: T.brandSoft || "rgba(16,185,129,0.1)",
+                  color: T.brand || "#10b981", fontSize: 11, fontWeight: 700,
+                }}>{cat.codigo}</span>
+              ))}
+              <span style={{ fontSize: 12, color: T.textSm }}>{cidadesDoCamp.length} cidade{cidadesDoCamp.length !== 1 ? "s" : ""}</span>
+              <span style={{ fontSize: 12, color: T.textSm }}>·</span>
+              <span style={{ fontSize: 12, color: T.textSm }}>{campNAtrib}/{campNItens} itens com fornecedor</span>
             </div>
           </div>
-        )}
-      </div>
 
-      {showNova && (
-        <NovaTabela
-          fornecedores={fornecedores}
-          cidades={cidades}
-          tabelas={tabelasMigradas}
-          onCreate={criarNeg}
-          onClose={()=>setShowNova(false)}
-          T={T}
-        />
+          {!itens.length ? (
+            <div style={{ padding: 32, textAlign: "center", color: T.textSm, fontSize: 12 }}>
+              Nenhum item neste campeonato. Edite em Catálogos → Campeonatos para adicionar itens.
+            </div>
+          ) : (
+            <div style={{ flex: 1, overflow: "auto", padding: "0 0 20px" }}>
+              <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 12 }}>
+                <colgroup>
+                  <col style={{ width: 160 }} />
+                  <col style={{ width: 160 }} />
+                  {cidadesDoCamp.flatMap(c =>
+                    categorias.map(cat => <col key={`${c.id}-${cat.codigo}`} style={{ width: 88 }} />)
+                  )}
+                </colgroup>
+
+                <thead>
+                  <tr>
+                    {/* Item col header */}
+                    <th style={{
+                      position: "sticky", top: 0, left: 0, zIndex: 3,
+                      background: T.surfaceAlt || T.bg,
+                      padding: "9px 14px", textAlign: "left",
+                      borderBottom: `1px solid ${T.border}`,
+                      borderRight: `1px solid ${T.border}`,
+                      fontSize: 11, fontWeight: 700, color: T.textMd,
+                      whiteSpace: "nowrap",
+                    }}>Item</th>
+
+                    {/* Fornecedor col header */}
+                    <th style={{
+                      position: "sticky", top: 0, left: 160, zIndex: 3,
+                      background: T.surfaceAlt || T.bg,
+                      padding: "9px 12px", textAlign: "left",
+                      borderBottom: `1px solid ${T.border}`,
+                      borderRight: `2px solid ${T.border}`,
+                      fontSize: 11, fontWeight: 700, color: T.textMd,
+                      whiteSpace: "nowrap",
+                    }}>Fornecedor</th>
+
+                    {/* Cidade × Categoria col headers */}
+                    {cidadesDoCamp.flatMap(cidade =>
+                      categorias.map((cat, i) => (
+                        <th key={`${cidade.id}-${cat.codigo}`} style={{
+                          position: "sticky", top: 0, zIndex: 2,
+                          background: T.surfaceAlt || T.bg,
+                          padding: "9px 8px", textAlign: "center",
+                          borderBottom: `1px solid ${T.border}`,
+                          borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
+                          fontSize: 11, fontWeight: 700, color: T.text,
+                          whiteSpace: "nowrap",
+                        }}>
+                          {cidade.nome.length > 10 ? cidade.uf : cidade.nome}/{cat.codigo}
+                        </th>
+                      ))
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {["periferico", "equipe"].map(catKey => {
+                    const items = itensPorCat[catKey];
+                    if (!items.length) return null;
+                    const { label, color, Icon } = CAT_META[catKey];
+
+                    return [
+                      // Category group header row
+                      <tr key={`grp-${catKey}`}>
+                        <td
+                          colSpan={2 + cidadesDoCamp.length * categorias.length}
+                          style={{
+                            padding: "7px 14px",
+                            fontSize: 10, fontWeight: 800,
+                            color, letterSpacing: "0.06em", textTransform: "uppercase",
+                            background: `${color}10`,
+                            borderBottom: `1px solid ${T.border}`,
+                          }}
+                        >
+                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Icon size={10} />{label}
+                          </span>
+                        </td>
+                      </tr>,
+
+                      // Item rows
+                      ...items.map(item => {
+                        const atrib = getAtrib(atribuicoes, item.id);
+                        const forn  = atrib.fornecedorId ? fornById[String(atrib.fornecedorId)] : null;
+
+                        return (
+                          <tr key={item.id} style={{ borderBottom: `1px solid ${T.border}` }}>
+                            {/* Item name */}
+                            <td style={{
+                              position: "sticky", left: 0, zIndex: 1,
+                              background: stickyBg,
+                              padding: "7px 14px",
+                              borderRight: `1px solid ${T.border}`,
+                              fontWeight: 600, color: T.text, fontSize: 12,
+                              whiteSpace: "nowrap",
+                            }}>
+                              {item.nome}
+                            </td>
+
+                            {/* Fornecedor selector */}
+                            <td style={{
+                              position: "sticky", left: 160, zIndex: 1,
+                              background: stickyBg,
+                              padding: "5px 8px",
+                              borderRight: `2px solid ${T.border}`,
+                            }}>
+                              <select
+                                value={atrib.fornecedorId ?? ""}
+                                onChange={e => setFornecedor(item.id, e.target.value)}
+                                style={{
+                                  width: "100%",
+                                  background: "transparent",
+                                  border: `1px solid ${forn ? (T.brand || "#10b981") : T.border}`,
+                                  borderRadius: RADIUS.sm,
+                                  color: forn ? (T.brand || "#10b981") : T.textSm,
+                                  fontSize: 11,
+                                  fontWeight: forn ? 700 : 400,
+                                  padding: "4px 6px",
+                                  outline: "none",
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                <option value="">— Sem fornecedor —</option>
+                                {[...fornecedores]
+                                  .sort((a, b) => (a.apelido || "").localeCompare(b.apelido || ""))
+                                  .map(f => (
+                                    <option key={f.id} value={f.id}>{f.apelido}</option>
+                                  ))}
+                              </select>
+                            </td>
+
+                            {/* Value cells */}
+                            {cidadesDoCamp.flatMap(cidade =>
+                              categorias.map((cat, i) => {
+                                const val    = atrib.valores?.[cidade.id]?.[cat.codigo] ?? null;
+                                const hasVal = val !== null && val !== undefined;
+                                return (
+                                  <td
+                                    key={`${cidade.id}-${cat.codigo}`}
+                                    style={{
+                                      padding: "3px 3px",
+                                      borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
+                                    }}
+                                  >
+                                    <input
+                                      type="number"
+                                      key={`${selectedId}-${item.id}-${cidade.id}-${cat.codigo}`}
+                                      defaultValue={hasVal ? val : ""}
+                                      onBlur={e => setValor(item.id, cidade.id, cat.codigo, e.target.value)}
+                                      placeholder="—"
+                                      style={cellStyle(hasVal)}
+                                    />
+                                  </td>
+                                );
+                              })
+                            )}
+                          </tr>
+                        );
+                      }),
+                    ];
+                  })}
+
+                  {/* Total row */}
+                  {hasTotais && (
+                    <tr style={{ borderTop: `2px solid ${T.border}` }}>
+                      <td style={{
+                        position: "sticky", left: 0, zIndex: 1,
+                        background: T.surfaceAlt || T.bg,
+                        padding: "8px 14px",
+                        borderRight: `1px solid ${T.border}`,
+                        fontWeight: 800, color: T.textMd, fontSize: 12,
+                      }}>Total estimado</td>
+                      <td style={{
+                        position: "sticky", left: 160, zIndex: 1,
+                        background: T.surfaceAlt || T.bg,
+                        borderRight: `2px solid ${T.border}`,
+                      }} />
+                      {cidadesDoCamp.flatMap(cidade =>
+                        categorias.map((cat, i) => {
+                          const key   = `${cidade.id}:${cat.codigo}`;
+                          const total = totais[key];
+                          return (
+                            <td
+                              key={`tot-${cidade.id}-${cat.codigo}`}
+                              style={{
+                                padding: "7px 6px",
+                                textAlign: "right",
+                                fontFamily: "'JetBrains Mono',ui-monospace,monospace",
+                                fontWeight: 800,
+                                color: T.brand || "#10b981",
+                                fontSize: 12,
+                                background: T.surfaceAlt || T.bg,
+                                borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
+                              }}
+                            >
+                              {total ? fmt(total) : "—"}
+                            </td>
+                          );
+                        })
+                      )}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

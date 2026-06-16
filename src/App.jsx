@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO, FONT } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
@@ -11,17 +11,17 @@ import {
 } from "lucide-react";
 import Home             from "./components/Home";
 import LivemodeLogo     from "./components/LivemodeLogo";
-import TabJogos         from "./components/tabs/TabJogos";
-import TabSavings       from "./components/tabs/TabSavings";
-import TabGraficos      from "./components/tabs/TabGraficos";
-import TabServicos      from "./components/tabs/TabServicos";
-import VisaoMicro       from "./components/tabs/VisaoMicro";
-import TabApresentacoes from "./components/tabs/TabApresentacoes";
-import TabNotas         from "./components/tabs/TabNotas";
-import TabNotasMensal  from "./components/tabs/TabNotasMensal";
-import TabEnvio        from "./components/tabs/TabEnvio";
-import TabLivemode     from "./components/tabs/TabLivemode";
-import TabLogistica    from "./components/tabs/TabLogistica";
+const TabJogos         = lazy(() => import("./components/tabs/TabJogos"));
+const TabSavings       = lazy(() => import("./components/tabs/TabSavings"));
+const TabGraficos      = lazy(() => import("./components/tabs/TabGraficos"));
+const TabServicos      = lazy(() => import("./components/tabs/TabServicos"));
+const VisaoMicro       = lazy(() => import("./components/tabs/VisaoMicro"));
+const TabApresentacoes = lazy(() => import("./components/tabs/TabApresentacoes"));
+const TabNotas         = lazy(() => import("./components/tabs/TabNotas"));
+const TabNotasMensal   = lazy(() => import("./components/tabs/TabNotasMensal"));
+const TabEnvio         = lazy(() => import("./components/tabs/TabEnvio"));
+const TabLivemode      = lazy(() => import("./components/tabs/TabLivemode"));
+const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -685,6 +685,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         </>)}
 
         {/* ── ABAS ── */}
+        <Suspense fallback={<div style={{padding:'2rem',textAlign:'center',opacity:.5}}>Carregando…</div>}>
         {tab==="jogos"         && <TabJogos         jogos={jogosCalc} filtrados={filtrados} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} rodadasList={rodadasList} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} setNovoRapido={setNovoRapido} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
         {tab==="savings"       && <TabSavings       jogosFiltered={jogosFiltered} divulgados={divulgados} totOrcJogos={totOrcJogos} totProvJogos={totProvJogos} filtroRod={filtroRod} setFiltroRod={setFiltroRod} filtroCat={filtroCat} setFiltroCat={setFiltroCat} rodadasList={rodadasList} T={T}/>}
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
@@ -696,6 +697,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}
+        </Suspense>
 
       </div>
 

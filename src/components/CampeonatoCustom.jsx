@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import { CATS, TIPO_COLOR, RADIUS, FONT } from "../constants";
 import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
@@ -8,17 +8,17 @@ import {
   ArrowLeft, Eye, EyeOff, Sun, Moon,
   Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
-import TabJogosPaulistao  from "./tabs/TabJogosPaulistao";
-import TabSavings         from "./tabs/TabSavings";
-import TabGraficos        from "./tabs/TabGraficos";
-import TabServicos        from "./tabs/TabServicos";
-import VisaoMicro         from "./tabs/VisaoMicro";
-import TabApresentacoes   from "./tabs/TabApresentacoes";
-import TabNotas           from "./tabs/TabNotas";
-import TabNotasMensal    from "./tabs/TabNotasMensal";
-import TabEnvio          from "./tabs/TabEnvio";
-import TabLivemode       from "./tabs/TabLivemode";
-import TabLogistica      from "./tabs/TabLogistica";
+const TabJogosPaulistao  = lazy(() => import("./tabs/TabJogosPaulistao"));
+const TabSavings         = lazy(() => import("./tabs/TabSavings"));
+const TabGraficos        = lazy(() => import("./tabs/TabGraficos"));
+const TabServicos        = lazy(() => import("./tabs/TabServicos"));
+const VisaoMicro         = lazy(() => import("./tabs/VisaoMicro"));
+const TabApresentacoes   = lazy(() => import("./tabs/TabApresentacoes"));
+const TabNotas           = lazy(() => import("./tabs/TabNotas"));
+const TabNotasMensal     = lazy(() => import("./tabs/TabNotasMensal"));
+const TabEnvio           = lazy(() => import("./tabs/TabEnvio"));
+const TabLivemode        = lazy(() => import("./tabs/TabLivemode"));
+const TabLogistica       = lazy(() => import("./tabs/TabLogistica"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
@@ -523,6 +523,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
           </Card>
         </>)}
 
+        <Suspense fallback={<div style={{padding:'2rem',textAlign:'center',opacity:.5}}>Carregando…</div>}>
         {tab==="jogos"         && <TabJogosPaulistao jogos={jogosCalc} fases={fases} formato={formato} numRodadas={numRodadas} filtroFase={filtroFase} setFiltroFase={setFiltroFase} filtroRodada={filtroRodada} setFiltroRodada={setFiltroRodada} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} showPlaceholder={showPlaceholder} setShowPlaceholder={setShowPlaceholder} setMicroJogoId={setMicroJogoId} setTab={setTab} setNovo={setNovo} onDelete={deleteJogo} onEdit={editJogo} T={T}/>}
         {tab==="savings"       && <TabSavings jogosFiltered={jogosFilteredSav} divulgados={jogosParaSavings} totOrcJogos={totOrcSav} totProvJogos={totProvSav} filtroRod={filtroRodSav} setFiltroRod={setFiltroRodSav} filtroCat={filtroCatSav} setFiltroCat={setFiltroCatSav} rodadasList={rodadasListSavings} T={T}/>}
         {tab==="gráficos"      && <TabGraficos divulgados={divulgados} savingRodada={savingPorFase} RESUMO_CATS={RESUMO_CATS} T={T}/>}
@@ -534,6 +535,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios}/>}
+        </Suspense>
         </div>
 
         {showNovo && <NovoJogoPaulistaoModal fases={fases} titulo={nome} onSave={addJogo} onClose={()=>setNovo(false)} T={T}/>}

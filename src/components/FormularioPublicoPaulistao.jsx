@@ -23,6 +23,7 @@ const HIDE_SPINNERS = `input[type=number]::-webkit-outer-spin-button,input[type=
 // ── Serviços por jogo ──────────────────────────────────────────────────────────
 const SERVICOS_JOGO = [
   { catLabel:"Operações", catColor:"#D97706", subKey:"um_b3",      subLabel:"UM B3" },
+  { catLabel:"Pessoal",   catColor:"#2563EB", subKey:"coord_um",   subLabel:"Coordenador de UM" },
   { catLabel:"Pessoal",   catColor:"#2563EB", subKey:"prod_um",    subLabel:"Produtor de UM" },
   { catLabel:"Pessoal",   catColor:"#2563EB", subKey:"prod_campo", subLabel:"Produtor de Campo" },
   { catLabel:"Pessoal",   catColor:"#2563EB", subKey:"supervisor1",subLabel:"Supervisor 1" },

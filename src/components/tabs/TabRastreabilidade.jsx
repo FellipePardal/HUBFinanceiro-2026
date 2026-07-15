@@ -4,7 +4,7 @@ import { fmt } from "../../utils";
 import { Pill } from "../shared";
 import { Card, PanelTitle, Segmented, Chip, tableStyles } from "../ui";
 import { getNFFile } from "../../lib/supabase";
-import { ALIAS_SUBKEY, getNotaFiscalScales } from "../../lib/notasFiscais";
+import { ALIAS_SUBKEY, SUBS_IGNORAR_REALIZADO_NF, getNotaFiscalScales } from "../../lib/notasFiscais";
 import { FileText, X, ChevronDown, ChevronRight } from "lucide-react";
 
 const MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -35,13 +35,15 @@ const LOG_CATS_COM_AJUSTE = ["passagem", "hospedagem"];
 
 // Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId.
 // Aplica o mesmo ALIAS_SUBKEY do motor de cálculo (TabNotas.jsx) para que subKeys
-// virtuais (sng_host, reembolso_log, etc.) caiam na categoria onde o valor
-// realmente é contabilizado no orçamento.
+// virtuais (sng_host, etc.) caiam na categoria onde o valor realmente é contabilizado
+// no orçamento. reembolso_log é ignorado: é o pedido/comprovante formal de um valor
+// que já está contado nos lançamentos de Logística -- não deve compor nenhuma categoria.
 const papelDaNotaJogo = nota => {
   if (nota.servicosDetalhe) {
     const acc = {};
     Object.entries(nota.servicosDetalhe).forEach(([k, v]) => {
       const subKey = k.split("_").slice(1).join("_");
+      if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
       const finalKey = ALIAS_SUBKEY[subKey] || subKey;
       acc[finalKey] = (acc[finalKey] || 0) + (v || 0);
     });
@@ -50,6 +52,7 @@ const papelDaNotaJogo = nota => {
   if (nota.servicosValores) {
     const acc = {};
     Object.entries(nota.servicosValores).forEach(([subKey, v]) => {
+      if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
       const finalKey = ALIAS_SUBKEY[subKey] || subKey;
       acc[finalKey] = (acc[finalKey] || 0) + (v || 0);
     });
@@ -73,6 +76,7 @@ const TIPOS = [
   { value:"fixo",       label:"Fixo" },
   { value:"logistica",  label:"Logística" },
   { value:"livemode",   label:"Livemode" },
+  { value:"reembolso",  label:"Reembolso Livemode" },
 ];
 
 export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, logistica = [], notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
@@ -110,11 +114,12 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
   const linhasJogo = useMemo(() => notas.map(n => {
     const papel = papelDaNotaJogo(n);
     const subKeys = Object.keys(papel);
+    const isReembolso = n.tipo === "reembolso_livemode";
     const categorias = subKeys.length
       ? [...new Set(subKeys.map(sk => SUBKEY_TO_CAT[sk]?.label || "Sem categoria"))]
-      : ["Sem categoria"];
+      : [isReembolso ? "Reembolso Livemode (já contado na Logística)" : "Sem categoria"];
     const jogo = jogos.find(j => j.id === n.jogoId);
-    const tipo = n.tipo === "avulsa" ? "avulsa" : "prevista";
+    const tipo = n.tipo === "avulsa" ? "avulsa" : isReembolso ? "reembolso" : "prevista";
     return {
       id: n.id, origem:"jogo", tipo,
       fornecedor: n.fornecedor || "—",
@@ -298,8 +303,8 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return [...map.values()].sort((a,b) => b.valor - a.valor);
   }, [agrupamento, linhasFiltradas, filtroInicial]);
 
-  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística", livemode:"Livemode" };
-  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A", livemode:"#a855f7" };
+  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística", livemode:"Livemode", reembolso:"Reembolso Livemode" };
+  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A", livemode:"#a855f7", reembolso:"#64748b" };
 
   const LinhaRow = ({ l }) => (
     <tr style={TS.tr}>

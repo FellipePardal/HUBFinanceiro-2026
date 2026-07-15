@@ -12,10 +12,13 @@ const num = value => Number(value) || 0;
 
 // Aliases: subKeys virtuais (usados só na entrada/UI da NF) → subKey financeira real de CATS.
 // SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra".
-// reembolso_log (NF "Reembolso Log. Livemode") não é um subKey de CATS — sem o alias,
-// seu valor nunca entra em nenhum total de categoria (fica só no subTotal por jogo,
-// divergindo do Resumo por Categoria do dashboard).
-export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra', reembolso_log: 'outros_log' };
+export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra' };
+
+// reembolso_log (NF "Reembolso Log. Livemode") NÃO deve contar em nenhum bucket do
+// orçamento: o valor lançado nessa NF é o consolidado de custos que já foram lançados
+// (e já contam) na aba Logística ao longo do período -- é só o pedido/comprovante
+// formal de reembolso, não um custo adicional. Somar contaria o mesmo dinheiro 2x.
+export const SUBS_IGNORAR_REALIZADO_NF = new Set(["reembolso_log"]);
 
 // subKeys que NÃO são recalculados a partir das Notas Fiscais aqui -- têm fonte própria:
 // transporte/uber/hospedagem (lançamentos da aba Logística), seg_espacial (rateio mensal
@@ -35,7 +38,8 @@ export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false }
       if (!SUBS_EXCLUIR_REALIZADO.has(sub.key)) realizado[sub.key] = 0;
     }));
     // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
-    // antes dos alias sng_host->sng / sng_premiere->sng_extra / reembolso_log->outros_log)
+    // antes do alias sng_host->sng / sng_premiere->sng_extra, ou de quando reembolso_log
+    // ainda era gravado direto, antes de virar um subKey ignorado)
     delete realizado.sng_host;
     delete realizado.sng_premiere;
     delete realizado.reembolso_log;
@@ -49,6 +53,7 @@ export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false }
         const realizado = map[parseInt(jId)];
         if (realizado) {
           const subKey = rest.join("_");
+          if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
           const finalKey = ALIAS_SUBKEY[subKey] || subKey;
           realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
         }
@@ -57,6 +62,7 @@ export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false }
       const realizado = map[n.jogoId];
       if (realizado) {
         Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
+          if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
           const finalKey = ALIAS_SUBKEY[subKey] || subKey;
           realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
         });

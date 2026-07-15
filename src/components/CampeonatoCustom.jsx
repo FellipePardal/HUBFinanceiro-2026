@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
-import { CATS, TIPO_COLOR, RADIUS, FONT } from "../constants";
+import { CATS, TIPO_COLOR, VAR_CAT_TO_CATKEY, RADIUS, FONT } from "../constants";
 import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./ui";
@@ -19,6 +19,7 @@ const TabNotasMensal     = lazy(() => import("./tabs/TabNotasMensal"));
 const TabEnvio           = lazy(() => import("./tabs/TabEnvio"));
 const TabLivemode        = lazy(() => import("./tabs/TabLivemode"));
 const TabLogistica       = lazy(() => import("./tabs/TabLogistica"));
+const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
@@ -144,8 +145,6 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     return next;
   });
 
-  const VAR_CAT_TO_CATKEY = { "Transporte":"logistica","Uber":"logistica","Hospedagem":"logistica","Seg. Espacial":"operacoes" };
-
   const logRealizadoPorJogo = useMemo(() => {
     const map = {};
     (Array.isArray(logistica) ? logistica : []).filter(l => l && l.jogoId).forEach(l => {
@@ -221,10 +220,14 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         provisionado: allJ.reduce((s,j) => s+catTotal(j.provisionado, cat), 0),
         realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0) + realizadoMensal,
         tipo: "variavel",
+        subKeys: cat.subs.map(sub => sub.key),
+        catKey: cat.key,
       };
     });
-    const extraOrc = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
-    result.push({ nome:"Extra", orcado:extraOrc, provisionado:0, realizado:0, tipo:"variavel" });
+    const extraOrc  = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
+    const extraProv = allJ.reduce((s,j) => s+((j.provisionado&&j.provisionado.extra)||0), 0);
+    const extraReal = allJ.reduce((s,j) => s+((j.realizado&&j.realizado.extra)||0), 0);
+    result.push({ nome:"Extra", orcado:extraOrc, provisionado:extraProv, realizado:extraReal, tipo:"variavel", subKeys:["extra"] });
     return result;
   }, [jogosCalc, notasMensais]);
 
@@ -234,6 +237,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     provisionado: s.itens.reduce((t,i) => t+i.provisionado, 0),
     realizado:    s.itens.reduce((t,i) => t+i.realizado, 0),
     tipo: "fixo",
+    servicoIds: s.itens.map(i => i.id),
   })), [servicosCalc]);
 
   const outrosMensaisCalc = useMemo(() => {
@@ -241,7 +245,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
       .filter(n => !n.servicoId && !VAR_CAT_TO_CATKEY[n.categoria])
       .reduce((s, n) => s + (n.valor || 0), 0);
     return total > 0
-      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo" }]
+      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo", outrosMensais:true }]
       : [];
   }, [notasMensais]);
 
@@ -257,6 +261,19 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [microJogoId, setMicroJogoId]   = useState(jogos.find(j=>j.mandante!=="A definir")?.id);
   const [ocultar, setOcultar]           = useState(false);
+  const [filtroRastreabilidade, setFiltroRastreabilidade] = useState(null);
+
+  const abrirRastreabilidade = (cat) => {
+    setFiltroRastreabilidade({
+      nome: cat.nome,
+      subKeys: cat.subKeys || null,
+      catKey: cat.catKey || null,
+      servicoIds: cat.servicoIds || null,
+      outrosMensais: !!cat.outrosMensais,
+    });
+    setSetor("notas");
+    setTab("rastreabilidade");
+  };
 
   const saveJogo       = j => setJogos(js => js.map(x => x.id===j.id ? j : x));
   const addJogo        = j => {
@@ -337,7 +354,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   }, [divulgados]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
-  const TABS_NF   = ["notas fiscais","mensal","serviços livemode"];
+  const TABS_NF   = ["notas fiscais","mensal","serviços livemode","rastreabilidade"];
   const TABS_REL  = ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor==="orcamento" ? TABS_ORC : setor==="notas" ? TABS_NF : setor==="logistica" ? TABS_LOG : TABS_REL;
@@ -498,7 +515,10 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
                   {RESUMO_CATS.map(c => {
                     const pct = c.orcado ? Math.min(100,(c.realizado/c.orcado)*100) : 0;
                     return (
-                      <tr key={c.nome} style={{borderTop:`1px solid ${T.border}`}}>
+                      <tr key={`${c.nome}_${c.tipo}`} onClick={() => abrirRastreabilidade(c)} title="Ver NFs que compõem este valor"
+                        style={{borderTop:`1px solid ${T.border}`,cursor:"pointer"}}
+                        onMouseEnter={e => e.currentTarget.style.background = T.surfaceAlt||T.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <td style={{padding:"13px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text,fontSize:13}}>{c.nome}</td>
                         <td style={{padding:"13px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
@@ -529,12 +549,13 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="gráficos"      && <TabGraficos divulgados={divulgados} savingRodada={savingPorFase} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
         {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
         </Suspense>
         </div>
 

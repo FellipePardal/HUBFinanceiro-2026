@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
-import { DARK, LIGHT, CATS, TIPO_COLOR, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO, FONT } from "./constants";
+import { DARK, LIGHT, CATS, TIPO_COLOR, VAR_CAT_TO_CATKEY, LS_JOGOS, LS_SERVICOS, LS_DARK, btnStyle, RADIUS, CENARIO_INFO, FONT } from "./constants";
 import { fmt, fmtK, subTotal, catTotal, lsGet, lsSet } from "./utils";
 import { ALL_JOGOS, SERVICOS_INIT } from "./data";
 import { KPI, Pill, CustomTooltip } from "./components/shared";
@@ -22,6 +22,7 @@ const TabNotasMensal   = lazy(() => import("./components/tabs/TabNotasMensal"));
 const TabEnvio         = lazy(() => import("./components/tabs/TabEnvio"));
 const TabLivemode      = lazy(() => import("./components/tabs/TabLivemode"));
 const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
+const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
@@ -169,9 +170,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     return next;
   });
 
-  // Mapa de categoria variável (aba Mensal) → chave de CAT no dashboard
-  const VAR_CAT_TO_CATKEY = { "Transporte":"logistica", "Uber":"logistica", "Hospedagem":"logistica", "Seg. Espacial":"operacoes" };
-
   // Realizado de logística por jogo (fonte única: lançamentos da aba Logística)
   // Mapeamento: transporte_locado + passagem (+ ajuste passagem) -> transporte
   //             uber -> uber
@@ -260,10 +258,14 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         provisionado: allJ.reduce((s,j) => s+catTotal(j.provisionado, cat), 0),
         realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0) + realizadoMensal,
         tipo: "variavel",
+        subKeys: cat.subs.map(sub => sub.key),
+        catKey: cat.key,
       };
     });
-    const extraOrc = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
-    result.push({ nome:"Extra", orcado:extraOrc, provisionado:0, realizado:0, tipo:"variavel" });
+    const extraOrc  = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
+    const extraProv = allJ.reduce((s,j) => s+((j.provisionado&&j.provisionado.extra)||0), 0);
+    const extraReal = allJ.reduce((s,j) => s+((j.realizado&&j.realizado.extra)||0), 0);
+    result.push({ nome:"Extra", orcado:extraOrc, provisionado:extraProv, realizado:extraReal, tipo:"variavel", subKeys:["extra"] });
     return result;
   }, [jogosCalc, notasMensais]);
 
@@ -273,6 +275,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     provisionado: s.itens.reduce((t,i) => t+i.provisionado, 0),
     realizado:    s.itens.reduce((t,i) => t+i.realizado, 0),
     tipo: "fixo",
+    servicoIds: s.itens.map(i => i.id),
   })), [servicosCalc]);
 
   // "Outros Mensais": NFs mensais sem servicoId e sem mapeamento variável (ex: categoria "Outro")
@@ -281,7 +284,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
       .filter(n => !n.servicoId && !VAR_CAT_TO_CATKEY[n.categoria])
       .reduce((s, n) => s + (n.valor || 0), 0);
     return total > 0
-      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo" }]
+      ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo", outrosMensais:true }]
       : [];
   }, [notasMensais]);
 
@@ -298,6 +301,19 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [microJogoId,     setMicroJogoId]     = useState(jogos.find(j=>j.mandante!=="A definir")?.id);
   const [ocultar,         setOcultar]         = useState(false);
+  const [filtroRastreabilidade, setFiltroRastreabilidade] = useState(null);
+
+  const abrirRastreabilidade = (cat) => {
+    setFiltroRastreabilidade({
+      nome: cat.nome,
+      subKeys: cat.subKeys || null,
+      catKey: cat.catKey || null,
+      servicoIds: cat.servicoIds || null,
+      outrosMensais: !!cat.outrosMensais,
+    });
+    setSetor("notas");
+    setTab("rastreabilidade");
+  };
 
   const saveJogo       = j => setJogos(js => js.map(x => x.id===j.id ? j : x));
   const addJogo        = j => {
@@ -379,7 +395,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   }, [jogos]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
-  const TABS_NF   = role === 'visualizador' ? ["notas fiscais","mensal"] : ["notas fiscais","mensal","serviços livemode"];
+  const TABS_NF   = role === 'visualizador' ? ["notas fiscais","mensal","rastreabilidade"] : ["notas fiscais","mensal","serviços livemode","rastreabilidade"];
   const TABS_REL  = role === 'visualizador' ? ["envio"] : ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "logistica" ? TABS_LOG : TABS_REL;
@@ -657,7 +673,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
                     const saldo = c.orcado-c.realizado;
                     const pct   = c.orcado ? Math.min(100,(c.realizado/c.orcado)*100) : 0;
                     return (
-                      <tr key={c.nome} style={{borderTop:`1px solid ${T.border}`}}>
+                      <tr key={`${c.nome}_${c.tipo}`} onClick={() => abrirRastreabilidade(c)} title="Ver NFs que compõem este valor"
+                        style={{borderTop:`1px solid ${T.border}`,cursor:"pointer"}}
+                        onMouseEnter={e => e.currentTarget.style.background = T.surfaceAlt||T.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <td style={{padding:"13px 16px",fontWeight:600,whiteSpace:"nowrap",color:T.text,fontSize:13}}>{c.nome}</td>
                         <td style={{padding:"13px 16px"}}><Pill label={c.tipo} color={TIPO_COLOR[c.tipo]}/></td>
                         <td className="num" style={{padding:"13px 16px",textAlign:"right",whiteSpace:"nowrap",color:T.text,fontSize:13}}>{fmt(c.orcado)}</td>
@@ -697,6 +716,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
         </Suspense>
 
       </div>

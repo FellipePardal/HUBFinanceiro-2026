@@ -47,7 +47,7 @@ const TIPOS = [
   { value:"fixo",     label:"Fixo" },
 ];
 
-export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, T, filtroInicial, onClearFiltroInicial }) {
+export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
   const TS = tableStyles(T);
   const purple = "#a855f7";
 
@@ -77,7 +77,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return map;
   }, [servicos]);
 
-  const nfScales = useMemo(() => getNotaFiscalScales(notas, "valorNF", { dedupe: true }), [notas]);
+  const nfScales = useMemo(() => getNotaFiscalScales(notas, "valorNF", { dedupe: dedupeNotasPorNF }), [notas, dedupeNotasPorNF]);
 
   const linhasJogo = useMemo(() => notas.map(n => {
     const papel = papelDaNotaJogo(n);

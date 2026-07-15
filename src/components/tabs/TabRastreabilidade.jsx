@@ -18,6 +18,21 @@ const mesDeData = dataStr => {
 const SUBKEY_TO_CAT = {};
 CATS.forEach(cat => cat.subs.forEach(sub => { SUBKEY_TO_CAT[sub.key] = cat; }));
 
+// Lançamentos de Logística (TabLogistica) alimentam transporte/uber/hospedagem/outros_log
+// do orçamento por uma fonte separada das Notas Fiscais — ver logRealizadoPorJogo em
+// Paulistao.jsx/App.jsx. Cada campo bruto vira uma linha aqui, já no subKey final,
+// para que a soma bata exatamente com o que o dashboard mostra.
+const LOG_CAMPO_INFO = {
+  transporte_locado: { label:"Transporte Locado", subKey:"transporte" },
+  passagem:          { label:"Passagem",          subKey:"transporte" },
+  uber:              { label:"Uber",              subKey:"uber" },
+  hospedagem:        { label:"Hospedagem",         subKey:"hospedagem" },
+  clara:             { label:"Clara",              subKey:"hospedagem" },
+  espresso:          { label:"Espresso",           subKey:"hospedagem" },
+  outros:            { label:"Outros (Log.)",      subKey:"outros_log" },
+};
+const LOG_CATS_COM_AJUSTE = ["passagem", "hospedagem"];
+
 // Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId
 const papelDaNotaJogo = nota => {
   if (nota.servicosDetalhe) {
@@ -40,14 +55,15 @@ const AGRUPAMENTOS = [
   { value:"fornecedor", label:"Por Fornecedor" },
 ];
 const TIPOS = [
-  { value:"todos",    label:"Todos" },
-  { value:"prevista", label:"Prevista" },
-  { value:"avulsa",   label:"Avulsa" },
-  { value:"mensal",   label:"Mensal" },
-  { value:"fixo",     label:"Fixo" },
+  { value:"todos",      label:"Todos" },
+  { value:"prevista",   label:"Prevista" },
+  { value:"avulsa",     label:"Avulsa" },
+  { value:"mensal",     label:"Mensal" },
+  { value:"fixo",       label:"Fixo" },
+  { value:"logistica",  label:"Logística" },
 ];
 
-export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
+export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, logistica = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
   const TS = tableStyles(T);
   const purple = "#a855f7";
 
@@ -107,8 +123,11 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       tipo = "fixo";
       categoriaLabel = servicoInfo[n.servicoId]?.secao || "Fixo";
     } else if (n.categoria === "Seg. Espacial") {
+      // Rateada entre os jogos do mês (rateioSegEspacialPorJogo) e somada dentro de
+      // jogo.realizado.seg_espacial — conta em "Operações", não num bucket mensal direto.
       tipo = "mensal";
-      categoriaLabel = "Seg. Espacial (não contabilizado no resumo)";
+      catKeyMensal = "operacoes";
+      categoriaLabel = "Operações (Seg. Espacial, rateada por jogo)";
     } else if (VAR_CAT_TO_CATKEY[n.categoria]) {
       tipo = "mensal";
       catKeyMensal = VAR_CAT_TO_CATKEY[n.categoria];
@@ -131,7 +150,33 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     };
   }), [notasMensais, servicoInfo]);
 
-  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal], [linhasJogo, linhasMensal]);
+  const linhasLogistica = useMemo(() => {
+    const out = [];
+    (logistica || []).filter(l => l && l.jogoId != null).forEach(l => {
+      const jogo = jogos.find(j => j.id === l.jogoId);
+      Object.entries(LOG_CAMPO_INFO).forEach(([campo, info]) => {
+        const base = parseFloat(l.valores?.[campo]) || 0;
+        const ajuste = LOG_CATS_COM_AJUSTE.includes(campo) ? (parseFloat(l.ajustes?.[campo]?.valor) || 0) : 0;
+        const valor = base + ajuste;
+        if (valor === 0) return;
+        out.push({
+          id: `${l.id}_${campo}`, origem:"logistica", tipo:"logistica",
+          fornecedor: l.prestador || "—",
+          numeroNF: "", codigo: "",
+          valorNF: valor, scale: 1,
+          rodada: jogo?.rodada ?? null, mes: mesDeData(jogo?.data),
+          jogoLabel: jogo ? `${jogo.mandante} x ${jogo.visitante}` : "",
+          descricao: info.label + (ajuste ? ` (c/ ajuste: ${l.ajustes?.[campo]?.motivo || "s/ motivo"})` : ""),
+          categorias: [SUBKEY_TO_CAT[info.subKey]?.label || "Logística"],
+          dataEmissao: "", hasFile: !!l.arquivos?.[campo],
+          _papel: {}, _subKeyFinal: info.subKey,
+        });
+      });
+    });
+    return out;
+  }, [logistica, jogos]);
+
+  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal, ...linhasLogistica], [linhasJogo, linhasMensal, linhasLogistica]);
 
   const matchFiltroInicial = linha => {
     if (!filtroInicial) return true;
@@ -139,6 +184,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     if (filtroInicial.outrosMensais) return !!linha._isOutrosMensais;
     if (filtroInicial.subKeys) {
       if (linha.origem === "jogo") return Object.keys(linha._papel).some(sk => filtroInicial.subKeys.includes(sk));
+      if (linha.origem === "logistica") return filtroInicial.subKeys.includes(linha._subKeyFinal);
       if (linha.origem === "mensal") return !!filtroInicial.catKey && linha._catKeyMensal === filtroInicial.catKey;
     }
     return true;
@@ -169,7 +215,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     };
     linhasFiltradas.forEach(l => {
       if (agrupamento === "rodada") {
-        add(l.origem === "jogo" && l.rodada != null ? `Rodada ${l.rodada}` : "Mensais (sem rodada)", l, valorLinha(l));
+        add(l.rodada != null ? `Rodada ${l.rodada}` : "Mensais (sem rodada)", l, valorLinha(l));
       } else if (agrupamento === "mes") {
         add(l.mes || "Sem data", l, valorLinha(l));
       } else if (agrupamento === "fornecedor") {
@@ -191,8 +237,8 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return [...map.values()].sort((a,b) => b.valor - a.valor);
   }, [agrupamento, linhasFiltradas]);
 
-  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo" };
-  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED" };
+  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística" };
+  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A" };
 
   const LinhaRow = ({ l }) => (
     <tr style={TS.tr}>
@@ -203,7 +249,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
           {l.categorias.map(c => <Pill key={c} label={c} color="#06b6d4"/>)}
         </div>
       </td>
-      <td style={TS.td}>{l.origem==="jogo" ? (l.rodada!=null?`Rd ${l.rodada}`:"—") : (l.mes||"—")}</td>
+      <td style={TS.td}>{l.rodada!=null ? `Rd ${l.rodada}` : (l.mes||"—")}</td>
       <td style={TS.td}><Pill label={TIPO_LABEL[l.tipo]||l.tipo} color={TIPO_PILL_COLOR[l.tipo]||"#64748b"}/></td>
       <td style={TS.td}>{l.descricao || "—"}</td>
       <td style={{...TS.tdNum, color:T.success||"#16A34A", fontWeight:600}}>

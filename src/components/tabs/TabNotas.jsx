@@ -5,7 +5,7 @@ import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
-import { countNotasFiscais, getNotaFiscalScales, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
+import { ALIAS_SUBKEY, countNotasFiscais, getNotaFiscalScales, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
 
@@ -1245,9 +1245,6 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
   // Recalcula o realizado sempre que as notas mudam
   useEffect(() => {
-    // Aliases: subKeys virtuais (NF) → subKey financeira (CATS)
-    // SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra".
-    const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra' };
     const nfScales = getNotaFiscalScales(notas, "valorNF", { dedupe: dedupeNotasPorNF });
     setJogos(js => js.map(j => {
       const realizado = {...(j.realizado || {})};
@@ -1255,9 +1252,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
       }));
       // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
-      // antes do alias sng_host->sng / sng_premiere->sng_extra)
+      // antes dos alias sng_host->sng / sng_premiere->sng_extra / reembolso_log->outros_log)
       delete realizado.sng_host;
       delete realizado.sng_premiere;
+      delete realizado.reembolso_log;
       // Somar valores — usa servicosDetalhe (granular por jogo) se disponível
       notas.forEach(n => {
         const scale = nfScales[n.id] ?? 1;

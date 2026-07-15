@@ -230,7 +230,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
           transporte: lg.transporte,
           uber:       lg.uber,
           hospedagem: lg.hospedagem,
-          outros_log: lg.outros_log,
+          // outros_log também pode vir de NF (ex: Reembolso Log. Livemode, aliased pro
+          // mesmo subKey) -- soma em vez de substituir, senão o lançamento de Logística
+          // apaga silenciosamente o valor da NF quando os dois existem no mesmo jogo.
+          outros_log: (j.realizado?.outros_log || 0) + lg.outros_log,
         } : {}),
         ...(se ? { seg_espacial: se } : {}),
       },
@@ -278,15 +281,18 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     servicoIds: s.itens.map(i => i.id),
   })), [servicosCalc]);
 
-  // "Outros Mensais": NFs mensais sem servicoId e sem mapeamento variável (ex: categoria "Outro")
+  // "Outros Mensais": NFs mensais sem servicoId e sem mapeamento variável (ex: categoria "Outro"),
+  // e também NFs cujo servicoId aponta pra um item de serviço fixo já excluído (órfãs) --
+  // sem isso, o valor delas some do dashboard mas continua aparecendo na aba Mensal.
   const outrosMensaisCalc = useMemo(() => {
+    const servicoIdsValidos = new Set(servicosCalc.flatMap(sec => sec.itens.map(i => i.id)));
     const total = notasMensais
-      .filter(n => !n.servicoId && !VAR_CAT_TO_CATKEY[n.categoria])
+      .filter(n => (!n.servicoId || !servicoIdsValidos.has(n.servicoId)) && !VAR_CAT_TO_CATKEY[n.categoria])
       .reduce((s, n) => s + (n.valor || 0), 0);
     return total > 0
       ? [{ nome:"Outros Mensais", orcado:0, provisionado:0, realizado: total, tipo:"fixo", outrosMensais:true }]
       : [];
-  }, [notasMensais]);
+  }, [notasMensais, servicosCalc]);
 
   const RESUMO_CATS = [...varCalc, ...fixosCalc, ...outrosMensaisCalc];
 
@@ -716,7 +722,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}
-        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
         </Suspense>
 
       </div>

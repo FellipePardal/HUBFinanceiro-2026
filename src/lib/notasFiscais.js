@@ -8,6 +8,13 @@ const norm = value => String(value || "")
 
 const num = value => Number(value) || 0;
 
+// Aliases: subKeys virtuais (usados só na entrada/UI da NF) → subKey financeira real de CATS.
+// SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra".
+// reembolso_log (NF "Reembolso Log. Livemode") não é um subKey de CATS — sem o alias,
+// seu valor nunca entra em nenhum total de categoria (fica só no subTotal por jogo,
+// divergindo do Resumo por Categoria do dashboard).
+export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra', reembolso_log: 'outros_log' };
+
 export function notaFiscalKey(nota) {
   const numero = norm(nota?.numeroNF);
   if (numero) {

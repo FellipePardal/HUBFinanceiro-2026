@@ -4,7 +4,7 @@ import { fmt } from "../../utils";
 import { Pill } from "../shared";
 import { Card, PanelTitle, Segmented, Chip, tableStyles } from "../ui";
 import { getNFFile } from "../../lib/supabase";
-import { getNotaFiscalScales } from "../../lib/notasFiscais";
+import { ALIAS_SUBKEY, getNotaFiscalScales } from "../../lib/notasFiscais";
 import { FileText, X, ChevronDown, ChevronRight } from "lucide-react";
 
 const MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -33,17 +33,28 @@ const LOG_CAMPO_INFO = {
 };
 const LOG_CATS_COM_AJUSTE = ["passagem", "hospedagem"];
 
-// Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId
+// Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId.
+// Aplica o mesmo ALIAS_SUBKEY do motor de cálculo (TabNotas.jsx) para que subKeys
+// virtuais (sng_host, reembolso_log, etc.) caiam na categoria onde o valor
+// realmente é contabilizado no orçamento.
 const papelDaNotaJogo = nota => {
   if (nota.servicosDetalhe) {
     const acc = {};
     Object.entries(nota.servicosDetalhe).forEach(([k, v]) => {
       const subKey = k.split("_").slice(1).join("_");
-      acc[subKey] = (acc[subKey] || 0) + (v || 0);
+      const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+      acc[finalKey] = (acc[finalKey] || 0) + (v || 0);
     });
     return acc;
   }
-  if (nota.servicosValores) return { ...nota.servicosValores };
+  if (nota.servicosValores) {
+    const acc = {};
+    Object.entries(nota.servicosValores).forEach(([subKey, v]) => {
+      const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+      acc[finalKey] = (acc[finalKey] || 0) + (v || 0);
+    });
+    return acc;
+  }
   return {};
 };
 
@@ -61,9 +72,10 @@ const TIPOS = [
   { value:"mensal",     label:"Mensal" },
   { value:"fixo",       label:"Fixo" },
   { value:"logistica",  label:"Logística" },
+  { value:"livemode",   label:"Livemode" },
 ];
 
-export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, logistica = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
+export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, logistica = [], notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
   const TS = tableStyles(T);
   const purple = "#a855f7";
 
@@ -119,9 +131,16 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
 
   const linhasMensal = useMemo(() => notasMensais.map(n => {
     let categoriaLabel, tipo, catKeyMensal = null, isOutrosMensais = false;
-    if (n.servicoId) {
+    if (n.servicoId && servicoInfo[n.servicoId]) {
       tipo = "fixo";
-      categoriaLabel = servicoInfo[n.servicoId]?.secao || "Fixo";
+      categoriaLabel = servicoInfo[n.servicoId].secao || "Fixo";
+    } else if (n.servicoId) {
+      // servicoId aponta pra um item de serviço fixo que já foi excluído —
+      // órfã: cai em "Outros Mensais" (mesma regra do outrosMensaisCalc do dashboard),
+      // senão o valor dela desapareceria do resumo mas continuaria aparecendo aqui.
+      tipo = "mensal";
+      categoriaLabel = "Outros Mensais (serviço removido)";
+      isOutrosMensais = true;
     } else if (n.categoria === "Seg. Espacial") {
       // Rateada entre os jogos do mês (rateioSegEspacialPorJogo) e somada dentro de
       // jogo.realizado.seg_espacial — conta em "Operações", não num bucket mensal direto.
@@ -176,7 +195,29 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return out;
   }, [logistica, jogos]);
 
-  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal, ...linhasLogistica], [linhasJogo, linhasMensal, linhasLogistica]);
+  // NFs Livemode/liveU: alimentam jogo.realizado.infra em bloco (TabLivemode.syncInfra),
+  // sem quebra por jogo/subserviço — mostradas aqui pra fechar a ponta de rastreabilidade,
+  // já que antes elas não apareciam em lugar nenhum fora da própria aba Livemode.
+  const linhasLivemode = useMemo(() => {
+    const mapNota = (n, label) => ({
+      id: `livemode_${n.id}`, origem:"livemode", tipo:"livemode",
+      fornecedor: n.fornecedor || "Livemode",
+      numeroNF: n.numeroNF || "", codigo: "",
+      valorNF: n.valor || 0, scale: 1,
+      rodada: null, mes: n.rodadasLabel || n.jogosResumoLabel || null,
+      jogoLabel: n.jogosResumoLabel || "",
+      descricao: (n.servicosLabels || []).join(", ") || label,
+      categorias: [SUBKEY_TO_CAT["infra"]?.label || "Operações"],
+      dataEmissao: n.dataEmissao || "", hasFile: !!n.hasFile,
+      _papel: {}, _subKeyFinal: "infra",
+    });
+    return [
+      ...(notasLivemode || []).map(n => mapNota(n, "NF Livemode")),
+      ...(notasLiveU || []).map(n => mapNota(n, "liveU")),
+    ];
+  }, [notasLivemode, notasLiveU]);
+
+  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal, ...linhasLogistica, ...linhasLivemode], [linhasJogo, linhasMensal, linhasLogistica, linhasLivemode]);
 
   const matchFiltroInicial = linha => {
     if (!filtroInicial) return true;
@@ -184,7 +225,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     if (filtroInicial.outrosMensais) return !!linha._isOutrosMensais;
     if (filtroInicial.subKeys) {
       if (linha.origem === "jogo") return Object.keys(linha._papel).some(sk => filtroInicial.subKeys.includes(sk));
-      if (linha.origem === "logistica") return filtroInicial.subKeys.includes(linha._subKeyFinal);
+      if (linha.origem === "logistica" || linha.origem === "livemode") return filtroInicial.subKeys.includes(linha._subKeyFinal);
       if (linha.origem === "mensal") return !!filtroInicial.catKey && linha._catKeyMensal === filtroInicial.catKey;
     }
     return true;
@@ -257,8 +298,8 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return [...map.values()].sort((a,b) => b.valor - a.valor);
   }, [agrupamento, linhasFiltradas, filtroInicial]);
 
-  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística" };
-  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A" };
+  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística", livemode:"Livemode" };
+  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A", livemode:"#a855f7" };
 
   const LinhaRow = ({ l }) => (
     <tr style={TS.tr}>

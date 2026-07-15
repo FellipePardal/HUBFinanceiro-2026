@@ -28,6 +28,15 @@ import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
 import { PAULISTAO_JOGOS_INIT, PAULISTAO_SERVICOS_INIT, getFase, ordemFase } from "../data/paulistao";
 
+// Serviços Livemode — valores exclusivos do Paulistão F (sem Starlink, valores próprios
+// de Máquinas de Grafismo/Downlink/Distribuição). Não afeta Brasileirão nem outros
+// campeonatos, que continuam usando os valores padrão de TabLivemode.jsx.
+const SERVICOS_LM_PAULISTAO = [
+  { key:"grafismo",     orcadoKey:"maquinas",     label:"Máquinas de Grafismo", valorPadrao:958  },
+  { key:"downlink",     orcadoKey:"downlink",     label:"Downlink",             valorPadrao:1000 },
+  { key:"distribuicao", orcadoKey:"distribuicao", label:"Distribuição",         valorPadrao:1000 },
+];
+
 // Chaves de persistência namespaced no Supabase (mesma tabela app_state)
 const K = {
   jogos:            "paulistao_jogos",
@@ -636,7 +645,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} T={T} submissionsKey="paulistao_nf_submissions" historicoKey="paulistao_nf_historico" formHash="#formulario-paulistao" usarPortal={false} subsExcluirExtra={["downlink","distribuicao","maquinas"]} dedupeNotasPorNF={true} role={role}/>}
         {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T} role={role}/>}
-        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T} useOrcadoLivemode={true}/>}
+        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T} useOrcadoLivemode={true} servicosLm={SERVICOS_LM_PAULISTAO}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="pau" orcGlobal={orcGlobalVariaveis} mesInicio={4} saldoUsaGasto={true}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios} dedupeNotasPorNF={true} role={role}/>}

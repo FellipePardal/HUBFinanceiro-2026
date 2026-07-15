@@ -29,7 +29,7 @@ function jogoLabel(j) {
 }
 
 // ── Modal para registrar NF Livemode ──
-function NFLivemodeModal({ onSave, onClose, jogos, T }) {
+function NFLivemodeModal({ onSave, onClose, jogos, T, servicosLm = SERVICOS_LM }) {
   const IS = iSty(T);
   const divulgados = jogos.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada);
   const [selJogos, setSelJogos] = useState(new Set());
@@ -53,7 +53,7 @@ function NFLivemodeModal({ onSave, onClose, jogos, T }) {
   const toggleServico = (key) => {
     setServicos(prev => {
       const s = {...prev};
-      if (s[key] !== undefined) { delete s[key]; } else { s[key] = SERVICOS_LM.find(x=>x.key===key)?.valorPadrao || 0; }
+      if (s[key] !== undefined) { delete s[key]; } else { s[key] = servicosLm.find(x=>x.key===key)?.valorPadrao || 0; }
       return s;
     });
   };
@@ -62,7 +62,7 @@ function NFLivemodeModal({ onSave, onClose, jogos, T }) {
   const valorPorJogo = Object.values(servicos).reduce((s,v) => s+(v||0), 0);
   const totalNF = valorPorJogo * selJogos.size;
   const selCount = Object.keys(servicos).length;
-  const servicosLabels = Object.keys(servicos).map(k => SERVICOS_LM.find(x=>x.key===k)?.label||k);
+  const servicosLabels = Object.keys(servicos).map(k => servicosLm.find(x=>x.key===k)?.label||k);
 
   const selJogosArr = divulgados.filter(j => selJogos.has(j.id));
   const jogosIds = [...selJogos];
@@ -157,7 +157,7 @@ function NFLivemodeModal({ onSave, onClose, jogos, T }) {
         <div style={{marginBottom:12}}>
           <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:6}}>Serviços (valor por jogo)</label>
           <div style={{background:T.bg,borderRadius:8,padding:8}}>
-            {SERVICOS_LM.map(s => {
+            {servicosLm.map(s => {
               const checked = servicos[s.key] !== undefined;
               return (
                 <div key={s.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,background:checked?"#22c55e18":"transparent"}}>
@@ -392,7 +392,7 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
 }
 
 // ── Componente Principal ──
-export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, setJogos, fornecedores, T, useOrcadoLivemode = false }) {
+export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, setJogos, fornecedores, T, useOrcadoLivemode = false, servicosLm = SERVICOS_LM }) {
   const [tab, setTab] = useState("notas");
   const [showModal, setShowModal] = useState(false);
   const [showModalLiveU, setShowModalLiveU] = useState(false);
@@ -465,11 +465,11 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
   }, [liveUNfs]);
 
   // ── Orçado por jogo ──
-  const jogoOrcadoFn = useOrcadoLivemode ? lmOrcado : () => SERVICOS_LM.reduce((s,x) => s+x.valorPadrao, 0);
+  const jogoOrcadoFn = useOrcadoLivemode ? lmOrcado : () => servicosLm.reduce((s,x) => s+x.valorPadrao, 0);
   const totalOrcado = divulgados.reduce((s,j) => s + jogoOrcadoFn(j), 0);
 
   // Totais por serviço Livemode
-  const totaisPorServico = SERVICOS_LM.map(s => ({
+  const totaisPorServico = servicosLm.map(s => ({
     ...s,
     total: useOrcadoLivemode
       ? divulgados.reduce((sum,j) => sum + (j.orcado?.[s.orcadoKey]||0), 0)
@@ -718,7 +718,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
         </Card>
       )}
 
-      {showModal && <NFLivemodeModal onSave={addNota} onClose={()=>setShowModal(false)} jogos={jogos} T={T}/>}
+      {showModal && <NFLivemodeModal onSave={addNota} onClose={()=>setShowModal(false)} jogos={jogos} T={T} servicosLm={servicosLm}/>}
       {showModalLiveU && <NFLiveUModal onSave={addNotaLiveU} onClose={()=>setShowModalLiveU(false)} jogos={jogos} T={T}/>}
     </div>
   );

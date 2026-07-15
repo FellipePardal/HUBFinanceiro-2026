@@ -88,6 +88,11 @@ export const CATS = [
   { key:"operacoes", label:"Operações", color:"#D97706", subs:[{key:"um_b1",label:"UM B1"},{key:"um_b2",label:"UM B2"},{key:"um_b3",label:"UM B3"},{key:"geradores",label:"Geradores"},{key:"sng",label:"SNG"},{key:"sng_extra",label:"SNG Extra"},{key:"seg_espacial",label:"Seg. Espacial"},{key:"seg_extra",label:"Seg. Extra"},{key:"drone",label:"Drone"},{key:"grua",label:"Grua/Policam"},{key:"dslr",label:"DSLR + Microlink"},{key:"dslrs_transmissor",label:"DSLR + Transmissor"},{key:"refcam",label:"Refcam"},{key:"carrinho",label:"Carrinho"},{key:"especial",label:"Especial"},{key:"goalcam",label:"Goalcam"},{key:"minidrone",label:"Minidrone"},{key:"infra",label:"Infra + Distr."},{key:"downlink",label:"Downlink"},{key:"distribuicao",label:"Distribuição"},{key:"liveu",label:"LiveU"},{key:"internet",label:"Internet"},{key:"maquinas",label:"Máquinas"},{key:"montagem_vespera",label:"Montagem Véspera"},{key:"extra",label:"Extra"}]},
 ];
 
+// Notas mensais "variáveis" (sem servicoId) mapeiam para uma categoria de CATS
+// pelo texto livre em nota.categoria — usado no resumo do dashboard e na
+// rastreabilidade de NFs (Paulistão F).
+export const VAR_CAT_TO_CATKEY = { "Transporte":"logistica", "Uber":"logistica", "Hospedagem":"logistica", "Seg. Espacial":"operacoes" };
+
 // ─── CORES ────────────────────────────────────────────────────────────────────
 export const TIPO_COLOR   = { fixo:"#7C3AED", variavel:"#DC2626" };
 export const PIE_COLORS   = ["#65B32E","#2563EB","#D97706","#7C3AED","#DC2626","#10B981","#F59E0B"];

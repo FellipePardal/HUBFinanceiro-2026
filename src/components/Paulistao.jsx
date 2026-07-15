@@ -587,7 +587,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
                   {RESUMO_CATS.map(c => {
                     const pct = c.orcado ? Math.min(100,(c.realizado/c.orcado)*100) : 0;
                     return (
-                      <tr key={c.nome} onClick={() => abrirRastreabilidade(c)} title="Ver NFs que compõem este valor"
+                      <tr key={`${c.nome}_${c.tipo}`} onClick={() => abrirRastreabilidade(c)} title="Ver NFs que compõem este valor"
                         style={{borderTop:`1px solid ${T.border}`,cursor:"pointer"}}
                         onMouseEnter={e => e.currentTarget.style.background = T.surfaceAlt||T.bg}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>

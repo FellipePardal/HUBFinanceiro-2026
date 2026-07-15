@@ -5,7 +5,7 @@ import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
-import { ALIAS_SUBKEY, countNotasFiscais, getNotaFiscalScales, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
+import { countNotasFiscais, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
 
@@ -1243,43 +1243,9 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const totalValor     = sumNotasFiscais(notas, "valorNF", { dedupe: dedupeNotasPorNF });
   const notasAvulsas   = notas.filter(n => n.tipo === "avulsa").length;
 
-  // Recalcula o realizado sempre que as notas mudam
-  useEffect(() => {
-    const nfScales = getNotaFiscalScales(notas, "valorNF", { dedupe: dedupeNotasPorNF });
-    setJogos(js => js.map(j => {
-      const realizado = {...(j.realizado || {})};
-      CATS.forEach(cat => cat.subs.forEach(sub => {
-        if (!SUBS_EXCLUIR.has(sub.key)) realizado[sub.key] = 0;
-      }));
-      // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
-      // antes dos alias sng_host->sng / sng_premiere->sng_extra / reembolso_log->outros_log)
-      delete realizado.sng_host;
-      delete realizado.sng_premiere;
-      delete realizado.reembolso_log;
-      // Somar valores — usa servicosDetalhe (granular por jogo) se disponível
-      notas.forEach(n => {
-        const scale = nfScales[n.id] ?? 1;
-        if (n.servicosDetalhe) {
-          // Multi-jogo: pegar só as chaves deste jogo
-          Object.entries(n.servicosDetalhe).forEach(([k, valor]) => {
-            const [jId, ...rest] = k.split("_");
-            if (parseInt(jId) === j.id) {
-              const subKey = rest.join("_");
-              const finalKey = ALIAS_SUBKEY[subKey] || subKey;
-              realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
-            }
-          });
-        } else if (n.jogoId === j.id && n.servicosValores) {
-          // Formato antigo: jogoId simples
-          Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
-            const finalKey = ALIAS_SUBKEY[subKey] || subKey;
-            realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
-          });
-        }
-      });
-      return {...j, realizado};
-    }));
-  }, [notas]); // eslint-disable-line react-hooks/exhaustive-deps
+  // O realizado por jogo agora é calculado ao vivo no jogosCalc de cada campeonato
+  // (buildRealizadoPorJogo, em lib/notasFiscais.js) — sempre em dia, em qualquer aba,
+  // em vez de só quando esta aba estava montada e persistia o valor via setJogos.
 
   const addNota = nota => {
     setNotas(ns => [...ns, nota]);

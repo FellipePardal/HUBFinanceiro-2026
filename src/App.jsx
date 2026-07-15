@@ -25,6 +25,7 @@ const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
+import { buildRealizadoPorJogo } from "./lib/notasFiscais";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
 import { useSessionTimeout } from "./hooks/useSessionTimeout";
@@ -217,15 +218,22 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     return map;
   }, [notasMensais, jogos]);
 
-  // jogosCalc: jogos com realizado de logística derivado (substitui as subs logística)
+  // Realizado das Notas Fiscais, calculado ao vivo (não depende de a aba Notas Fiscais
+  // já ter sido aberta nesta sessão para o dashboard estar em dia).
+  const realizadoNotasPorJogo = useMemo(
+    () => buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF: false }),
+    [jogos, notas]
+  );
+
+  // jogosCalc: jogos com realizado recalculado das NFs + logística/seg. espacial derivados
   const jogosCalc = useMemo(() => jogos.map(j => {
+    const base = realizadoNotasPorJogo[j.id] || {};
     const lg = logRealizadoPorJogo[j.id];
     const se = rateioSegEspacialPorJogo[j.id];
-    if (!lg && !se) return j;
     return {
       ...j,
       realizado: {
-        ...(j.realizado||{}),
+        ...base,
         ...(lg ? {
           transporte: lg.transporte,
           uber:       lg.uber,
@@ -233,12 +241,12 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
           // outros_log também pode vir de NF (ex: Reembolso Log. Livemode, aliased pro
           // mesmo subKey) -- soma em vez de substituir, senão o lançamento de Logística
           // apaga silenciosamente o valor da NF quando os dois existem no mesmo jogo.
-          outros_log: (j.realizado?.outros_log || 0) + lg.outros_log,
+          outros_log: (base.outros_log || 0) + lg.outros_log,
         } : {}),
         ...(se ? { seg_espacial: se } : {}),
       },
     };
-  }), [jogos, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
 
   // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
   const servicosCalc = useMemo(() => servicos.map(sec => ({

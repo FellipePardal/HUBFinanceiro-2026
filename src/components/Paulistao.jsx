@@ -23,6 +23,7 @@ const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import LivemodeLogo from "./LivemodeLogo";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
+import { buildRealizadoPorJogo } from "../lib/notasFiscais";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
 import { PAULISTAO_JOGOS_INIT, PAULISTAO_SERVICOS_INIT, getFase, ordemFase } from "../data/paulistao";
@@ -222,21 +223,28 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
     return map;
   }, [notasMensais, jogos]);
 
+  // Realizado das Notas Fiscais, calculado ao vivo (não depende de a aba Notas Fiscais
+  // já ter sido aberta nesta sessão para o dashboard estar em dia).
+  const realizadoNotasPorJogo = useMemo(
+    () => buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF: true }),
+    [jogos, notas]
+  );
+
   const jogosCalc = useMemo(() => jogos.map(j => {
+    const base = realizadoNotasPorJogo[j.id] || {};
     const lg = logRealizadoPorJogo[j.id];
     const se = rateioSegEspacialPorJogo[j.id];
-    if (!lg && !se) return j;
     return {
       ...j,
       realizado: {
-        ...(j.realizado||{}),
+        ...base,
         // outros_log tambem pode vir de NF (ex: Reembolso Log. Livemode) -- soma em vez
         // de substituir, senao o lancamento de Logistica apaga o valor da NF.
-        ...(lg ? { transporte: lg.transporte, uber: lg.uber, hospedagem: lg.hospedagem, outros_log: (j.realizado?.outros_log || 0) + lg.outros_log } : {}),
+        ...(lg ? { transporte: lg.transporte, uber: lg.uber, hospedagem: lg.hospedagem, outros_log: (base.outros_log || 0) + lg.outros_log } : {}),
         ...(se ? { seg_espacial: se } : {}),
       },
     };
-  }), [jogos, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
 
   const servicosCalc = useMemo(() => servicos.map(sec => ({
     ...sec,

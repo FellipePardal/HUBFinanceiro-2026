@@ -1,3 +1,5 @@
+import { CATS } from "../constants";
+
 const norm = value => String(value || "")
   .trim()
   .toLowerCase()
@@ -14,6 +16,55 @@ const num = value => Number(value) || 0;
 // seu valor nunca entra em nenhum total de categoria (fica só no subTotal por jogo,
 // divergindo do Resumo por Categoria do dashboard).
 export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra', reembolso_log: 'outros_log' };
+
+// subKeys que NÃO são recalculados a partir das Notas Fiscais aqui -- têm fonte própria:
+// transporte/uber/hospedagem (lançamentos da aba Logística), seg_espacial (rateio mensal
+// por jogo), infra (sincronização manual de Serviços Livemode), seg_extra (edição manual).
+export const SUBS_EXCLUIR_REALIZADO = new Set(["transporte", "uber", "hospedagem", "seg_espacial", "infra", "seg_extra"]);
+
+// Recalcula o realizado de cada jogo a partir das Notas Fiscais -- puro, sem persistir.
+// Antes isso só rodava (e só era salvo) quando a aba "Notas Fiscais" estava montada, então
+// o dashboard podia ficar com valores desatualizados até alguém abrir aquela aba. Chamando
+// isso direto no jogosCalc de cada campeonato, o valor fica sempre em dia, em qualquer aba.
+export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false } = {}) {
+  const nfScales = getNotaFiscalScales(notas, "valorNF", { dedupe: dedupeNotasPorNF });
+  const map = {};
+  jogos.forEach(j => {
+    const realizado = { ...(j.realizado || {}) };
+    CATS.forEach(cat => cat.subs.forEach(sub => {
+      if (!SUBS_EXCLUIR_REALIZADO.has(sub.key)) realizado[sub.key] = 0;
+    }));
+    // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
+    // antes dos alias sng_host->sng / sng_premiere->sng_extra / reembolso_log->outros_log)
+    delete realizado.sng_host;
+    delete realizado.sng_premiere;
+    delete realizado.reembolso_log;
+    map[j.id] = realizado;
+  });
+  notas.forEach(n => {
+    const scale = nfScales[n.id] ?? 1;
+    if (n.servicosDetalhe) {
+      Object.entries(n.servicosDetalhe).forEach(([k, valor]) => {
+        const [jId, ...rest] = k.split("_");
+        const realizado = map[parseInt(jId)];
+        if (realizado) {
+          const subKey = rest.join("_");
+          const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+          realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
+        }
+      });
+    } else if (n.servicosValores) {
+      const realizado = map[n.jogoId];
+      if (realizado) {
+        Object.entries(n.servicosValores).forEach(([subKey, valor]) => {
+          const finalKey = ALIAS_SUBKEY[subKey] || subKey;
+          realizado[finalKey] = (realizado[finalKey] || 0) + (valor * scale);
+        });
+      }
+    }
+  });
+  return map;
+}
 
 export function notaFiscalKey(nota) {
   const numero = norm(nota?.numeroNF);

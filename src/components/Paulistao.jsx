@@ -260,8 +260,10 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         tipo: "variavel",
       };
     });
-    const extraOrc = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
-    result.push({ nome:"Extra", orcado:extraOrc, provisionado:0, realizado:0, tipo:"variavel" });
+    const extraOrc  = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
+    const extraProv = allJ.reduce((s,j) => s+((j.provisionado&&j.provisionado.extra)||0), 0);
+    const extraReal = allJ.reduce((s,j) => s+((j.realizado&&j.realizado.extra)||0), 0);
+    result.push({ nome:"Extra", orcado:extraOrc, provisionado:extraProv, realizado:extraReal, tipo:"variavel" });
     return result;
   }, [jogosCalc, notasMensais]);
 

@@ -479,18 +479,20 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
         hasFile = true;
       } catch(_){}
     }
+    const valorNF = parseFloat(form.valorNF) || 0;
     onSave({
       id: notaId,
       codigo,
       ...form,
-      valorNF: parseFloat(form.valorNF) || 0,
+      valorNF,
       rodada: jogo.rodada,
       jogoId: jogo.id,
       jogoLabel: `${jogo.mandante} x ${jogo.visitante}`,
       mandante: jogo.mandante,
       visitante: jogo.visitante,
-      servicosKeys: [],
+      servicosKeys: [`${jogo.id}_extra`],
       servicosLabels: [form.descricao || "Avulsa"],
+      servicosValores: { extra: valorNF },
       tipo: "avulsa",
       status: "Conferida",
       hasFile,

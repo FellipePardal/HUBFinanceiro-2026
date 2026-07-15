@@ -202,7 +202,21 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
   }, [baseLinhas, tipoSel, busca]);
 
   const valorLinha = l => (l.valorNF || 0) * (l.scale ?? 1);
-  const totalGeral = linhasFiltradas.reduce((s, l) => s + valorLinha(l), 0);
+
+  // Quando um filtro de categoria está ativo, uma NF que também cobre OUTRAS
+  // categorias (ex: uma nota "Pessoal" que também tem Operações) só deve contar,
+  // aqui, pela fatia que pertence à categoria filtrada — não pelo valor total da NF.
+  const valorAtribuido = l => {
+    if (filtroInicial?.subKeys && l.origem === "jogo") {
+      return Object.entries(l._papel)
+        .filter(([sk]) => filtroInicial.subKeys.includes(sk))
+        .reduce((s, [, v]) => s + v, 0) * (l.scale ?? 1);
+    }
+    return valorLinha(l);
+  };
+  const ehValorParcial = l => filtroInicial?.subKeys && l.origem === "jogo" && valorAtribuido(l) !== valorLinha(l);
+
+  const totalGeral = linhasFiltradas.reduce((s, l) => s + valorAtribuido(l), 0);
 
   const grupos = useMemo(() => {
     if (agrupamento === "individual") return null;
@@ -215,27 +229,33 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     };
     linhasFiltradas.forEach(l => {
       if (agrupamento === "rodada") {
-        add(l.rodada != null ? `Rodada ${l.rodada}` : "Mensais (sem rodada)", l, valorLinha(l));
+        add(l.rodada != null ? `Rodada ${l.rodada}` : "Mensais (sem rodada)", l, valorAtribuido(l));
       } else if (agrupamento === "mes") {
-        add(l.mes || "Sem data", l, valorLinha(l));
+        add(l.mes || "Sem data", l, valorAtribuido(l));
       } else if (agrupamento === "fornecedor") {
-        add(l.fornecedor || "—", l, valorLinha(l));
+        add(l.fornecedor || "—", l, valorAtribuido(l));
       } else if (agrupamento === "categoria") {
         if (l.origem === "jogo") {
+          // Se já há um filtro de categoria ativo, restringe o rateio às subKeys
+          // filtradas — senão uma NF multi-categoria "vaza" valor pra categorias
+          // que não são a filtrada.
+          const entradas = filtroInicial?.subKeys
+            ? Object.entries(l._papel).filter(([sk]) => filtroInicial.subKeys.includes(sk))
+            : Object.entries(l._papel);
           const contrib = {};
-          Object.entries(l._papel).forEach(([sk, v]) => {
+          entradas.forEach(([sk, v]) => {
             const label = SUBKEY_TO_CAT[sk]?.label || "Sem categoria";
             contrib[label] = (contrib[label] || 0) + v * (l.scale ?? 1);
           });
-          if (Object.keys(contrib).length === 0) contrib["Sem categoria"] = valorLinha(l);
+          if (Object.keys(contrib).length === 0) contrib["Sem categoria"] = valorAtribuido(l);
           Object.entries(contrib).forEach(([label, valor]) => add(label, l, valor));
         } else {
-          add(l.categorias[0], l, valorLinha(l));
+          add(l.categorias[0], l, valorAtribuido(l));
         }
       }
     });
     return [...map.values()].sort((a,b) => b.valor - a.valor);
-  }, [agrupamento, linhasFiltradas]);
+  }, [agrupamento, linhasFiltradas, filtroInicial]);
 
   const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística" };
   const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A" };
@@ -253,9 +273,12 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       <td style={TS.td}><Pill label={TIPO_LABEL[l.tipo]||l.tipo} color={TIPO_PILL_COLOR[l.tipo]||"#64748b"}/></td>
       <td style={TS.td}>{l.descricao || "—"}</td>
       <td style={{...TS.tdNum, color:T.success||"#16A34A", fontWeight:600}}>
-        {fmt(valorLinha(l))}
+        {fmt(valorAtribuido(l))}
         {l.scale != null && l.scale !== 1 && (
           <div style={{fontSize:10,color:T.textSm,fontWeight:400}}>rateado (dup. {Math.round(1/l.scale)}x)</div>
+        )}
+        {ehValorParcial(l) && (
+          <div style={{fontSize:10,color:T.textSm,fontWeight:400}}>de {fmt(valorLinha(l))} no total da NF</div>
         )}
       </td>
       <td style={TS.td}>

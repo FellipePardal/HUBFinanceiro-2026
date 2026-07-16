@@ -22,7 +22,7 @@ const TabLogistica       = lazy(() => import("./tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
-import { buildRealizadoPorJogo } from "../lib/notasFiscais";
+import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo } from "../lib/notasFiscais";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
 import { makeFaseHelpers } from "../data/customCampeonato";
@@ -194,6 +194,13 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     [jogos, notas]
   );
 
+  // Realizado de "Infra + Distr." por jogo, calculado ao vivo a partir das NFs
+  // Livemode (antes só era atualizado ao clicar em "Sincronizar Jogos").
+  const infraRealizadoPorJogo = useMemo(
+    () => buildInfraRealizadoPorJogo(notasLivemode),
+    [notasLivemode]
+  );
+
   const jogosCalc = useMemo(() => jogos.map(j => {
     const base = realizadoNotasPorJogo[j.id] || {};
     const lg = logRealizadoPorJogo[j.id];
@@ -206,9 +213,10 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         // de substituir, senao o lancamento de Logistica apaga o valor da NF.
         ...(lg ? { transporte: lg.transporte, uber: lg.uber, hospedagem: lg.hospedagem, outros_log: (base.outros_log || 0) + lg.outros_log } : {}),
         ...(se ? { seg_espacial: se } : {}),
+        infra: infraRealizadoPorJogo[j.id] || 0,
       },
     };
-  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
 
   const servicosCalc = useMemo(() => servicos.map(sec => ({
     ...sec,
@@ -564,7 +572,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T}/>}
         {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T}/>}
-        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios}/>}

@@ -25,7 +25,7 @@ const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
-import { buildRealizadoPorJogo } from "./lib/notasFiscais";
+import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo } from "./lib/notasFiscais";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
 import { useSessionTimeout } from "./hooks/useSessionTimeout";
@@ -225,6 +225,13 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     [jogos, notas]
   );
 
+  // Realizado de "Infra + Distr." por jogo, calculado ao vivo a partir das NFs
+  // Livemode/liveU (antes só era atualizado ao clicar em "Sincronizar Jogos").
+  const infraRealizadoPorJogo = useMemo(
+    () => buildInfraRealizadoPorJogo(notasLivemode, notasLiveU),
+    [notasLivemode, notasLiveU]
+  );
+
   // jogosCalc: jogos com realizado recalculado das NFs + logística/seg. espacial derivados
   const jogosCalc = useMemo(() => jogos.map(j => {
     const base = realizadoNotasPorJogo[j.id] || {};
@@ -244,9 +251,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
           outros_log: (base.outros_log || 0) + lg.outros_log,
         } : {}),
         ...(se ? { seg_espacial: se } : {}),
+        infra: infraRealizadoPorJogo[j.id] || 0,
       },
     };
-  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
 
   // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
   const servicosCalc = useMemo(() => servicos.map(sec => ({
@@ -726,7 +734,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} T={T} role={role}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T} role={role}/>}
-        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} T={T}/>}
+        {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}

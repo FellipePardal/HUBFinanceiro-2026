@@ -392,7 +392,7 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
 }
 
 // ── Componente Principal ──
-export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, setJogos, fornecedores, T, useOrcadoLivemode = false, servicosLm = SERVICOS_LM }) {
+export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, fornecedores, T, useOrcadoLivemode = false, servicosLm = SERVICOS_LM }) {
   const [tab, setTab] = useState("notas");
   const [showModal, setShowModal] = useState(false);
   const [showModalLiveU, setShowModalLiveU] = useState(false);
@@ -480,16 +480,6 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
     }, 0),
   }));
 
-  // ── Sync infra nos jogos (Livemode + liveU) ──
-  const syncInfra = () => {
-    setJogos(js => js.map(j => {
-      if (j.mandante === "A definir") return j;
-      const infraReal = (realizadoPorJogo[j.id] || 0) + (realizadoLiveUPorJogo[j.id] || 0);
-      return {...j, realizado: {...(j.realizado||{}), infra: Math.round(infraReal)}};
-    }));
-    alert("Infra + Distr. atualizado nos jogos com base nas NFs Livemode + liveU!");
-  };
-
   // Jogos com NF (livemode ou liveU)
   const jogosComNF = new Set([
     ...nfs.flatMap(n => n.jogosIds || []),
@@ -550,7 +540,6 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
         <div style={{display:"flex",gap:8}}>
           <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowModal(true)}>Nova NF</Button>
           <Button T={T} variant="secondary" size="md" icon={Plus} onClick={()=>setShowModalLiveU(true)} style={{background:amber+"22",color:amber,border:`1px solid ${amber}44`}}>Nova NF liveU</Button>
-          <Button T={T} variant="secondary" size="md" icon={CheckCircle2} onClick={syncInfra}>Sincronizar Jogos</Button>
         </div>
       </div>
 

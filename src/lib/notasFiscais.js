@@ -72,6 +72,24 @@ export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false }
   return map;
 }
 
+// Realizado de "Infra + Distr." por jogo, calculado ao vivo a partir das NFs
+// Livemode/liveU -- antes só era gravado em jogo.realizado.infra quando alguém
+// clicava em "Sincronizar Jogos" na aba Serviços Livemode, então o dashboard
+// ficava desatualizado sempre que uma NF Livemode/liveU era criada, editada ou
+// apagada sem re-sincronizar manualmente.
+export function buildInfraRealizadoPorJogo(notasLivemode = [], notasLiveU = []) {
+  const map = {};
+  const add = n => {
+    const ids = n.jogosIds || [];
+    if (ids.length === 0) return;
+    const valorPorJ = n.valorPorJogo || (n.valor / ids.length);
+    ids.forEach(id => { map[id] = (map[id] || 0) + valorPorJ; });
+  };
+  (notasLivemode || []).forEach(add);
+  (notasLiveU || []).forEach(add);
+  return map;
+}
+
 export function notaFiscalKey(nota) {
   const numero = norm(nota?.numeroNF);
   if (numero) {

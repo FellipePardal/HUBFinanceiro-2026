@@ -2,12 +2,15 @@ import { useState, useMemo, useRef, Fragment } from "react";
 import { KPI, Pill } from "../shared";
 import { iSty, btnStyle } from "../../constants";
 import { Card, Button, tableStyles } from "../ui";
-import { Plus, Trash2, Paperclip, Eye, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Paperclip, Eye, ChevronDown, ChevronRight, FileText, Link2, Unlink } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, CartesianGrid,
 } from "recharts";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
+import { pushHistorico } from "../../lib/historico";
+import { marcarLogisticaReembolsada } from "../../lib/notasFiscais";
+import { ReembolsoLogisticaModal } from "../modals/ReembolsoLogisticaModal";
 
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 
@@ -36,16 +39,31 @@ function abreviar(nome) {
 }
 
 // ─── Componente Principal ──────────────────────────────────────────────────
-// Modelo de dado: { id, jogoId, prestador, valores:{transporte_locado,uber,hospedagem,outros}, status, obs, hasFile }
-export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, eventosLog, setEventosLog, T }) {
+// Modelo de dado: { id, jogoId, prestador, valores:{transporte_locado,uber,hospedagem,outros}, status, obs, hasFile, reembolso? }
+export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, eventosLog, setEventosLog, setNotas, historicoKey = 'nf_historico', T }) {
   const fornecedoresList = Array.isArray(fornecedores) ? fornecedores : [];
   const eventos = Array.isArray(eventosLog) ? eventosLog : [];
   const [tab, setTab] = useState("grade");
   const [jogoSel, setJogoSel] = useState(null);   // pode ser { tipo:"jogo", id } ou { tipo:"evento", id }
   const [uploadingId, setUploadingId] = useState(null);
   const [ajusteAberto, setAjusteAberto] = useState(new Set()); // chaves "id|catKey" abertas
+  const [showReembolso, setShowReembolso] = useState(false);
   const fileRefs = useRef({});
   const painelRef = useRef(null);
+
+  // Registra a NF de reembolso direto daqui: aparece em Notas Fiscais igual a
+  // qualquer outra NF e já marca os lançamentos dos jogos cobertos como
+  // reembolsados, com a referência da NF -- fecha a consolidação num só passo.
+  const registrarReembolso = nota => {
+    setNotas(ns => [...(Array.isArray(ns)?ns:[]), nota]);
+    setLogistica(ls => marcarLogisticaReembolsada(ls, nota));
+    pushHistorico({ ...nota, decisao: "registrada", decidoEm: new Date().toISOString() }, historicoKey);
+    setShowReembolso(false);
+  };
+  const desvincularReembolso = jogoId => {
+    if (!window.confirm("Desvincular o reembolso deste jogo? Ele volta a ficar pendente.")) return;
+    setLogistica(ls => (ls||[]).map(l => l.jogoId === jogoId ? { ...l, status: "pendente", reembolso: null } : l));
+  };
   const ajusteKey = (id, catKey) => `${id}|${catKey}`;
   const toggleAjuste = (id, catKey) => setAjusteAberto(p => { const k = ajusteKey(id,catKey); const n = new Set(p); n.has(k)?n.delete(k):n.add(k); return n; });
 
@@ -65,6 +83,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
   const lancsPorJogo = jogoId => lancamentos.filter(l => l.jogoId === jogoId);
   const lancsPorEvento = evId => lancamentos.filter(l => l.eventoId === evId);
   const statusInfo = k => STATUS_REEMBOLSO.find(s => s.key === k) || STATUS_REEMBOLSO[0];
+  const reembolsoDoJogo = jogoId => lancsPorJogo(jogoId).find(l => l.reembolso)?.reembolso || null;
 
   // Totais gerais
   const totalGasto = lancamentos.reduce((s,l) => s + valorTotal(l), 0);
@@ -227,19 +246,25 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
       </div>
 
       {/* Sub-tabs */}
-      <div style={{display:"flex",gap:4,marginBottom:16}}>
-        {TABS.map(t => (
-          <button key={t.value} onClick={()=>setTab(t.value)} style={{
-            padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
-            background:tab===t.value?teal:"transparent",color:tab===t.value?"#fff":T.textMd,
-          }}>{t.label}</button>
-        ))}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:4}}>
+          {TABS.map(t => (
+            <button key={t.value} onClick={()=>setTab(t.value)} style={{
+              padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+              background:tab===t.value?teal:"transparent",color:tab===t.value?"#fff":T.textMd,
+            }}>{t.label}</button>
+          ))}
+        </div>
+        <Button T={T} variant="primary" size="md" icon={FileText} onClick={()=>setShowReembolso(true)}>Registrar NF de Reembolso</Button>
       </div>
+      <p style={{color:T.textSm,fontSize:11,margin:"-10px 0 16px"}}>
+        Os lançamentos aqui são um rascunho pra consolidar e pedir o reembolso — o Realizado do dashboard só conta quando a NF acima é registrada.
+      </p>
 
       {/* GRADE — Cards por jogo/evento */}
       {tab === "grade" && (() => {
         // Helper: renderiza painel de detalhe (funciona para jogo ou evento)
-        const renderPainelDetalhe = ({ titulo, subtitulo, lancs, onAddLinha, extraHeader }) => {
+        const renderPainelDetalhe = ({ titulo, subtitulo, lancs, onAddLinha, extraHeader, reembolso, onDesvincularReembolso }) => {
           const totalPainel = lancs.reduce((s,l) => s+valorTotal(l), 0);
           return (
             <div ref={painelRef}>
@@ -258,6 +283,21 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                     <Button T={T} variant="primary" size="md" icon={Plus} onClick={onAddLinha}>Prestador</Button>
                   </div>
                 </div>
+                {reembolso && (
+                  <div style={{padding:"10px 20px",display:"flex",alignItems:"center",gap:10,background:"#22c55e0f",borderBottom:`1px solid ${T.border}`}}>
+                    <Link2 size={13} color="#22c55e"/>
+                    <span style={{fontSize:12,color:T.text}}>
+                      Consolidado na NF <b style={{color:"#22c55e"}}>{reembolso.codigo || reembolso.numeroNF}</b>
+                      {reembolso.valorJogo != null && <> · <b>{fmt(reembolso.valorJogo)}</b> deste jogo</>}
+                    </span>
+                    {onDesvincularReembolso && (
+                      <button onClick={onDesvincularReembolso} title="Desvincular"
+                        style={{marginLeft:"auto",background:"transparent",border:"none",cursor:"pointer",color:T.textSm,display:"flex",alignItems:"center",gap:4,fontSize:11}}>
+                        <Unlink size={12}/> Desvincular
+                      </button>
+                    )}
+                  </div>
+                )}
                 {lancs.length === 0 ? (
                   <div style={{padding:40,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhum prestador ainda. Clique em "Prestador" para adicionar.</div>
                 ) : (
@@ -463,6 +503,7 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                       const lancs = lancsPorJogo(j.id);
                       const totalJogo = lancs.reduce((s,l) => s+valorTotal(l), 0);
                       const selecionado = isJogoSel(j.id);
+                      const reemb = reembolsoDoJogo(j.id);
                       return (
                         <div key={j.id} onClick={()=>{
                             setJogoSel(selecionado?null:{tipo:"jogo", id:j.id});
@@ -478,6 +519,11 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                             <span style={{fontSize:10,color:T.textSm}}>{lancs.length} prestador{lancs.length!==1?"es":""}</span>
                             <span style={{fontSize:13,fontWeight:800,color:totalJogo>0?purple:T.textSm}}>{totalJogo>0?fmt(totalJogo):"—"}</span>
                           </div>
+                          {reemb && (
+                            <div style={{marginTop:6}}>
+                              <Pill label={`NF ${reemb.codigo || reemb.numeroNF || ""}`} color="#22c55e"/>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -487,6 +533,8 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                     subtitulo: `Rodada ${jogoSelNestaRodada.rodada}`,
                     lancs: lancsPorJogo(jogoSelNestaRodada.id),
                     onAddLinha: () => addLinhaJogo(jogoSelNestaRodada.id),
+                    reembolso: reembolsoDoJogo(jogoSelNestaRodada.id),
+                    onDesvincularReembolso: () => desvincularReembolso(jogoSelNestaRodada.id),
                   })}
                 </div>
               );
@@ -531,6 +579,8 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
           </Card>
         </div>
       )}
+
+      {showReembolso && <ReembolsoLogisticaModal jogos={jogos} fornecedores={fornecedoresList} onSave={registrarReembolso} onClose={()=>setShowReembolso(false)} T={T}/>}
     </div>
   );
 }

@@ -90,6 +90,25 @@ export function buildInfraRealizadoPorJogo(notasLivemode = [], notasLiveU = []) 
   return map;
 }
 
+// Fecha a ponta de rastreabilidade entre o rascunho interno (lançamentos da aba
+// Logística) e o comprovante real (a NF de reembolso que a Livemode emite): marca
+// como "reembolsado" todo lançamento de um jogo coberto pela NF, guardando a
+// referência (id/código/valor) pra saber depois qual nota consolidou qual lançamento.
+// Se um jogo já tinha reembolso vinculado, o mais recente prevalece.
+export function marcarLogisticaReembolsada(logistica, nota) {
+  const jogoIds = new Set(nota?.jogoIds || []);
+  if (jogoIds.size === 0) return logistica;
+  return (logistica || []).map(l => {
+    if (!jogoIds.has(l.jogoId)) return l;
+    const valorJogo = nota.servicosDetalhe?.[`${l.jogoId}_reembolso_log`] ?? null;
+    return {
+      ...l,
+      status: "reembolsado",
+      reembolso: { notaId: nota.id, codigo: nota.codigo, numeroNF: nota.numeroNF, valorJogo, dataEmissao: nota.dataEmissao },
+    };
+  });
+}
+
 export function notaFiscalKey(nota) {
   const numero = norm(nota?.numeroNF);
   if (numero) {

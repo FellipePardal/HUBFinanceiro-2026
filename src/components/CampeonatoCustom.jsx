@@ -146,22 +146,6 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     return next;
   });
 
-  const logRealizadoPorJogo = useMemo(() => {
-    const map = {};
-    (Array.isArray(logistica) ? logistica : []).filter(l => l && l.jogoId).forEach(l => {
-      const v = l.valores || {};
-      const aj = l.ajustes || {};
-      const num = x => parseFloat(x) || 0;
-      const entry = map[l.jogoId] || { transporte:0, uber:0, hospedagem:0, outros_log:0 };
-      entry.transporte += num(v.transporte_locado) + num(v.passagem) + num(aj.passagem?.valor);
-      entry.uber       += num(v.uber);
-      entry.hospedagem += num(v.hospedagem) + num(v.clara) + num(v.espresso) + num(aj.hospedagem?.valor);
-      entry.outros_log += num(v.outros);
-      map[l.jogoId] = entry;
-    });
-    return map;
-  }, [logistica]);
-
   const rateioSegEspacialPorJogo = useMemo(() => {
     const parseMes = (dataStr) => {
       if (!dataStr || /^[aà] definir$/i.test(dataStr.trim())) return null;
@@ -201,22 +185,21 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     [notasLivemode]
   );
 
+  // Logística (transporte/uber/hospedagem/outros_log) vem só da NF de reembolso que a
+  // Livemode emite (via buildRealizadoPorJogo) -- os lançamentos da aba Logística são só
+  // um rascunho interno pra consolidar e pedir esse reembolso, não contam como realizado.
   const jogosCalc = useMemo(() => jogos.map(j => {
     const base = realizadoNotasPorJogo[j.id] || {};
-    const lg = logRealizadoPorJogo[j.id];
     const se = rateioSegEspacialPorJogo[j.id];
     return {
       ...j,
       realizado: {
         ...base,
-        // outros_log tambem pode vir de NF (ex: Reembolso Log. Livemode) -- soma em vez
-        // de substituir, senao o lancamento de Logistica apaga o valor da NF.
-        ...(lg ? { transporte: lg.transporte, uber: lg.uber, hospedagem: lg.hospedagem, outros_log: (base.outros_log || 0) + lg.outros_log } : {}),
         ...(se ? { seg_espacial: se } : {}),
         infra: infraRealizadoPorJogo[j.id] || 0,
       },
     };
-  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
 
   const servicosCalc = useMemo(() => servicos.map(sec => ({
     ...sec,

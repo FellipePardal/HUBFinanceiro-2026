@@ -11,19 +11,20 @@ const norm = value => String(value || "")
 const num = value => Number(value) || 0;
 
 // Aliases: subKeys virtuais (usados só na entrada/UI da NF) → subKey financeira real de CATS.
-// SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra".
-export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra' };
+// SNG Host alimenta o bucket "SNG"; SNG Premiere alimenta "SNG Extra". reembolso_log (NF
+// "Reembolso Log. Livemode") alimenta "Outros Logística": é a NF consolidada que a Livemode
+// emite cobrindo o custo real de logística de um lote de jogos -- a fonte de verdade do
+// realizado de Logística é essa NF, não os lançamentos internos da aba Logística (que só
+// servem pra consolidar e pedir o reembolso, e não têm quebra por Transporte/Uber/Hospedagem).
+export const ALIAS_SUBKEY = { sng_host: 'sng', sng_premiere: 'sng_extra', reembolso_log: 'outros_log' };
 
-// reembolso_log (NF "Reembolso Log. Livemode") NÃO deve contar em nenhum bucket do
-// orçamento: o valor lançado nessa NF é o consolidado de custos que já foram lançados
-// (e já contam) na aba Logística ao longo do período -- é só o pedido/comprovante
-// formal de reembolso, não um custo adicional. Somar contaria o mesmo dinheiro 2x.
-export const SUBS_IGNORAR_REALIZADO_NF = new Set(["reembolso_log"]);
+// subKeys ignorados por completo em qualquer bucket do realizado.
+export const SUBS_IGNORAR_REALIZADO_NF = new Set();
 
 // subKeys que NÃO são recalculados a partir das Notas Fiscais aqui -- têm fonte própria:
-// transporte/uber/hospedagem (lançamentos da aba Logística), seg_espacial (rateio mensal
-// por jogo), infra (sincronização manual de Serviços Livemode), seg_extra (edição manual).
-export const SUBS_EXCLUIR_REALIZADO = new Set(["transporte", "uber", "hospedagem", "seg_espacial", "infra", "seg_extra"]);
+// seg_espacial (rateio mensal por jogo), infra (NFs Livemode/liveU, calculado à parte),
+// seg_extra (edição manual).
+export const SUBS_EXCLUIR_REALIZADO = new Set(["seg_espacial", "infra", "seg_extra"]);
 
 // Recalcula o realizado de cada jogo a partir das Notas Fiscais -- puro, sem persistir.
 // Antes isso só rodava (e só era salvo) quando a aba "Notas Fiscais" estava montada, então
@@ -37,9 +38,8 @@ export function buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF = false }
     CATS.forEach(cat => cat.subs.forEach(sub => {
       if (!SUBS_EXCLUIR_REALIZADO.has(sub.key)) realizado[sub.key] = 0;
     }));
-    // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos
-    // antes do alias sng_host->sng / sng_premiere->sng_extra, ou de quando reembolso_log
-    // ainda era gravado direto, antes de virar um subKey ignorado)
+    // Remove subKeys virtuais que não fazem parte do CATS (vinham de runs antigos,
+    // antes de existirem os aliases sng_host->sng / sng_premiere->sng_extra / reembolso_log->outros_log)
     delete realizado.sng_host;
     delete realizado.sng_premiere;
     delete realizado.reembolso_log;

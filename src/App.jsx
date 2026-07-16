@@ -171,27 +171,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     return next;
   });
 
-  // Realizado de logística por jogo (fonte única: lançamentos da aba Logística)
-  // Mapeamento: transporte_locado + passagem (+ ajuste passagem) -> transporte
-  //             uber -> uber
-  //             hospedagem + clara + espresso (+ ajuste hospedagem) -> hospedagem
-  //             outros -> outros_log
-  const logRealizadoPorJogo = useMemo(() => {
-    const map = {};
-    (Array.isArray(logistica) ? logistica : []).filter(l => l && l.jogoId).forEach(l => {
-      const v = l.valores || {};
-      const aj = l.ajustes || {};
-      const num = x => parseFloat(x) || 0;
-      const entry = map[l.jogoId] || { transporte:0, uber:0, hospedagem:0, outros_log:0 };
-      entry.transporte += num(v.transporte_locado) + num(v.passagem) + num(aj.passagem?.valor);
-      entry.uber       += num(v.uber);
-      entry.hospedagem += num(v.hospedagem) + num(v.clara) + num(v.espresso) + num(aj.hospedagem?.valor);
-      entry.outros_log += num(v.outros);
-      map[l.jogoId] = entry;
-    });
-    return map;
-  }, [logistica]);
-
   // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
   const rateioSegEspacialPorJogo = useMemo(() => {
     const parseMes = (dataStr) => {
@@ -232,29 +211,22 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     [notasLivemode, notasLiveU]
   );
 
-  // jogosCalc: jogos com realizado recalculado das NFs + logística/seg. espacial derivados
+  // jogosCalc: jogos com realizado recalculado das NFs + seg. espacial derivado.
+  // Logística (transporte/uber/hospedagem/outros_log) vem só da NF de reembolso que a
+  // Livemode emite (via buildRealizadoPorJogo) -- os lançamentos da aba Logística são só
+  // um rascunho interno pra consolidar e pedir esse reembolso, não contam como realizado.
   const jogosCalc = useMemo(() => jogos.map(j => {
     const base = realizadoNotasPorJogo[j.id] || {};
-    const lg = logRealizadoPorJogo[j.id];
     const se = rateioSegEspacialPorJogo[j.id];
     return {
       ...j,
       realizado: {
         ...base,
-        ...(lg ? {
-          transporte: lg.transporte,
-          uber:       lg.uber,
-          hospedagem: lg.hospedagem,
-          // outros_log também pode vir de NF (ex: Reembolso Log. Livemode, aliased pro
-          // mesmo subKey) -- soma em vez de substituir, senão o lançamento de Logística
-          // apaga silenciosamente o valor da NF quando os dois existem no mesmo jogo.
-          outros_log: (base.outros_log || 0) + lg.outros_log,
-        } : {}),
         ...(se ? { seg_espacial: se } : {}),
         infra: infraRealizadoPorJogo[j.id] || 0,
       },
     };
-  }), [jogos, realizadoNotasPorJogo, logRealizadoPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
+  }), [jogos, realizadoNotasPorJogo, rateioSegEspacialPorJogo, infraRealizadoPorJogo]);
 
   // Servicos com realizado derivado das NFs mensais (fonte única da verdade: as NFs)
   const servicosCalc = useMemo(() => servicos.map(sec => ({

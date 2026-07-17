@@ -608,7 +608,26 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
 
   useEffect(() => { loadAll(); }, []);
 
-  const salvarHistorico = (next) => { setHistorico(next); setSupabaseState(historicoKey, next); };
+  // Recebidas não tem realtime (só carrega ao montar + botão "Atualizar"), então o
+  // array em memória pode estar desatualizado se uma NF nova chegou pelo formulário
+  // ou outra pessoa mexeu na fila enquanto esta aba estava aberta. Escrever a partir
+  // desse array desatualizado sobrescreveria a versão mais nova no Supabase, fazendo
+  // submissões "sumirem" ou parecerem duplicadas. Por isso relemos o estado atual do
+  // Supabase logo antes de aplicar qualquer mudança, em vez de confiar só na cópia local.
+  const persistSubmissions = async (updater) => {
+    const atual = (await getState(submissionsKey)) || [];
+    const next = updater(atual);
+    setSubmissions(next);
+    await setSupabaseState(submissionsKey, next);
+    return next;
+  };
+  const persistHistorico = async (updater) => {
+    const atual = (await getState(historicoKey)) || [];
+    const next = updater(atual);
+    setHistorico(next);
+    await setSupabaseState(historicoKey, next);
+    return next;
+  };
 
   const startEdit = (sub) => {
     setEditingId(sub.id);
@@ -632,7 +651,7 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     setEditServicos(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
   };
 
-  const aprovar = (sub) => {
+  const aprovar = async (sub) => {
     let valorNF, nota;
     if (sub.tipo === "mensal") {
       valorNF = editingId === sub.id ? (editServicos._mensal || 0) : (sub.valorNF || 0);
@@ -686,33 +705,27 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
       };
       addNota(nota);
     }
-    salvarHistorico([...historico, {...sub, decisao:"aprovada", decidoEm: new Date().toISOString()}]);
-    const next = submissions.filter(s => s.id !== sub.id);
-    setSubmissions(next);
-    setSupabaseState(submissionsKey, next);
+    await persistHistorico(h => [...h, {...sub, decisao:"aprovada", decidoEm: new Date().toISOString()}]);
+    await persistSubmissions(subs => subs.filter(s => s.id !== sub.id));
     setEditingId(null);
   };
 
-  const rejeitar = (id) => {
+  const rejeitar = async (id) => {
     if (!window.confirm("Rejeitar esta submissão?")) return;
     const sub = submissions.find(s => s.id === id);
-    salvarHistorico([...historico, {...sub, decisao:"rejeitada", decidoEm: new Date().toISOString()}]);
-    const next = submissions.filter(s => s.id !== id);
-    setSubmissions(next);
-    setSupabaseState(submissionsKey, next);
+    await persistHistorico(h => [...h, {...sub, decisao:"rejeitada", decidoEm: new Date().toISOString()}]);
+    await persistSubmissions(subs => subs.filter(s => s.id !== id));
   };
 
-  const recuperar = (item) => {
-    const next = [...submissions, {...item, decisao:undefined, decidoEm:undefined}];
-    setSubmissions(next);
-    setSupabaseState(submissionsKey, next);
-    salvarHistorico(historico.filter(h => h.id !== item.id));
+  const recuperar = async (item) => {
+    await persistSubmissions(subs => [...subs, {...item, decisao:undefined, decidoEm:undefined}]);
+    await persistHistorico(h => h.filter(x => x.id !== item.id));
   };
 
-  const excluirDefinitivo = (id) => {
+  const excluirDefinitivo = async (id) => {
     if (!window.confirm("Excluir definitivamente do histórico?")) return;
     deleteNFFile(id);
-    salvarHistorico(historico.filter(h => h.id !== id));
+    await persistHistorico(h => h.filter(x => x.id !== id));
   };
 
   if (loading) return <p style={{color:T.textSm,padding:20}}>Carregando submissões...</p>;

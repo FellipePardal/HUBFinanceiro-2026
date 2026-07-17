@@ -1018,11 +1018,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const envioMap = useMemo(() => {
     const map = {};
     (envios || []).forEach(e => {
-      const info = { numero: e.numero, dataPagamento: e.dataPagamento };
+      const info = { numero: e.numero, nome: e.nome, dataPagamento: e.dataPagamento };
       (e.notasIds || []).forEach(id => { map[id] = info; });
     });
     return map;
   }, [envios]);
+  const envioLabel = info => info.nome || `Envio ${info.numero}`;
 
   // Stats
   const allServicos = useMemo(() => {
@@ -1091,7 +1092,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     const qtd = idsParaApagar.length;
     const sufixo = qtd > 1 ? ` (${qtd} cópias duplicadas)` : "";
     const msg = temEnvio
-      ? `Excluir esta NF${sufixo}? Ela está no Envio ${enviosAfetados[0].numero} e também será removida de lá.`
+      ? `Excluir esta NF${sufixo}? Ela está no ${enviosAfetados[0].nome || `Envio ${enviosAfetados[0].numero}`} e também será removida de lá.`
       : `Excluir esta NF${sufixo}?`;
 
     if (window.confirm(msg)) {
@@ -1391,7 +1392,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                 <span style={{color:T.text,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                                   <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{nota.codigo}</code>
                                   <span style={{color:T.textMd}}>{nota.fornecedor}</span>
-                                  {envioMap[nota.id] && <Pill label={`Envio ${envioMap[nota.id].numero}`} color={purple}/>}
+                                  {envioMap[nota.id] && <Pill label={envioLabel(envioMap[nota.id])} color={purple}/>}
                                   {nota.hasFile
                                     ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(nota)}/>
                                     : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
@@ -1528,7 +1529,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     <td style={TS.td}>
                       <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                         <Pill label={n.tipo==="avulsa"?"Avulsa":"Prevista"} color={n.tipo==="avulsa"?T.warning:T.brand}/>
-                        {envioMap[n.id] && <Pill label={`Envio ${envioMap[n.id].numero}`} color={purple}/>}
+                        {envioMap[n.id] && <Pill label={envioLabel(envioMap[n.id])} color={purple}/>}
                       </div>
                     </td>
                     <td style={TS.td}>

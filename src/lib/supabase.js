@@ -6,7 +6,16 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export async function getState(key) {
-  const { data } = await supabase.from('app_state').select('value').eq('key', key).single();
+  const { data, error } = await supabase.from('app_state').select('value').eq('key', key).single();
+  if (error) {
+    // PGRST116 = nenhuma linha encontrada: a key realmente não existe ainda, pode
+    // seedar com defaults. Qualquer outro erro (rede, timeout, etc.) precisa
+    // propagar — se engolirmos e devolvermos null aqui, quem chama confunde
+    // "erro transitório" com "linha não existe" e sobrescreve dados reais com
+    // defaults (incidente 2026-05-01, que se repetiu por essa mesma causa).
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
   return data?.value ?? null;
 }
 

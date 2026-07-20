@@ -47,45 +47,54 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [eventosLog, setEventosLogRaw]   = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]            = useState(true);
+  const [loadError, setLoadError]        = useState(null);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
-      // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
-      // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
-      // dados existentes — assim um getState com falha transitória/null não zera
-      // notas, notas_mensais, fornecedores etc. (incidente 2026-05-01).
-      const seedIfMissing = (val, key, init, setRaw) => {
-        if (val != null) { setRaw(val); return; }
-        setRaw(init);
-        setSupabaseState(key, init);
-      };
-      seedIfMissing(j, 'jogos', ALL_JOGOS, setJogosRaw);
-      if (s != null) {
-        // Migração: renomear "Infraestrutura e Distribuição de Sinais" -> "Serviços Complementares"
-        const OLD = "Infraestrutura e Distribuição de Sinais";
-        const NEW = "Serviços Complementares";
-        const precisaMigrar = Array.isArray(s) && s.some(sec => sec.secao === OLD);
-        if (precisaMigrar) {
-          const migrado = s.map(sec => sec.secao === OLD ? {...sec, secao: NEW} : sec);
-          setServicosRaw(migrado);
-          setSupabaseState('servicos', migrado);
-        } else {
-          setServicosRaw(s);
-        }
-      } else { setServicosRaw(SERVICOS_INIT); setSupabaseState('servicos', SERVICOS_INIT); }
-      seedIfMissing(n,   'notas',             [],                  setNotasRaw);
-      seedIfMissing(f,   'fornecedores',      FORNECEDORES_INIT,   setFornecedoresRaw);
-      seedIfMissing(nm,  'notas_mensais',     [],                  setNotasMensaisRaw);
-      seedIfMissing(ev,  'envios',            [],                  setEnviosRaw);
-      seedIfMissing(lm,  'livemode',          [],                  setLivemodeRaw);
-      seedIfMissing(nlm, 'notas_livemode',    [],                  setNotasLivemodeRaw);
-      seedIfMissing(nlu, 'notas_liveu',       [],                  setNotasLiveURaw);
-      seedIfMissing(co,  'cotacoes',          COTACAO_INIT,        setCotacoesRaw);
-      seedIfMissing(fj,  'fornecedores_jogo', {},                  setFornecedoresJogoRaw);
-      seedIfMissing(lg,  'logistica',         [],                  setLogisticaRaw);
-      seedIfMissing(elg, 'eventos_log',       [],                  setEventosLogRaw);
-      setLoading(false);
+      try {
+        const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
+        // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
+        // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
+        // dados existentes — assim um getState com falha transitória/null não zera
+        // notas, notas_mensais, fornecedores etc. (incidente 2026-05-01). Se getState
+        // falhar de verdade (erro de rede etc.) ele agora lança, cai no catch abaixo
+        // e NADA aqui é seedado por cima de dados reais.
+        const seedIfMissing = (val, key, init, setRaw) => {
+          if (val != null) { setRaw(val); return; }
+          setRaw(init);
+          setSupabaseState(key, init);
+        };
+        seedIfMissing(j, 'jogos', ALL_JOGOS, setJogosRaw);
+        if (s != null) {
+          // Migração: renomear "Infraestrutura e Distribuição de Sinais" -> "Serviços Complementares"
+          const OLD = "Infraestrutura e Distribuição de Sinais";
+          const NEW = "Serviços Complementares";
+          const precisaMigrar = Array.isArray(s) && s.some(sec => sec.secao === OLD);
+          if (precisaMigrar) {
+            const migrado = s.map(sec => sec.secao === OLD ? {...sec, secao: NEW} : sec);
+            setServicosRaw(migrado);
+            setSupabaseState('servicos', migrado);
+          } else {
+            setServicosRaw(s);
+          }
+        } else { setServicosRaw(SERVICOS_INIT); setSupabaseState('servicos', SERVICOS_INIT); }
+        seedIfMissing(n,   'notas',             [],                  setNotasRaw);
+        seedIfMissing(f,   'fornecedores',      FORNECEDORES_INIT,   setFornecedoresRaw);
+        seedIfMissing(nm,  'notas_mensais',     [],                  setNotasMensaisRaw);
+        seedIfMissing(ev,  'envios',            [],                  setEnviosRaw);
+        seedIfMissing(lm,  'livemode',          [],                  setLivemodeRaw);
+        seedIfMissing(nlm, 'notas_livemode',    [],                  setNotasLivemodeRaw);
+        seedIfMissing(nlu, 'notas_liveu',       [],                  setNotasLiveURaw);
+        seedIfMissing(co,  'cotacoes',          COTACAO_INIT,        setCotacoesRaw);
+        seedIfMissing(fj,  'fornecedores_jogo', {},                  setFornecedoresJogoRaw);
+        seedIfMissing(lg,  'logistica',         [],                  setLogisticaRaw);
+        seedIfMissing(elg, 'eventos_log',       [],                  setEventosLogRaw);
+        setLoading(false);
+        setLoadError(null);
+      } catch (err) {
+        console.error('Falha ao carregar dados do Supabase — nada foi sobrescrito:', err);
+        setLoadError(err);
+      }
     }
     load();
 
@@ -404,6 +413,12 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     else if (s === "relatorio") setTab(role === 'visualizador' ? "envio" : "apresentações");
   };
 
+  if (loadError) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
+      <p style={{color:T.textMd,fontSize:16}}>Falha ao carregar os dados. Nada foi alterado — clique para tentar de novo.</p>
+      <button onClick={() => window.location.reload()} style={{...btnStyle,background:"#65B32E"}}>Tentar novamente</button>
+    </div>
+  );
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>

@@ -66,35 +66,43 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const [eventosLog, setEventosLogRaw]             = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]                      = useState(true);
+  const [loadError, setLoadError]                  = useState(null);
 
   useEffect(() => {
     async function load() {
-      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([
-        getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
-        getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
-        getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
-      ]);
-      // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
-      // Nunca sobrescreve dados — getState com falha transitória não pode zerar
-      // notas/fornecedores etc. (incidente 2026-05-01).
-      const seedIfMissing = (val, key, init, setRaw) => {
-        if (val != null) { setRaw(val); return; }
-        setRaw(init);
-        setSupabaseState(key, init);
-      };
-      seedIfMissing(j,   K.jogos,             initialJogos,        setJogosRaw);
-      seedIfMissing(s,   K.servicos,          initialServicos,     setServicosRaw);
-      seedIfMissing(n,   K.notas,             [],                  setNotasRaw);
-      seedIfMissing(f,   K.fornecedores,      FORNECEDORES_INIT,   setFornecedoresRaw);
-      seedIfMissing(nm,  K.notas_mensais,     [],                  setNotasMensaisRaw);
-      seedIfMissing(ev,  K.envios,            [],                  setEnviosRaw);
-      seedIfMissing(lm,  K.livemode,          [],                  setLivemodeRaw);
-      seedIfMissing(nlm, K.notas_livemode,    [],                  setNotasLivemodeRaw);
-      seedIfMissing(co,  K.cotacoes,          COTACAO_INIT,        setCotacoesRaw);
-      seedIfMissing(fj,  K.fornecedores_jogo, {},                  setFornecedoresJogoRaw);
-      seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
-      seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
-      setLoading(false);
+      try {
+        const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([
+          getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
+          getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
+          getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
+        ]);
+        // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
+        // Nunca sobrescreve dados — getState com falha transitória não pode zerar
+        // notas/fornecedores etc. (incidente 2026-05-01). Se getState falhar de
+        // verdade, ele lança e cai no catch abaixo — nada é seedado por cima.
+        const seedIfMissing = (val, key, init, setRaw) => {
+          if (val != null) { setRaw(val); return; }
+          setRaw(init);
+          setSupabaseState(key, init);
+        };
+        seedIfMissing(j,   K.jogos,             initialJogos,        setJogosRaw);
+        seedIfMissing(s,   K.servicos,          initialServicos,     setServicosRaw);
+        seedIfMissing(n,   K.notas,             [],                  setNotasRaw);
+        seedIfMissing(f,   K.fornecedores,      FORNECEDORES_INIT,   setFornecedoresRaw);
+        seedIfMissing(nm,  K.notas_mensais,     [],                  setNotasMensaisRaw);
+        seedIfMissing(ev,  K.envios,            [],                  setEnviosRaw);
+        seedIfMissing(lm,  K.livemode,          [],                  setLivemodeRaw);
+        seedIfMissing(nlm, K.notas_livemode,    [],                  setNotasLivemodeRaw);
+        seedIfMissing(co,  K.cotacoes,          COTACAO_INIT,        setCotacoesRaw);
+        seedIfMissing(fj,  K.fornecedores_jogo, {},                  setFornecedoresJogoRaw);
+        seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
+        seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
+        setLoading(false);
+        setLoadError(null);
+      } catch (err) {
+        console.error('Falha ao carregar dados do Supabase (campeonato custom) — nada foi sobrescrito:', err);
+        setLoadError(err);
+      }
     }
     load();
 
@@ -372,6 +380,12 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     else if (s === "relatorio") setTab("apresentações");
   };
 
+  if (loadError) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
+      <p style={{color:T.textMd,fontSize:16}}>Falha ao carregar os dados. Nada foi alterado — clique para tentar de novo.</p>
+      <button onClick={() => window.location.reload()} style={{color:"#fff",border:"none",borderRadius:7,padding:"8px 14px",cursor:"pointer",fontWeight:500,fontSize:12,background:PRIMARY||"#65B32E"}}>Tentar novamente</button>
+    </div>
+  );
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>

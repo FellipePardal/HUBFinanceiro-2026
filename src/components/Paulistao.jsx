@@ -67,9 +67,11 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const [eventosLog, setEventosLogRaw]             = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]                      = useState(true);
+  const [loadError, setLoadError]                  = useState(null);
 
   useEffect(() => {
     async function load() {
+      try {
       const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([
         getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
@@ -77,7 +79,8 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
       ]);
       // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
       // Nunca sobrescreve dados — getState com falha transitória não pode zerar
-      // notas/fornecedores etc. (incidente 2026-05-01).
+      // notas/fornecedores etc. (incidente 2026-05-01). Se getState falhar de
+      // verdade, ele lança e cai no catch abaixo — nada é seedado por cima.
       const seedIfMissing = (val, key, init, setRaw) => {
         if (val != null) { setRaw(val); return; }
         setRaw(init);
@@ -138,6 +141,11 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
       seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
       seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
       setLoading(false);
+      setLoadError(null);
+      } catch (err) {
+        console.error('Falha ao carregar dados do Supabase (Paulistão) — nada foi sobrescrito:', err);
+        setLoadError(err);
+      }
     }
     load();
 
@@ -417,6 +425,12 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
     else if (s === "relatorio") setTab(role === 'visualizador' ? "envio" : "apresentações");
   };
 
+  if (loadError) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
+      <p style={{color:T.textMd,fontSize:16}}>Falha ao carregar os dados. Nada foi alterado — clique para tentar de novo.</p>
+      <button onClick={() => window.location.reload()} style={{color:"#fff",border:"none",borderRadius:7,padding:"8px 14px",cursor:"pointer",fontWeight:500,fontSize:12,background:"#65B32E"}}>Tentar novamente</button>
+    </div>
+  );
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>

@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { RADIUS, FONT } from "../constants";
-import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
 import { CIDADES_INIT, CAMPEONATOS_FORN_INIT, ITENS_MASTER_INIT } from "../data/catalogos";
@@ -28,36 +28,43 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [itensMaster,  setItensMasterRaw]  = useState(ITENS_MASTER_INIT);
   const [tabelas,      setTabelasRaw]      = useState([]);
   const [loading,      setLoading]         = useState(true);
+  const [loadError,    setLoadError]       = useState(null);
   const [ocultar,      setOcultar]         = useState(false);
   const [filtroCamp,   setFiltroCamp]      = useState(filtroInicial || FILTRO_TODOS);
 
   // Carga inicial + realtime
   useEffect(() => {
     async function load() {
-      const [f, c, j, ci, ca, im, tb, jf] = await Promise.all([
-        getState('fornecedores'),
-        getState('cotacoes'),
-        getState('jogos'),
-        getState('forn_cidades'),
-        getState('forn_campeonatos'),
-        getState('forn_itens_master'),
-        getState('forn_tabelas_preco'),
-        getState('forn_jogos'),
-      ]);
-      if (f)  setFornecedoresRaw(f);
-      if (c)  setCotacoesRaw(c);
-      if (j)  setJogosRaw(j);
-      if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
-      if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
-      const OLD_IDS = new Set(["eq-b1","eq-b2","eq-b3","coord-prod","dir-tv"]);
-      const REQUIRED_IDS = ["supervisor2"];
-      const needsMigration = !im || im.some(x => OLD_IDS.has(x.id)) || REQUIRED_IDS.some(id => !im.find(x => x.id === id));
-      const imFinal = needsMigration ? ITENS_MASTER_INIT : im;
-      if (needsMigration) setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
-      setItensMasterRaw(imFinal);
-      if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
-      if (jf) setJogosFornRaw(jf);   else setSupabaseState('forn_jogos', JOGOS_FORN_INIT);
-      setLoading(false);
+      try {
+        const [f, c, j, ci, ca, im, tb, jf] = await Promise.all([
+          getState('fornecedores'),
+          getState('cotacoes'),
+          getState('jogos'),
+          getState('forn_cidades'),
+          getState('forn_campeonatos'),
+          getState('forn_itens_master'),
+          getState('forn_tabelas_preco'),
+          getState('forn_jogos'),
+        ]);
+        if (f)  setFornecedoresRaw(f);
+        if (c)  setCotacoesRaw(c);
+        if (j)  setJogosRaw(j);
+        if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
+        if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
+        const OLD_IDS = new Set(["eq-b1","eq-b2","eq-b3","coord-prod","dir-tv"]);
+        const REQUIRED_IDS = ["supervisor2"];
+        const needsMigration = !im || im.some(x => OLD_IDS.has(x.id)) || REQUIRED_IDS.some(id => !im.find(x => x.id === id));
+        const imFinal = needsMigration ? ITENS_MASTER_INIT : im;
+        if (needsMigration) setSupabaseState('forn_itens_master', ITENS_MASTER_INIT);
+        setItensMasterRaw(imFinal);
+        if (tb) setTabelasRaw(tb);     else setSupabaseState('forn_tabelas_preco', []);
+        if (jf) setJogosFornRaw(jf);   else setSupabaseState('forn_jogos', JOGOS_FORN_INIT);
+        setLoading(false);
+        setLoadError(null);
+      } catch (err) {
+        console.error('Falha ao carregar dados do Hub de Fornecedores — nada foi sobrescrito:', err);
+        setLoadError(err);
+      }
     }
     load();
 
@@ -78,34 +85,18 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const setFornecedores = fn => setFornecedoresRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('fornecedores', next); return next;
-  });
-  const setCotacoes = fn => setCotacoesRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('cotacoes', next); return next;
-  });
-  const setCidades = fn => setCidadesRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('forn_cidades', next); return next;
-  });
-  const setCampeonatos = fn => setCampeonatosRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('forn_campeonatos', next); return next;
-  });
-  const setItensMaster = fn => setItensMasterRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('forn_itens_master', next); return next;
-  });
-  const setTabelas = fn => setTabelasRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('forn_tabelas_preco', next); return next;
-  });
-  const setJogosForn = fn => setJogosFornRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('forn_jogos', next); return next;
-  });
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — 'fornecedores'/'cotacoes' são
+  // compartilhados com Brasileirão/Paulistão, então uma edição feita aqui não
+  // pode se basear num `prev` local desatualizado em relação à outra aba.
+  const persistRefs = useRef({}).current;
+  const setFornecedores = createPersistedSetter('fornecedores',      setFornecedoresRaw, persistRefs);
+  const setCotacoes     = createPersistedSetter('cotacoes',          setCotacoesRaw,     persistRefs);
+  const setCidades      = createPersistedSetter('forn_cidades',      setCidadesRaw,      persistRefs);
+  const setCampeonatos  = createPersistedSetter('forn_campeonatos',  setCampeonatosRaw,  persistRefs);
+  const setItensMaster  = createPersistedSetter('forn_itens_master', setItensMasterRaw,  persistRefs);
+  const setTabelas      = createPersistedSetter('forn_tabelas_preco',setTabelasRaw,      persistRefs);
+  const setJogosForn    = createPersistedSetter('forn_jogos',        setJogosFornRaw,    persistRefs);
 
   // Métricas consolidadas (todas as cotações, independente do filtro)
   const metricasGlobais = useMemo(() => {
@@ -126,6 +117,12 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
     ? null
     : CAMPEONATOS_COTACAO.find(c => c.id === filtroCamp);
 
+  if (loadError) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
+      <p style={{color:T.textMd,fontSize:16}}>Falha ao carregar os dados. Nada foi alterado — clique para tentar de novo.</p>
+      <button onClick={() => window.location.reload()} style={{color:"#fff",border:"none",borderRadius:7,padding:"8px 14px",cursor:"pointer",fontWeight:500,fontSize:12,background:"#65B32E"}}>Tentar novamente</button>
+    </div>
+  );
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando Hub de Fornecedores...</p>

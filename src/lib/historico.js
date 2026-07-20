@@ -5,6 +5,10 @@ import { getState, setState as setSupabaseState } from "./supabase";
 // "NF de Reembolso" criada direto na aba Logística). Permite reconstruir o
 // array de notas se ele for zerado por bug ou ação manual.
 export async function pushHistorico(entry, historicoKey = 'nf_historico') {
-  const atual = (await getState(historicoKey)) || [];
-  await setSupabaseState(historicoKey, [...atual, entry]);
+  try {
+    const atual = (await getState(historicoKey)) || [];
+    await setSupabaseState(historicoKey, [...atual, entry]);
+  } catch (err) {
+    console.error(`Falha ao gravar em "${historicoKey}":`, err);
+  }
 }

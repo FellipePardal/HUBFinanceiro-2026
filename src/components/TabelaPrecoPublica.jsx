@@ -146,22 +146,26 @@ export default function TabelaPrecoPublica({ token }) {
   const persistir = async (statusNovo) => {
     if (!tabela) return;
     setSalvando(true);
-    const next = {
-      ...tabela,
-      status: statusNovo || tabela.status,
-      atualizadoEm: new Date().toISOString(),
-      ...(statusNovo === "enviada" ? { enviadaEm: new Date().toISOString() } : {}),
-    };
-    const novaLista = tabelas.map(t => t.id === next.id ? next : t);
-    await setSupabaseState("forn_tabelas_preco", novaLista);
-    setTabelas(novaLista);
-    setTabela(next);
-    setDirty(false);
+    try {
+      const next = {
+        ...tabela,
+        status: statusNovo || tabela.status,
+        atualizadoEm: new Date().toISOString(),
+        ...(statusNovo === "enviada" ? { enviadaEm: new Date().toISOString() } : {}),
+      };
+      const novaLista = tabelas.map(t => t.id === next.id ? next : t);
+      await setSupabaseState("forn_tabelas_preco", novaLista);
+      setTabelas(novaLista);
+      setTabela(next);
+      setDirty(false);
+      setMensagem(statusNovo === "enviada"
+        ? "Tabela enviada com sucesso! Você pode fechar esta página."
+        : "Progresso salvo.");
+      setTimeout(() => setMensagem(null), 4000);
+    } catch (err) {
+      setMensagem("Erro ao salvar, tente novamente: " + err.message);
+    }
     setSalvando(false);
-    setMensagem(statusNovo === "enviada"
-      ? "Tabela enviada com sucesso! Você pode fechar esta página."
-      : "Progresso salvo.");
-    setTimeout(() => setMensagem(null), 4000);
   };
 
   // ── Estados de erro/limite ───────────────────────────────────────────────

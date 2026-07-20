@@ -131,33 +131,37 @@ export default function FormularioPublico() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    const submissions = [];
-    for (const jogoId of jogosSel) {
-      const jogo = divulgados.find(j => j.id === jogoId);
-      if (!jogo) continue;
-      const subs = servicosSel[jogoId] || [];
-      if (subs.length === 0) continue;
-      const servicosValores = {};
-      let valorNF = 0;
-      subs.forEach(sk => { const v = valores[`${jogoId}_${sk}`] || 0; servicosValores[sk] = v; valorNF += v; });
-      const allServicos = extrairServicos(jogo);
-      const submissionId = Date.now() + jogoId;
-      let hasFile = false;
-      if (arquivo) {
-        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+    try {
+      const submissions = [];
+      for (const jogoId of jogosSel) {
+        const jogo = divulgados.find(j => j.id === jogoId);
+        if (!jogo) continue;
+        const subs = servicosSel[jogoId] || [];
+        if (subs.length === 0) continue;
+        const servicosValores = {};
+        let valorNF = 0;
+        subs.forEach(sk => { const v = valores[`${jogoId}_${sk}`] || 0; servicosValores[sk] = v; valorNF += v; });
+        const allServicos = extrairServicos(jogo);
+        const submissionId = Date.now() + jogoId;
+        let hasFile = false;
+        if (arquivo) {
+          try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+        }
+        submissions.push({
+          id: submissionId, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
+          jogoLabel: `${jogo.mandante} x ${jogo.visitante}`, mandante: jogo.mandante, visitante: jogo.visitante,
+          servicosKeys: subs.map(sk => `${jogo.id}_${sk}`),
+          servicosLabels: allServicos.filter(s => subs.includes(s.subKey)).map(s => s.subLabel),
+          servicosValores, status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
+        });
       }
-      submissions.push({
-        id: submissionId, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
-        jogoLabel: `${jogo.mandante} x ${jogo.visitante}`, mandante: jogo.mandante, visitante: jogo.visitante,
-        servicosKeys: subs.map(sk => `${jogo.id}_${sk}`),
-        servicosLabels: allServicos.filter(s => subs.includes(s.subKey)).map(s => s.subLabel),
-        servicosValores, status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
-      });
+      const current = (await getState('nf_submissions')) || [];
+      await setState('nf_submissions', [...current, ...submissions]);
+      setDone(true);
+    } catch (err) {
+      alert("Erro ao enviar a NF, tente novamente: " + err.message);
     }
-    const current = (await getState('nf_submissions')) || [];
-    await setState('nf_submissions', [...current, ...submissions]);
     setSubmitting(false);
-    setDone(true);
   };
 
   const reset = () => {

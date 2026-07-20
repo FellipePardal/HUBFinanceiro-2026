@@ -24,7 +24,7 @@ const TabLivemode      = lazy(() => import("./components/tabs/TabLivemode"));
 const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-import { getState, setState as setSupabaseState, supabase } from "./lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "./lib/supabase";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "./lib/notasFiscais";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
@@ -120,65 +120,23 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const setJogos = fn => setJogosRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('jogos', next); return next;
-  });
-  const setServicos = fn => setServicosRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('servicos', next); return next;
-  });
-  const setNotas = fn => setNotasRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('notas', next); return next;
-  });
-  const setEnvios = fn => setEnviosRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('envios', next); return next;
-  });
-  const setNotasMensais = fn => setNotasMensaisRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('notas_mensais', next); return next;
-  });
-  const setFornecedores = fn => setFornecedoresRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('fornecedores', next); return next;
-  });
-  const setLivemode = fn => setLivemodeRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('livemode', next); return next;
-  });
-  const setNotasLivemode = fn => setNotasLivemodeRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('notas_livemode', next); return next;
-  });
-  const setNotasLiveU = fn => setNotasLiveURaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('notas_liveu', next); return next;
-  });
-  const setCotacoes = fn => setCotacoesRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('cotacoes', next); return next;
-  });
-  const setEventosLog = fn => setEventosLogRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState('eventos_log', next); return next;
-  });
-  // Debounce da gravação no Supabase para reduzir rollbacks do realtime durante digitação
-  const logisticaTimer = useRef(null);
-  const setLogistica = fn => setLogisticaRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    if (logisticaTimer.current) clearTimeout(logisticaTimer.current);
-    logisticaTimer.current = setTimeout(() => { setSupabaseState('logistica', next); }, 500);
-    return next;
-  });
-  const fornJogoTimer = useRef(null);
-  const setFornecedoresJogo = fn => setFornecedoresJogoRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    if (fornJogoTimer.current) clearTimeout(fornJogoTimer.current);
-    fornJogoTimer.current = setTimeout(() => { setSupabaseState('fornecedores_jogo', next); }, 500);
-    return next;
-  });
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
+  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
+  const persistRefs = useRef({}).current;
+  const setJogos             = createPersistedSetter('jogos',             setJogosRaw,             persistRefs);
+  const setServicos          = createPersistedSetter('servicos',          setServicosRaw,          persistRefs);
+  const setNotas             = createPersistedSetter('notas',             setNotasRaw,             persistRefs);
+  const setEnvios            = createPersistedSetter('envios',            setEnviosRaw,            persistRefs);
+  const setNotasMensais      = createPersistedSetter('notas_mensais',     setNotasMensaisRaw,      persistRefs);
+  const setFornecedores      = createPersistedSetter('fornecedores',      setFornecedoresRaw,      persistRefs);
+  const setLivemode          = createPersistedSetter('livemode',          setLivemodeRaw,          persistRefs);
+  const setNotasLivemode     = createPersistedSetter('notas_livemode',    setNotasLivemodeRaw,     persistRefs);
+  const setNotasLiveU        = createPersistedSetter('notas_liveu',       setNotasLiveURaw,        persistRefs);
+  const setCotacoes          = createPersistedSetter('cotacoes',          setCotacoesRaw,          persistRefs);
+  const setEventosLog        = createPersistedSetter('eventos_log',       setEventosLogRaw,        persistRefs);
+  const setLogistica         = createPersistedSetter('logistica',         setLogisticaRaw,         persistRefs, { debounceMs: 500 });
+  const setFornecedoresJogo  = createPersistedSetter('fornecedores_jogo', setFornecedoresJogoRaw,  persistRefs, { empty: {}, debounceMs: 500 });
 
   // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
   const rateioSegEspacialPorJogo = useMemo(() => {

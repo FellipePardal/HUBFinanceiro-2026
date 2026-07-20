@@ -263,8 +263,12 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
   // Histórico append-only para notas mensais (espelha o de TabNotas).
   // Permite recuperar a lista se for zerada por bug ou ação manual.
   const pushHistoricoMensal = async (entry) => {
-    const atual = (await getState('nf_historico_mensal')) || [];
-    await setSupabaseState('nf_historico_mensal', [...atual, entry]);
+    try {
+      const atual = (await getState('nf_historico_mensal')) || [];
+      await setSupabaseState('nf_historico_mensal', [...atual, entry]);
+    } catch (err) {
+      console.error('Falha ao gravar em "nf_historico_mensal":', err);
+    }
   };
 
   const addNota = n => {

@@ -20,7 +20,43 @@ export async function getState(key) {
 }
 
 export async function setState(key, value) {
-  await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw error;
+}
+
+// Cria um setter que atualiza o estado local na hora (otimista), mas relê o
+// valor atual do Supabase antes de gravar de volta, reaplicando as mudanças
+// pendentes por cima dele em vez de um `prev` local que pode estar
+// desatualizado (aba parada, realtime caído, etc.) — sem isso, dois clientes
+// editando quase ao mesmo tempo podem fazer um sobrescrever o outro.
+// `persistRefs` é um objeto estável (ex: useRef({}).current) compartilhado
+// entre todos os setters do componente, uma entrada por key.
+export function createPersistedSetter(key, setRaw, persistRefs, { empty = [], debounceMs = 0 } = {}) {
+  if (!persistRefs[key]) persistRefs[key] = { pending: [], timer: null, queue: Promise.resolve() };
+  const s = persistRefs[key];
+  const flush = () => {
+    const fns = s.pending; s.pending = [];
+    s.queue = s.queue.then(async () => {
+      try {
+        const atual = await getState(key);
+        let next = atual != null ? atual : empty;
+        for (const f of fns) next = typeof f === "function" ? f(next) : f;
+        await setState(key, next);
+      } catch (err) {
+        console.error(`Falha ao persistir "${key}" no Supabase:`, err);
+      }
+    });
+  };
+  return fn => {
+    setRaw(prev => (typeof fn === "function" ? fn(prev) : fn));
+    s.pending.push(fn);
+    if (debounceMs > 0) {
+      if (s.timer) clearTimeout(s.timer);
+      s.timer = setTimeout(flush, debounceMs);
+    } else {
+      flush();
+    }
+  };
 }
 
 // ─── ARQUIVOS NF ─────────────────────────────────────────────────────────────

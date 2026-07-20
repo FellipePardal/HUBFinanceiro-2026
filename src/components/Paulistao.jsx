@@ -22,7 +22,7 @@ const TabLogistica       = lazy(() => import("./tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import LivemodeLogo from "./LivemodeLogo";
-import { getState, setState as setSupabaseState, supabase } from "../lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "../lib/supabase";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "../lib/notasFiscais";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
@@ -167,37 +167,22 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const persisted = (key, raw, setRaw) => fn => setRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    setSupabaseState(key, next);
-    return next;
-  });
-  const setJogos          = persisted(K.jogos,           jogos,          setJogosRaw);
-  const setServicos       = persisted(K.servicos,        servicos,       setServicosRaw);
-  const setNotas          = persisted(K.notas,           notas,          setNotasRaw);
-  const setEnvios         = persisted(K.envios,          envios,         setEnviosRaw);
-  const setNotasMensais   = persisted(K.notas_mensais,   notasMensais,   setNotasMensaisRaw);
-  const setFornecedores   = persisted(K.fornecedores,    fornecedores,   setFornecedoresRaw);
-  const setLivemode       = persisted(K.livemode,        livemode,       setLivemodeRaw);
-  const setNotasLivemode  = persisted(K.notas_livemode,  notasLivemode,  setNotasLivemodeRaw);
-  const setCotacoes       = persisted(K.cotacoes,        cotacoes,       setCotacoesRaw);
-  const setEventosLog     = persisted(K.eventos_log,     eventosLog,     setEventosLogRaw);
-
-  // Debounce em logística e fornecedores_jogo (digitação intensa)
-  const logTimer = useRef(null);
-  const setLogistica = fn => setLogisticaRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    if (logTimer.current) clearTimeout(logTimer.current);
-    logTimer.current = setTimeout(() => setSupabaseState(K.logistica, next), 500);
-    return next;
-  });
-  const fjTimer = useRef(null);
-  const setFornecedoresJogo = fn => setFornecedoresJogoRaw(prev => {
-    const next = typeof fn === "function" ? fn(prev) : fn;
-    if (fjTimer.current) clearTimeout(fjTimer.current);
-    fjTimer.current = setTimeout(() => setSupabaseState(K.fornecedores_jogo, next), 500);
-    return next;
-  });
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
+  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
+  const persistRefs = useRef({}).current;
+  const setJogos          = createPersistedSetter(K.jogos,           setJogosRaw,          persistRefs);
+  const setServicos       = createPersistedSetter(K.servicos,        setServicosRaw,       persistRefs);
+  const setNotas          = createPersistedSetter(K.notas,           setNotasRaw,          persistRefs);
+  const setEnvios         = createPersistedSetter(K.envios,          setEnviosRaw,         persistRefs);
+  const setNotasMensais   = createPersistedSetter(K.notas_mensais,   setNotasMensaisRaw,   persistRefs);
+  const setFornecedores   = createPersistedSetter(K.fornecedores,    setFornecedoresRaw,   persistRefs);
+  const setLivemode       = createPersistedSetter(K.livemode,        setLivemodeRaw,       persistRefs);
+  const setNotasLivemode  = createPersistedSetter(K.notas_livemode,  setNotasLivemodeRaw,  persistRefs);
+  const setCotacoes       = createPersistedSetter(K.cotacoes,        setCotacoesRaw,       persistRefs);
+  const setEventosLog     = createPersistedSetter(K.eventos_log,     setEventosLogRaw,     persistRefs);
+  const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
+  const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
 
   const rateioSegEspacialPorJogo = useMemo(() => {
     const parseMes = (dataStr) => {

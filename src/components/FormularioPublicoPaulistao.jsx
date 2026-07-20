@@ -167,52 +167,56 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    const submissionId = Date.now();
-    const servicosDetalhe = {};
-    const servicosValores = {};
-    const servicosKeys = [];
-    const servicosLabels = new Set();
-    const jogosResumo = [];
-    let hasFile = false;
+    try {
+      const submissionId = Date.now();
+      const servicosDetalhe = {};
+      const servicosValores = {};
+      const servicosKeys = [];
+      const servicosLabels = new Set();
+      const jogosResumo = [];
+      let hasFile = false;
 
-    if (arquivo) {
-      try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
-    }
+      if (arquivo) {
+        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      }
 
-    for (const jogoId of jogosSel) {
-      const jogo = divulgados.find(j => j.id === jogoId);
-      if (!jogo) continue;
-      const subs = servicosSel[jogoId] || [];
-      if (subs.length === 0) continue;
-      jogosResumo.push(jogo);
-      subs.forEach(sk => {
-        const key = `${jogo.id}_${sk}`;
-        const v = valores[key] || 0;
-        servicosDetalhe[key] = v;
-        servicosValores[sk] = (servicosValores[sk] || 0) + v;
-        servicosKeys.push(key);
-        const servico = SERVICOS_JOGO.find(s => s.subKey === sk);
-        if (servico) servicosLabels.add(servico.subLabel);
-      });
+      for (const jogoId of jogosSel) {
+        const jogo = divulgados.find(j => j.id === jogoId);
+        if (!jogo) continue;
+        const subs = servicosSel[jogoId] || [];
+        if (subs.length === 0) continue;
+        jogosResumo.push(jogo);
+        subs.forEach(sk => {
+          const key = `${jogo.id}_${sk}`;
+          const v = valores[key] || 0;
+          servicosDetalhe[key] = v;
+          servicosValores[sk] = (servicosValores[sk] || 0) + v;
+          servicosKeys.push(key);
+          const servico = SERVICOS_JOGO.find(s => s.subKey === sk);
+          if (servico) servicosLabels.add(servico.subLabel);
+        });
+      }
+      const valorNF = Object.values(servicosDetalhe).reduce((s, v) => s + (v || 0), 0);
+      const firstJogo = jogosResumo[0];
+      const submission = {
+        id: submissionId, tipo:"jogo", ...nfData, valorNF, valorFiscalTotal: valorNF,
+        fase: firstJogo?.fase, rodada: firstJogo?.rodada, jogoId: firstJogo?.id,
+        jogoIds: jogosResumo.map(j => j.id),
+        jogoLabel: jogosResumo.map(j => `${j.mandante} x ${j.visitante}`).join(" + "),
+        mandante: firstJogo?.mandante, visitante: firstJogo?.visitante,
+        servicosKeys,
+        servicosLabels: [...servicosLabels],
+        servicosValores,
+        servicosDetalhe,
+        status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
+      };
+      const current = (await getState('paulistao_nf_submissions')) || [];
+      await setState('paulistao_nf_submissions', [...current, submission]);
+      onDone();
+    } catch (err) {
+      alert("Erro ao enviar a NF, tente novamente: " + err.message);
     }
-    const valorNF = Object.values(servicosDetalhe).reduce((s, v) => s + (v || 0), 0);
-    const firstJogo = jogosResumo[0];
-    const submission = {
-      id: submissionId, tipo:"jogo", ...nfData, valorNF, valorFiscalTotal: valorNF,
-      fase: firstJogo?.fase, rodada: firstJogo?.rodada, jogoId: firstJogo?.id,
-      jogoIds: jogosResumo.map(j => j.id),
-      jogoLabel: jogosResumo.map(j => `${j.mandante} x ${j.visitante}`).join(" + "),
-      mandante: firstJogo?.mandante, visitante: firstJogo?.visitante,
-      servicosKeys,
-      servicosLabels: [...servicosLabels],
-      servicosValores,
-      servicosDetalhe,
-      status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
-    };
-    const current = (await getState('paulistao_nf_submissions')) || [];
-    await setState('paulistao_nf_submissions', [...current, submission]);
     setSubmitting(false);
-    onDone();
   };
 
   const STEPS = STEPS_JOGO;
@@ -419,24 +423,28 @@ function FormMensal({ fornecedores, onDone, T }) {
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    const submissionId = Date.now();
-    let hasFile = false;
-    if (arquivo) {
-      try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+    try {
+      const submissionId = Date.now();
+      let hasFile = false;
+      if (arquivo) {
+        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      }
+      const submission = {
+        id: submissionId, tipo:"mensal", ...nfData,
+        valorNF: parseFloat(valor) || 0,
+        mes: mesSel, mesLabel: MESES[mesSel],
+        servicoId: servicoSel.id,
+        servicoNome: servicoSel.nome,
+        servicosLabels: [servicoSel.nome],
+        status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
+      };
+      const current = (await getState('paulistao_nf_submissions')) || [];
+      await setState('paulistao_nf_submissions', [...current, submission]);
+      onDone();
+    } catch (err) {
+      alert("Erro ao enviar a NF, tente novamente: " + err.message);
     }
-    const submission = {
-      id: submissionId, tipo:"mensal", ...nfData,
-      valorNF: parseFloat(valor) || 0,
-      mes: mesSel, mesLabel: MESES[mesSel],
-      servicoId: servicoSel.id,
-      servicoNome: servicoSel.nome,
-      servicosLabels: [servicoSel.nome],
-      status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
-    };
-    const current = (await getState('paulistao_nf_submissions')) || [];
-    await setState('paulistao_nf_submissions', [...current, submission]);
     setSubmitting(false);
-    onDone();
   };
 
   const STEPS = STEPS_MENSAL;

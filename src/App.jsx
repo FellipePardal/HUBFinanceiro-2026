@@ -167,7 +167,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   // Realizado das Notas Fiscais, calculado ao vivo (não depende de a aba Notas Fiscais
   // já ter sido aberta nesta sessão para o dashboard estar em dia).
   const realizadoNotasPorJogo = useMemo(
-    () => buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF: false }),
+    () => buildRealizadoPorJogo(jogos, notas, { dedupeNotasPorNF: true }),
     [jogos, notas]
   );
 
@@ -677,13 +677,13 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} setNotas={setNotas} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
-        {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role}/>}
-        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role} dedupeNotasPorNF={true}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true}/>}
         </Suspense>
 
       </div>

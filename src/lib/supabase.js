@@ -19,9 +19,51 @@ export async function getState(key) {
   return data?.value ?? null;
 }
 
+const MAX_BACKUPS = 15;
+
+// Antes de qualquer escrita, guarda o valor ATUAL (o que está sendo substituído)
+// numa pilha própria (key + "::backup"), até MAX_BACKUPS versões. Isso não depende
+// de nenhum código estar certo — mesmo que um bug futuro grave o valor errado em
+// `jogos`/`notas`/etc., a versão de imediatamente antes fica preservada aqui, e dá
+// pra restaurar com restoreBackup(key). É a rede de segurança contra o incidente
+// de perda de dados de 2026-07 (ver getState/createPersistedSetter acima).
+async function pushBackup(key, valorAtual) {
+  if (key.startsWith('nf_file_') || key.endsWith('::backup')) return;
+  try {
+    const backupKey = `${key}::backup`;
+    const { data } = await supabase.from('app_state').select('value').eq('key', backupKey).single();
+    const pilha = Array.isArray(data?.value) ? data.value : [];
+    const nova = [{ at: new Date().toISOString(), value: valorAtual }, ...pilha].slice(0, MAX_BACKUPS);
+    await supabase.from('app_state').upsert({ key: backupKey, value: nova, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  } catch (err) {
+    console.error(`Falha ao gravar backup de "${key}" (a escrita principal segue mesmo assim):`, err);
+  }
+}
+
 export async function setState(key, value) {
+  const atual = await getState(key).catch(() => null);
+  if (atual != null) await pushBackup(key, atual);
   const { error } = await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) throw error;
+}
+
+// Lista as versões anteriores de `key` (mais recente primeiro). Use para
+// inspecionar antes de decidir restaurar.
+export async function getBackups(key) {
+  const data = await getState(`${key}::backup`);
+  return Array.isArray(data) ? data : [];
+}
+
+// Restaura `key` para a versão `stepsBack` passos atrás (0 = a gravação
+// imediatamente anterior à atual). Sobrescreve o valor atual — a versão que
+// estava valendo entra na pilha de backup antes de ser substituída, então
+// restaurar também não é uma via de mão única.
+export async function restoreBackup(key, stepsBack = 0) {
+  const pilha = await getBackups(key);
+  const versao = pilha[stepsBack];
+  if (!versao) throw new Error(`Não há backup ${stepsBack} passos atrás para "${key}"`);
+  await setState(key, versao.value);
+  return versao;
 }
 
 // Cria um setter que atualiza o estado local na hora (otimista), mas relê o

@@ -1398,9 +1398,19 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                           <td style={{...TS.td, fontSize:11}}>
                             {!hasNotas ? <span style={{color:T.textSm}}>—</span>
                               : notasDestaLinha.length > 1 ? (
-                                <span style={{color:T.textSm,fontSize:11}}>
-                                  {notasDestaLinha.map(n => n.fornecedor).filter(Boolean).join(", ")}
-                                </span>
+                                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                  {notasDestaLinha.map(n => (
+                                    <span key={n.id} style={{color:T.text,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                                      <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
+                                      <span style={{color:T.textMd}}>{n.fornecedor}</span>
+                                      {envioMap[n.id] && <Pill label={envioLabel(envioMap[n.id])} color={purple}/>}
+                                      {n.hasFile
+                                        ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
+                                        : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                                      {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
+                                    </span>
+                                  ))}
+                                </div>
                               ) : (
                                 <span style={{color:T.text,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                                   <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{nota.codigo}</code>

@@ -143,7 +143,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     }
   };
 
-  const selJogosArr = notas.filter(n => selJogosNFs.has(n.id));
+  const selJogosArrTodos = notas.filter(n => selJogosNFs.has(n.id));
+  // Com agruparReembolsoComLivemode, o reembolso selecionado (mesmo Set selJogosNFs)
+  // vai pro livemodeResumo do envio, não pro notasResumo -- consistente com onde
+  // ele aparece na lista de seleção acima.
+  const selJogosArr = agruparReembolsoComLivemode ? selJogosArrTodos.filter(n => n.tipo !== "reembolso_livemode") : selJogosArrTodos;
+  const selReembolsosArr = agruparReembolsoComLivemode ? selJogosArrTodos.filter(n => n.tipo === "reembolso_livemode") : [];
   const selMensaisArr = notasMensais.filter(n => selMensaisNFs.has(n.id));
   const selLivemodeArr = notasLivemode.filter(n => selLivemodeNFs.has(n.id));
   // Total calculado a partir dos grupos visuais: evita contar duplicatas duas vezes
@@ -164,7 +169,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
   const criarEnvio = () => {
     if (selJogosNFs.size === 0 && selMensaisNFs.size === 0 && selLivemodeNFs.size === 0) return;
     const numero = proximoNumeroEnvio;
-    const totalLivemode = selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0);
+    const totalLivemode = selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0) + selReembolsosArr.reduce((s, n) => s + (n.valorNF||0), 0);
     const novo = normalizeEnvioMetricas({
       id: Date.now(),
       numero,
@@ -178,7 +183,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       livemodeIds: [...selLivemodeNFs],
       notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
       mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
-      livemodeResumo: selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      livemodeResumo: [
+        ...selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+        ...selReembolsosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      ],
       totalJogos: 0,
       totalMensais: 0,
       totalLivemode,
@@ -268,7 +276,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
 
   const confirmarAdicionarNotas = (envioId) => {
     if (addSelJogos.size === 0 && addSelMensais.size === 0 && addSelLivemode.size === 0) return;
-    const novosJogos = notas.filter(n => addSelJogos.has(n.id));
+    const novosJogosTodos = notas.filter(n => addSelJogos.has(n.id));
+    const novosJogos = agruparReembolsoComLivemode ? novosJogosTodos.filter(n => n.tipo !== "reembolso_livemode") : novosJogosTodos;
+    const novosReembolsos = agruparReembolsoComLivemode ? novosJogosTodos.filter(n => n.tipo === "reembolso_livemode") : [];
     const novosMensais = notasMensais.filter(n => addSelMensais.has(n.id));
     const novosLivemode = notasLivemode.filter(n => addSelLivemode.has(n.id));
 
@@ -279,7 +289,11 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       const livemodeIds = [...(e.livemodeIds||[]), ...[...addSelLivemode]];
       const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
       const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
-      const livemodeResumo = [...(e.livemodeResumo||[]), ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const livemodeResumo = [
+        ...(e.livemodeResumo||[]),
+        ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile})),
+        ...novosReembolsos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile})),
+      ];
       return normalizeEnvioMetricas({...e, notasIds, mensaisIds, livemodeIds, notasResumo, mensaisResumo, livemodeResumo}, { dedupeNotasPorNF });
     }));
 

@@ -4,7 +4,7 @@ import { fmt, subTotal, catTotal } from "../../utils";
 import { allSubKeys } from "../../data";
 import { Pill } from "../shared";
 import { Card, PanelTitle, Button, Segmented } from "../ui";
-import { ChevronLeft, ChevronRight, Pencil, Save, X, Copy, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Save, X, Copy, Trophy, Lock, Unlock } from "lucide-react";
 
 export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
   const parseData = s => {
@@ -47,6 +47,17 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
   };
   const copyOrcadoToProvisionado = () => { if(!draft) return; setDraft(d=>({...d,provisionado:{...d.orcado}})); };
 
+  // "Fechar jogo": quando todas as NFs daquele jogo já chegaram, o provisionado
+  // (projeção manual pré-rodada) passa a ser o realizado atual (100% NF), pra
+  // não ficar divergindo da projeção antiga. Ação manual e por jogo -- as NFs
+  // chegam em prazos diferentes por jogo, então não dá pra automatizar isso.
+  const fecharJogo = () => {
+    if (!window.confirm(`Fechar o orçamento de ${jogo.mandante} × ${jogo.visitante}? O provisionado de todos os itens vai virar o realizado atual (${fmt(subTotal({...emptyNums(), ...(jogo.realizado||{})}))}).`)) return;
+    const realizadoAtual = {...emptyNums(), ...(jogo.realizado||{})};
+    onSave({...jogo, provisionado: realizadoAtual, fechado: true, fechadoEm: new Date().toISOString()});
+  };
+  const reabrirJogo = () => onSave({...jogo, fechado: false});
+
   if(!jogo) return <p style={{color:T.textSm,padding:20}}>Nenhum jogo selecionado.</p>;
 
   const data    = editing && draft ? draft : jogo;
@@ -81,7 +92,13 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
         </div>
         <div style={{display:"flex",gap:8}}>
           {!editing
-            ? <Button T={T} variant="primary" size="md" icon={Pencil} onClick={startEdit}>Editar valores</Button>
+            ? <>
+                {jogo.fechado
+                  ? <Button T={T} variant="secondary" size="md" icon={Unlock} onClick={reabrirJogo}>Reabrir</Button>
+                  : <Button T={T} variant="secondary" size="md" icon={Lock} onClick={fecharJogo}>Fechar Jogo</Button>
+                }
+                <Button T={T} variant="primary" size="md" icon={Pencil} onClick={startEdit}>Editar valores</Button>
+              </>
             : <>
                 {activeTab==="provisionado" && <Button T={T} variant="secondary" size="md" icon={Copy} onClick={copyOrcadoToProvisionado}>Copiar Orçado</Button>}
                 <Button T={T} variant="secondary" size="md" icon={X} onClick={cancelEdit}>Cancelar</Button>
@@ -118,7 +135,12 @@ export default function VisaoMicro({jogos, jogoId, onChangeJogo, onSave, T}) {
                 </p>
               </div>
             </div>
-            <Pill label={data.categoria} color={data.categoria==="B1"?(T.brand||"#10b981"):(T.warning||"#f59e0b")}/>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {jogo.fechado && (
+                <Pill label={`✓ Fechado em ${new Date(jogo.fechadoEm).toLocaleDateString("pt-BR")}`} color={T.brand||"#10b981"}/>
+              )}
+              <Pill label={data.categoria} color={data.categoria==="B1"?(T.brand||"#10b981"):(T.warning||"#f59e0b")}/>
+            </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginTop:20}}>
             {[

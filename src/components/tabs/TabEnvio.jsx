@@ -113,6 +113,11 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     });
   };
   const nfsGrupadas = groupNFsList(nfsDisponiveis);
+  // rodadasLabel (quando existe, ex: reembolso multi-rodada) mostra a faixa real
+  // em vez de só a rodada do primeiro jogo do grupo, que é enganosa.
+  const rodadaPillLabel = g => g.rodadasLabel
+    ? (g._isGroup ? `${g._groupIds.length} jogos · ${g.rodadasLabel}` : g.rodadasLabel)
+    : (g._isGroup ? `${g._groupIds.length} jogos · Rd ${g.rodada}` : `Rd ${g.rodada}`);
   // NF de reembolso Livemode (Logística) é um "notas" jogo a jogo por estrutura, mas
   // conceitualmente é uma NF Livemode -- com agruparReembolsoComLivemode, é mostrada
   // junto do painel "NFs Livemode" em vez de "NFs de Jogos" (continua no mesmo
@@ -408,9 +413,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{g.fornecedor}</span>
                     <span style={{fontSize:11,color:T.textSm}}>NF {g.numeroNF||"—"}</span>
                     <span style={{fontSize:11,color:T.textSm}}>{g.jogoLabel}</span>
-                    {g._isGroup
-                      ? <Pill label={`${g._groupIds.length} jogos · Rd ${g.rodada}`} color={T.warning}/>
-                      : <Pill label={`Rd ${g.rodada}`} color={T.warning}/>}
+                    <Pill label={rodadaPillLabel(g)} color={T.warning}/>
                     <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(g.valorNF)}</span>
                   </div>
                 );
@@ -462,9 +465,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{g.fornecedor || "Livemode"}</span>
                     <Pill label="Reembolso Logística" color={teal}/>
-                    {g._isGroup
-                      ? <Pill label={`${g._groupIds.length} jogos · Rd ${g.rodada}`} color={T.warning}/>
-                      : <Pill label={`Rd ${g.rodada}`} color={T.warning}/>}
+                    <Pill label={rodadaPillLabel(g)} color={T.warning}/>
                     <span style={{fontSize:10,color:T.textSm}}>NF {g.numeroNF||"—"}</span>
                     <span className="num" style={{fontSize:13,color:purple,fontWeight:700,minWidth:90,textAlign:"right"}}>{fmt(g.valorNF)}</span>
                   </div>
@@ -558,9 +559,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{g.fornecedor}</span>
                           <span style={{fontSize:10,color:T.textSm}}>NF {g.numeroNF||"—"}</span>
                           <span style={{fontSize:10,color:T.textSm}}>{g.jogoLabel}</span>
-                          {g._isGroup
-                            ? <Pill label={`${g._groupIds.length} jogos · Rd ${g.rodada}`} color={T.warning}/>
-                            : <Pill label={`Rd ${g.rodada}`} color={T.warning}/>}
+                          <Pill label={rodadaPillLabel(g)} color={T.warning}/>
                           <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(g.valorNF)}</span>
                         </div>
                       );
@@ -601,9 +600,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:teal}}/>
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{g.fornecedor || "Livemode"}</span>
                           <Pill label="Reembolso Logística" color={teal}/>
-                          {g._isGroup
-                            ? <Pill label={`${g._groupIds.length} jogos · Rd ${g.rodada}`} color={T.warning}/>
-                            : <Pill label={`Rd ${g.rodada}`} color={T.warning}/>}
+                          <Pill label={rodadaPillLabel(g)} color={T.warning}/>
                           <span className="num" style={{fontSize:12,color:purple,fontWeight:700}}>{fmt(g.valorNF)}</span>
                         </div>
                       );

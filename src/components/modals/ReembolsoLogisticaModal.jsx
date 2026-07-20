@@ -117,6 +117,10 @@ export function ReembolsoLogisticaModal({ jogos, fornecedores, onSave, onClose, 
   const rodada = firstJogo?.rodada;
   const jogoLabel = jogosSelecionados.map(j => `${j.mandante} x ${j.visitante}`).join(" + ");
   const codigo = firstJogo ? gerarCodigo(rodada, firstJogo.mandante, firstJogo.visitante, totalNF, form.numeroNF) : "";
+  // Reembolso costuma cobrir varias rodadas de uma vez -- "rodada" sozinho (so a
+  // primeira) é enganoso na etiqueta. rodadasLabel mostra a faixa real (Rd 1-3).
+  const rodadasArr = [...new Set(jogosSelecionados.map(j => j.rodada))].sort((a, b) => a - b);
+  const rodadasLabel = rodadasArr.length === 0 ? "" : rodadasArr.length === 1 ? `Rd ${rodadasArr[0]}` : `Rd ${rodadasArr[0]}-${rodadasArr[rodadasArr.length - 1]}`;
 
   const handleSave = async () => {
     if (jogosSel.size === 0 || totalNF === 0) return;
@@ -133,6 +137,7 @@ export function ReembolsoLogisticaModal({ jogos, fornecedores, onSave, onClose, 
     onSave({
       id: notaId, codigo, ...form,
       valorNF: totalNF, rodada,
+      rodadas: rodadasArr, rodadasLabel,
       jogoId: jogoIds[0], jogoIds, jogoLabel,
       servicosKeys: [], servicosLabels: ["Reembolso Log. Livemode"],
       servicosDetalhe,

@@ -229,6 +229,9 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
   const divulgados = jogos.filter(j => j.mandante !== "A definir").sort((a,b) => a.rodada - b.rodada);
   const [selJogos, setSelJogos] = useState(new Set());
   const [form, setForm] = useState({ numeroNF:"", fornecedor:"", dataEmissao:"", obs:"" });
+  // Valor Real fica em branco por padrao -- so sugere o projetado (LIVEU_VALOR_PADRAO
+  // x qtd de jogos) como referencia. Precisa ser digitado pra bater com a NF de verdade.
+  const [valorRealStr, setValorRealStr] = useState("");
   const [arquivo, setArquivo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
@@ -244,8 +247,9 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
     setSelJogos(new Set(ids));
   };
 
-  const valorPorJogo = LIVEU_VALOR_PADRAO;
-  const totalNF = valorPorJogo * selJogos.size;
+  const totalProjetado = LIVEU_VALOR_PADRAO * selJogos.size;
+  const totalNF = valorRealStr !== "" ? (parseFloat(valorRealStr) || 0) : totalProjetado;
+  const valorPorJogo = selJogos.size > 0 ? totalNF / selJogos.size : 0;
 
   const selJogosArr = divulgados.filter(j => selJogos.has(j.id));
   const jogosIds = [...selJogos];
@@ -292,7 +296,7 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
     <div style={{position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:T.card,borderRadius:16,padding:28,width:"100%",maxWidth:620,maxHeight:"90vh",overflowY:"auto"}}>
         <h3 style={{margin:"0 0 4px",fontSize:16,color:T.text}}>Registrar NF liveU</h3>
-        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Valor fixo de {fmt(LIVEU_VALOR_PADRAO)}/jogo — selecione os jogos cobertos</p>
+        <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>{fmt(LIVEU_VALOR_PADRAO)}/jogo é só o projetado — selecione os jogos e informe o valor real da NF</p>
 
         <div style={{marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -334,12 +338,14 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
           {selJogos.size > 0 && <p style={{color:amber,fontSize:11,margin:"6px 0 0",fontWeight:600}}>{jogosResumoLabel} · {fmt(valorPorJogo)}/jogo · Total: {fmt(totalNF)}</p>}
         </div>
 
-        <div style={{marginBottom:12,padding:"12px 16px",background:T.bg,borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <p style={{margin:0,fontSize:13,color:T.text,fontWeight:600}}>liveU</p>
-            <p style={{margin:"2px 0 0",fontSize:11,color:T.textSm}}>Valor fixo por jogo</p>
+        <div style={{marginBottom:12,padding:"12px 16px",background:T.bg,borderRadius:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <p style={{margin:0,fontSize:13,color:T.text,fontWeight:600}}>Valor Real da NF</p>
+            <p style={{margin:0,fontSize:11,color:T.textSm}}>Projetado: {fmt(totalProjetado)} ({fmt(LIVEU_VALOR_PADRAO)}/jogo)</p>
           </div>
-          <p className="num" style={{margin:0,fontSize:18,fontWeight:800,color:amber}}>{fmt(LIVEU_VALOR_PADRAO)}</p>
+          <input type="number" value={valorRealStr} onChange={e=>setValorRealStr(e.target.value)}
+            placeholder={`Sugestão: ${totalProjetado}`} style={{...IS,fontSize:18,fontWeight:800,color:amber}}/>
+          <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Digite o valor total que está na nota fiscal, pra bater o realizado com o que foi cobrado de verdade. Em branco, usa o projetado.</p>
         </div>
 
         {selJogos.size > 0 && (

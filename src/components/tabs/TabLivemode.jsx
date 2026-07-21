@@ -281,6 +281,8 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
       jogosIds,
       jogosResumoLabel,
       rodadas: rodadasArr,
+      rodadasLabel: jogosResumoLabel,
+      servicosLabels: ["liveU"],
       numeroNF: form.numeroNF,
       fornecedor: form.fornecedor,
       valor: totalNF,

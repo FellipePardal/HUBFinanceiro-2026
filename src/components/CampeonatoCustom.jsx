@@ -140,7 +140,11 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
 
-  const rateioSegEspacialPorJogo = useMemo(() => {
+  // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo,
+  // não tem jogo pra receber o rateio -- o valor ia sendo descartado do realizado
+  // (a NF existe, mas cai em nenhum lugar). Agora fica em `orfao`, somado direto
+  // na categoria Operações em vez de sumir.
+  const { map: rateioSegEspacialPorJogo, orfao: segEspacialOrfao } = useMemo(() => {
     const parseMes = (dataStr) => {
       if (!dataStr || /^[aà] definir$/i.test(dataStr.trim())) return null;
       let m = dataStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -156,13 +160,14 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
       (jogosPorMes[mes] = jogosPorMes[mes] || []).push(j.id);
     });
     const map = {};
+    let orfao = 0;
     (notasMensais||[]).filter(n => n.categoria === "Seg. Espacial").forEach(n => {
       const ids = jogosPorMes[n.mes] || [];
-      if (ids.length === 0) return;
+      if (ids.length === 0) { orfao += (n.valor || 0); return; }
       const share = (n.valor || 0) / ids.length;
       ids.forEach(id => { map[id] = (map[id] || 0) + share; });
     });
-    return map;
+    return { map, orfao };
   }, [notasMensais, jogos]);
 
   // Realizado das Notas Fiscais, calculado ao vivo (não depende de a aba Notas Fiscais
@@ -209,22 +214,22 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
       const realizadoMensal = notasMensais
         .filter(n => !n.servicoId && VAR_CAT_TO_CATKEY[n.categoria] === cat.key && n.categoria !== "Seg. Espacial")
         .reduce((s, n) => s + (n.valor || 0), 0);
+      // Seg. Espacial órfã (mês sem jogo) pertence à Operações, junto com o resto do rateio.
+      const orfaoDessaCategoria = cat.key === "operacoes" ? segEspacialOrfao : 0;
       return {
         nome: cat.label,
         orcado:       allJ.reduce((s,j) => s+catTotal(j.orcado, cat), 0),
         provisionado: allJ.reduce((s,j) => s+catTotal(j.provisionado, cat), 0),
-        realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0) + realizadoMensal,
+        realizado:    allJ.reduce((s,j) => s+catTotal(j.realizado, cat), 0) + realizadoMensal + orfaoDessaCategoria,
         tipo: "variavel",
         subKeys: cat.subs.map(sub => sub.key),
         catKey: cat.key,
       };
     });
-    const extraOrc  = allJ.reduce((s,j) => s+((j.orcado&&j.orcado.extra)||0), 0);
-    const extraProv = allJ.reduce((s,j) => s+((j.provisionado&&j.provisionado.extra)||0), 0);
-    const extraReal = allJ.reduce((s,j) => s+((j.realizado&&j.realizado.extra)||0), 0);
-    result.push({ nome:"Extra", orcado:extraOrc, provisionado:extraProv, realizado:extraReal, tipo:"variavel", subKeys:["extra"] });
+    // "Extra" já está incluso dentro de Operações (é um dos subs de CATS "operacoes") --
+    // uma linha própria aqui somaria o mesmo valor duas vezes no total do dashboard.
     return result;
-  }, [jogosCalc, notasMensais]);
+  }, [jogosCalc, notasMensais, segEspacialOrfao]);
 
   const fixosCalc = useMemo(() => servicosCalc.map(s => ({
     nome: s.secao,

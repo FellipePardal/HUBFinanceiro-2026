@@ -58,16 +58,19 @@ export default function EnvioPublico({ numero, envioRef }) {
       const todosEnvios = (await getState(stateKey)) || [];
       const hoje = new Date();
       const dataHoje = hoje.toLocaleDateString("pt-BR");
+      const agora = hoje.toISOString();
+      const nome = (payerName||"").trim() || null;
+      const marcarPaga = n => ({...n, statusNota:"Pago", statusAlteradoEm: agora, statusAlteradoPor: nome});
       const atualizado = todosEnvios.map(e => envioMatches(e, target)
         ? {
             ...e,
             pago:true,
-            pagoEm:hoje.toISOString(),
-            pagoPor:(payerName||"").trim() || null,
+            pagoEm:agora,
+            pagoPor:nome,
             dataPagamentoEfetiva:dataHoje,
-            notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-            mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-            livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+            notasResumo: (e.notasResumo||[]).map(marcarPaga),
+            mensaisResumo: (e.mensaisResumo||[]).map(marcarPaga),
+            livemodeResumo: (e.livemodeResumo||[]).map(marcarPaga),
           }
         : e
       );

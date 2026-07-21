@@ -215,15 +215,24 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
   };
 
   const togglePago = (envioId) => {
+    const envioAtual = envios.find(e => e.id === envioId);
+    const marcandoComoPago = !envioAtual?.pago;
+    let nome = null;
+    if (marcandoComoPago) {
+      nome = (window.prompt("Seu nome (fica registrado com a confirmação de pagamento):") || "").trim();
+      if (!nome) return;
+    }
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
-      const novoPago = !e.pago;
-      if (novoPago) {
+      if (marcandoComoPago) {
+        const agora = new Date().toISOString();
+        const marcarPaga = n => ({...n, statusNota:"Pago", statusAlteradoEm: agora, statusAlteradoPor: nome});
         return {
-          ...e, pago: true,
-          notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-          mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-          livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          ...e, pago: true, pagoEm: agora, pagoPor: nome,
+          dataPagamentoEfetiva: e.dataPagamentoEfetiva || new Date().toLocaleDateString("pt-BR"),
+          notasResumo: (e.notasResumo||[]).map(marcarPaga),
+          mensaisResumo: (e.mensaisResumo||[]).map(marcarPaga),
+          livemodeResumo: (e.livemodeResumo||[]).map(marcarPaga),
         };
       }
       return {...e, pago: false};

@@ -21,7 +21,7 @@ const TabLivemode        = lazy(() => import("./tabs/TabLivemode"));
 const TabLogistica       = lazy(() => import("./tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
-import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "../lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "../lib/supabase";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "../lib/notasFiscais";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
@@ -67,6 +67,12 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]                      = useState(true);
   const [loadError, setLoadError]                  = useState(null);
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
+  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
+  // Também usado pelo handler de realtime abaixo pra não sobrescrever uma
+  // edição local em andamento com um eco desatualizado (isPersistPending).
+  const persistRefs = useRef({}).current;
 
   useEffect(() => {
     async function load() {
@@ -117,7 +123,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
           [K.logistica]: setLogisticaRaw, [K.eventos_log]: setEventosLogRaw,
         };
         const fn = m[payload.new.key];
-        if (fn) fn(payload.new.value);
+        if (fn && !isPersistPending(persistRefs, payload.new.key)) fn(payload.new.value);
       })
       .subscribe();
 
@@ -125,10 +131,6 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campId]);
 
-  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
-  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
-  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
-  const persistRefs = useRef({}).current;
   const setJogos          = createPersistedSetter(K.jogos,           setJogosRaw,          persistRefs);
   const setServicos       = createPersistedSetter(K.servicos,        setServicosRaw,       persistRefs);
   const setNotas          = createPersistedSetter(K.notas,           setNotasRaw,          persistRefs);

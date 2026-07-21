@@ -24,7 +24,7 @@ const TabLivemode      = lazy(() => import("./components/tabs/TabLivemode"));
 const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
-import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "./lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "./lib/supabase";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "./lib/notasFiscais";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
@@ -48,6 +48,12 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [loading, setLoading]            = useState(true);
   const [loadError, setLoadError]        = useState(null);
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
+  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
+  // Também usado pelo handler de realtime abaixo pra não sobrescrever uma
+  // edição local em andamento com um eco desatualizado (isPersistPending).
+  const persistRefs = useRef({}).current;
 
   useEffect(() => {
     async function load() {
@@ -101,29 +107,27 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     const channel = supabase
       .channel('app_state_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
-        if (payload.new.key === 'jogos')        setJogosRaw(payload.new.value);
-        if (payload.new.key === 'servicos')     setServicosRaw(payload.new.value);
-        if (payload.new.key === 'notas')        setNotasRaw(payload.new.value);
-        if (payload.new.key === 'fornecedores')   setFornecedoresRaw(payload.new.value);
-        if (payload.new.key === 'notas_mensais') setNotasMensaisRaw(payload.new.value);
-        if (payload.new.key === 'envios')        setEnviosRaw(payload.new.value);
-        if (payload.new.key === 'livemode')      setLivemodeRaw(payload.new.value);
-        if (payload.new.key === 'notas_livemode') setNotasLivemodeRaw(payload.new.value);
-        if (payload.new.key === 'notas_liveu')   setNotasLiveURaw(payload.new.value);
-        if (payload.new.key === 'cotacoes')       setCotacoesRaw(payload.new.value);
-        if (payload.new.key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
-        if (payload.new.key === 'logistica')     setLogisticaRaw(payload.new.value);
-        if (payload.new.key === 'eventos_log')   setEventosLogRaw(payload.new.value);
+        const key = payload.new.key;
+        if (isPersistPending(persistRefs, key)) return; // edição local em andamento vence o eco
+        if (key === 'jogos')        setJogosRaw(payload.new.value);
+        if (key === 'servicos')     setServicosRaw(payload.new.value);
+        if (key === 'notas')        setNotasRaw(payload.new.value);
+        if (key === 'fornecedores')   setFornecedoresRaw(payload.new.value);
+        if (key === 'notas_mensais') setNotasMensaisRaw(payload.new.value);
+        if (key === 'envios')        setEnviosRaw(payload.new.value);
+        if (key === 'livemode')      setLivemodeRaw(payload.new.value);
+        if (key === 'notas_livemode') setNotasLivemodeRaw(payload.new.value);
+        if (key === 'notas_liveu')   setNotasLiveURaw(payload.new.value);
+        if (key === 'cotacoes')       setCotacoesRaw(payload.new.value);
+        if (key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
+        if (key === 'logistica')     setLogisticaRaw(payload.new.value);
+        if (key === 'eventos_log')   setEventosLogRaw(payload.new.value);
       })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
-  // createPersistedSetter em lib/supabase.js) — uma aba parada ou o realtime
-  // caído não fazem mais uma edição sobrescrever o que outra pessoa salvou.
-  const persistRefs = useRef({}).current;
   const setJogos             = createPersistedSetter('jogos',             setJogosRaw,             persistRefs);
   const setServicos          = createPersistedSetter('servicos',          setServicosRaw,          persistRefs);
   const setNotas             = createPersistedSetter('notas',             setNotasRaw,             persistRefs);

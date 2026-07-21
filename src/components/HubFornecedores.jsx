@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { RADIUS, FONT } from "../constants";
-import { getState, setState as setSupabaseState, supabase, createPersistedSetter } from "../lib/supabase";
+import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
 import { CIDADES_INIT, CAMPEONATOS_FORN_INIT, ITENS_MASTER_INIT } from "../data/catalogos";
@@ -31,6 +31,13 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const [loadError,    setLoadError]       = useState(null);
   const [ocultar,      setOcultar]         = useState(false);
   const [filtroCamp,   setFiltroCamp]      = useState(filtroInicial || FILTRO_TODOS);
+  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
+  // createPersistedSetter em lib/supabase.js) — 'fornecedores'/'cotacoes' são
+  // compartilhados com Brasileirão/Paulistão, então uma edição feita aqui não
+  // pode se basear num `prev` local desatualizado em relação à outra aba.
+  // Também usado pelo handler de realtime abaixo pra não sobrescrever uma
+  // edição local em andamento com um eco desatualizado (isPersistPending).
+  const persistRefs = useRef({}).current;
 
   // Carga inicial + realtime
   useEffect(() => {
@@ -71,25 +78,22 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
     const channel = supabase
       .channel('hub_fornecedores_changes')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, payload => {
-        if (payload.new.key === 'fornecedores')       setFornecedoresRaw(payload.new.value);
-        if (payload.new.key === 'cotacoes')           setCotacoesRaw(payload.new.value);
-        if (payload.new.key === 'jogos')              setJogosRaw(payload.new.value);
-        if (payload.new.key === 'forn_cidades')       setCidadesRaw(payload.new.value);
-        if (payload.new.key === 'forn_campeonatos')   setCampeonatosRaw(payload.new.value);
-        if (payload.new.key === 'forn_itens_master')  setItensMasterRaw(payload.new.value);
-        if (payload.new.key === 'forn_tabelas_preco') setTabelasRaw(payload.new.value);
-        if (payload.new.key === 'forn_jogos')         setJogosFornRaw(payload.new.value);
+        const key = payload.new.key;
+        if (isPersistPending(persistRefs, key)) return; // edição local em andamento vence o eco
+        if (key === 'fornecedores')       setFornecedoresRaw(payload.new.value);
+        if (key === 'cotacoes')           setCotacoesRaw(payload.new.value);
+        if (key === 'jogos')              setJogosRaw(payload.new.value);
+        if (key === 'forn_cidades')       setCidadesRaw(payload.new.value);
+        if (key === 'forn_campeonatos')   setCampeonatosRaw(payload.new.value);
+        if (key === 'forn_itens_master')  setItensMasterRaw(payload.new.value);
+        if (key === 'forn_tabelas_preco') setTabelasRaw(payload.new.value);
+        if (key === 'forn_jogos')         setJogosFornRaw(payload.new.value);
       })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
-  // createPersistedSetter em lib/supabase.js) — 'fornecedores'/'cotacoes' são
-  // compartilhados com Brasileirão/Paulistão, então uma edição feita aqui não
-  // pode se basear num `prev` local desatualizado em relação à outra aba.
-  const persistRefs = useRef({}).current;
   const setFornecedores = createPersistedSetter('fornecedores',      setFornecedoresRaw, persistRefs);
   const setCotacoes     = createPersistedSetter('cotacoes',          setCotacoesRaw,     persistRefs);
   const setCidades      = createPersistedSetter('forn_cidades',      setCidadesRaw,      persistRefs);

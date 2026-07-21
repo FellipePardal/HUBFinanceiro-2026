@@ -221,15 +221,13 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
       const novoPago = !e.pago;
-      if (novoPago) {
-        return {
-          ...e, pago: true,
-          notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-          mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-          livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
-        };
-      }
-      return {...e, pago: false};
+      const novoStatus = novoPago ? "Pago" : "Pendente";
+      return {
+        ...e, pago: novoPago,
+        notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota: novoStatus})),
+        mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota: novoStatus})),
+        livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota: novoStatus})),
+      };
     }));
   };
 

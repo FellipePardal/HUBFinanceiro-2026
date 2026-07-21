@@ -74,10 +74,11 @@ export async function restoreBackup(key, stepsBack = 0) {
 // `persistRefs` é um objeto estável (ex: useRef({}).current) compartilhado
 // entre todos os setters do componente, uma entrada por key.
 export function createPersistedSetter(key, setRaw, persistRefs, { empty = [], debounceMs = 0 } = {}) {
-  if (!persistRefs[key]) persistRefs[key] = { pending: [], timer: null, queue: Promise.resolve() };
+  if (!persistRefs[key]) persistRefs[key] = { pending: [], timer: null, queue: Promise.resolve(), inFlight: 0 };
   const s = persistRefs[key];
   const flush = () => {
     const fns = s.pending; s.pending = [];
+    s.inFlight++;
     s.queue = s.queue.then(async () => {
       try {
         const atual = await getState(key);
@@ -86,6 +87,8 @@ export function createPersistedSetter(key, setRaw, persistRefs, { empty = [], de
         await setState(key, next);
       } catch (err) {
         console.error(`Falha ao persistir "${key}" no Supabase:`, err);
+      } finally {
+        s.inFlight--;
       }
     });
   };
@@ -94,11 +97,24 @@ export function createPersistedSetter(key, setRaw, persistRefs, { empty = [], de
     s.pending.push(fn);
     if (debounceMs > 0) {
       if (s.timer) clearTimeout(s.timer);
-      s.timer = setTimeout(flush, debounceMs);
+      s.timer = setTimeout(() => { s.timer = null; flush(); }, debounceMs);
     } else {
       flush();
     }
   };
+}
+
+// Enquanto essa key tem uma escrita local pendente (aguardando debounce ou já
+// em voo pro Supabase), o estado local já é mais atual do que qualquer eco de
+// realtime que possa chegar -- aplicar o eco por cima causaria o "rollback"
+// visual clássico (o campo que a pessoa está digitando volta pra um valor de
+// alguns caracteres atrás). isPersistPending deixa o handler de realtime
+// pular esses ecos com segurança: quando a escrita local terminar, o próprio
+// eco dela (já com o valor final) chega e sincroniza normalmente.
+export function isPersistPending(persistRefs, key) {
+  const s = persistRefs[key];
+  if (!s) return false;
+  return s.pending.length > 0 || s.inFlight > 0 || !!s.timer;
 }
 
 // ─── ARQUIVOS NF ─────────────────────────────────────────────────────────────

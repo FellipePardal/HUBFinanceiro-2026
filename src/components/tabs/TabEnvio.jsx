@@ -5,7 +5,7 @@ import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { getNFFile } from "../../lib/supabase";
 import { countNotasFiscais, getEnvioMetricas, normalizeEnvioMetricas, sumNotasFiscais } from "../../lib/notasFiscais";
 import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
-import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package, Edit2, PlusCircle, X, MessageSquare } from "lucide-react";
+import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package, Edit2, PlusCircle, X, MessageSquare, Eraser } from "lucide-react";
 
 const catTotal = (subs, cat) => cat.subs.reduce((s, sub) => s + (subs?.[sub.key]||0), 0);
 const nextEnvioNumero = envios => Math.max(0, ...(envios || []).map(e => Number(e.numero) || 0)) + 1;
@@ -241,6 +241,22 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       if (e.id !== envioId) return e;
       const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
       return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n)};
+    }));
+  };
+
+  // Limpa o rastro de quem/quando alterou (gravado pela pagina publica) sem
+  // mudar o status/pago em si -- so por dentro do Hub, pra corrigir marcacao
+  // errada ou resetar antes de reenviar.
+  const limparMarcacoes = (envioId) => {
+    if (!window.confirm("Limpar as marcações de quem/quando alterou cada NF deste envio? O status (Pago/Pendente/Alteração) continua como está.")) return;
+    const semMarcacao = n => { const { statusAlteradoEm, statusAlteradoPor, ...resto } = n; return resto; };
+    setEnvios(ev => ev.map(e => e.id !== envioId ? e : {
+      ...e,
+      pagoEm: null,
+      pagoPor: null,
+      notasResumo: (e.notasResumo||[]).map(semMarcacao),
+      mensaisResumo: (e.mensaisResumo||[]).map(semMarcacao),
+      livemodeResumo: (e.livemodeResumo||[]).map(semMarcacao),
     }));
   };
 
@@ -548,6 +564,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
             <Button T={T} variant={(envioDetalhe?.pago)?"secondary":"primary"} size="sm" icon={CheckCircle2} onClick={()=>togglePago(envioDetalhe.id)}>
               {(envioDetalhe?.pago)?"Marcar pendente":"Marcar pago"}
             </Button>
+            <Button T={T} variant="secondary" size="sm" icon={Eraser} onClick={()=>limparMarcacoes(envioDetalhe.id)}>Limpar marcações</Button>
             <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());setAddSelLivemode(new Set());}}>
               {addingNotas?"Cancelar":"Adicionar notas"}
             </Button>

@@ -214,25 +214,19 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     const a = document.createElement("a"); a.href = data; a.download = filename; a.click();
   };
 
+  // Rastreio de quem/quando alterou (statusAlteradoEm/Por, pagoEm/pagoPor) só
+  // acontece na pagina publica do envio (EnvioPublico.jsx) -- alteracoes feitas
+  // aqui de dentro do Hub, pela propria equipe, ficam sem marcacao mesmo.
   const togglePago = (envioId) => {
-    const envioAtual = envios.find(e => e.id === envioId);
-    const marcandoComoPago = !envioAtual?.pago;
-    let nome = null;
-    if (marcandoComoPago) {
-      nome = (window.prompt("Seu nome (fica registrado com a confirmação de pagamento):") || "").trim();
-      if (!nome) return;
-    }
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
-      if (marcandoComoPago) {
-        const agora = new Date().toISOString();
-        const marcarPaga = n => ({...n, statusNota:"Pago", statusAlteradoEm: agora, statusAlteradoPor: nome});
+      const novoPago = !e.pago;
+      if (novoPago) {
         return {
-          ...e, pago: true, pagoEm: agora, pagoPor: nome,
-          dataPagamentoEfetiva: e.dataPagamentoEfetiva || new Date().toLocaleDateString("pt-BR"),
-          notasResumo: (e.notasResumo||[]).map(marcarPaga),
-          mensaisResumo: (e.mensaisResumo||[]).map(marcarPaga),
-          livemodeResumo: (e.livemodeResumo||[]).map(marcarPaga),
+          ...e, pago: true,
+          notasResumo: (e.notasResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          mensaisResumo: (e.mensaisResumo||[]).map(n => ({...n, statusNota:"Pago"})),
+          livemodeResumo: (e.livemodeResumo||[]).map(n => ({...n, statusNota:"Pago"})),
         };
       }
       return {...e, pago: false};
@@ -242,17 +236,11 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
   const STATUS_NOTA = ["Pendente","Pago","Alteração"];
   const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Pago":"#22c55e","Alteração":"#ef4444"};
 
-  // Pede quem está alterando -- mesmo rastro de data/hora/nome que a página pública
-  // do envio já registra, pra saber quem mexeu no status mesmo quando é a própria
-  // equipe corrigindo algo, não só o responsável pelo pagamento.
   const updateNotaStatus = (envioId, notaId, tipo, novoStatus) => {
-    const nome = (window.prompt("Seu nome (fica registrado com a alteração):") || "").trim();
-    if (!nome) return;
-    const agora = new Date().toISOString();
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
       const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
-      return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus, statusAlteradoEm: agora, statusAlteradoPor: nome} : n)};
+      return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n)};
     }));
   };
 

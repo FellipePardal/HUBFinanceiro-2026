@@ -38,6 +38,9 @@ export default function EnvioPublico({ numero, envioRef }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [payerName, setPayerName] = useState("");
   const [paying, setPaying] = useState(false);
+  const [statusChange, setStatusChange] = useState(null); // {notaId, tipo, novoStatus, statusAtual}
+  const [statusChangeName, setStatusChangeName] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
   const { stateKey, target } = parseEnvioRef(envioRef ?? numero);
   const dedupeNotasPorNF = stateKey === "paulistao_envios";
@@ -125,19 +128,36 @@ export default function EnvioPublico({ numero, envioRef }) {
     });
   };
 
-  const updateNotaStatus = async (notaId, tipo, novoStatus) => {
+  // Toda alteração de status de NF pede o nome de quem alterou e registra
+  // quando -- sem isso não tinha como saber se um atraso no pagamento veio de
+  // alguém não ter olhado o envio ou de uma alteração que ninguém rastreou.
+  const requestStatusChange = (notaId, tipo, novoStatus, statusAtual) => {
+    if (novoStatus === statusAtual) return;
+    setStatusChange({ notaId, tipo, novoStatus, statusAtual });
+    setStatusChangeName("");
+  };
+
+  const confirmStatusChange = async () => {
+    const nome = statusChangeName.trim();
+    if (!statusChange || !nome) return;
+    setSavingStatus(true);
     try {
+      const { notaId, tipo, novoStatus } = statusChange;
       const todosEnvios = (await getState(stateKey)) || [];
       const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
+      const agora = new Date().toISOString();
       const atualizado = todosEnvios.map(e => !envioMatches(e, target) ? e : {
         ...e,
-        [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n),
+        [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus, statusAlteradoEm: agora, statusAlteradoPor: nome} : n),
       });
       await setState(stateKey, atualizado);
       setEnvio(atualizado.find(e => envioMatches(e, target)) || null);
+      setStatusChange(null);
+      setStatusChangeName("");
     } catch (err) {
       alert("Erro ao atualizar status: " + err.message);
     }
+    setSavingStatus(false);
   };
 
   if (loading) return (
@@ -186,7 +206,7 @@ export default function EnvioPublico({ numero, envioRef }) {
               {envio.dataPagamento && <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>Pagamento previsto: <span className="num">{envio.dataPagamento}</span></p>}
               {envio.pago && (envio.dataPagamentoEfetiva || envio.pagoPor) && (
                 <p style={{fontSize:12,margin:"4px 0 0",color:"#86efac",fontWeight:600}}>
-                  Pago{envio.dataPagamentoEfetiva?<> em <span className="num">{envio.dataPagamentoEfetiva}</span></>:""}{envio.pagoPor?` por ${envio.pagoPor}`:""}
+                  Pago{envio.dataPagamentoEfetiva?<> em <span className="num">{envio.dataPagamentoEfetiva}</span></>:""}{envio.pagoEm?<> às <span className="num">{new Date(envio.pagoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span></>:""}{envio.pagoPor?` por ${envio.pagoPor}`:""}
                 </p>
               )}
               {envio.obs && <p style={{fontSize:12,margin:"6px 0 0",color:"#bbf7d0",fontStyle:"italic"}}>{envio.obs}</p>}
@@ -271,10 +291,11 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span style={{fontSize:11,color:T.textSm}}>{n.jogoLabel}</span>
                 <span style={{fontSize:10,color:T.textSm,background:T.surfaceAlt,padding:"2px 8px",borderRadius:4}}>Rd {n.rodada}</span>
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
-                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"jogo",e.target.value)} className="no-print"
+                <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"jogo",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
+                {n.statusAlteradoEm && <span style={{fontSize:10,color:T.textSm}}>alterado {new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` por ${n.statusAlteradoPor}`:""}</span>}
                 {(n.servicosLabels||[]).length > 0 && <span style={{fontSize:10,color:T.textSm,flex:"1 1 100%"}}>{(n.servicosLabels||[]).join(", ")}</span>}
                 {n.hasFile && <button onClick={() => downloadNF(n.id, n.codigo)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
               </div>
@@ -300,10 +321,11 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span className="num" style={{fontSize:13,fontWeight:700,color:purple,minWidth:80}}>{fmt(n.valor)}</span>
                 <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
-                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"mensal",e.target.value)} className="no-print"
+                <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"mensal",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
+                {n.statusAlteradoEm && <span style={{fontSize:10,color:T.textSm}}>alterado {new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` por ${n.statusAlteradoPor}`:""}</span>}
                 {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_${n.fornecedor}`)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
               </div>
             ))}
@@ -328,10 +350,11 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                 {(n.servicosLabels||[]).length > 0 && <span style={{fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>}
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
-                <select value={n.statusNota||"Pendente"} onChange={e=>updateNotaStatus(n.id,"livemode",e.target.value)} className="no-print"
+                <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"livemode",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
+                {n.statusAlteradoEm && <span style={{fontSize:10,color:T.textSm}}>alterado {new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` por ${n.statusAlteradoPor}`:""}</span>}
                 {n.hasFile && <button onClick={() => downloadNF(n.id, `NF_LM_${n.fornecedor}`)} className="no-print" style={{background:T.info,color:"#fff",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:600,display:"inline-flex",alignItems:"center",gap:5,marginLeft:"auto"}}><Download size={12} strokeWidth={2.5}/>Baixar</button>}
               </div>
             ))}
@@ -361,18 +384,18 @@ export default function EnvioPublico({ numero, envioRef }) {
               Valor total: <b className="num" style={{color:T.brand,fontWeight:700}}>{fmt(metricas.totalGeral)}</b> · {metricas.qtdNotas} nota{metricas.qtdNotas!==1?"s":""}
             </p>
             <div style={{marginBottom:22}}>
-              <label style={{display:"block",fontSize:10,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:700}}>Seu nome (opcional)</label>
+              <label style={{display:"block",fontSize:10,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:700}}>Seu nome</label>
               <input value={payerName} onChange={e=>setPayerName(e.target.value)} placeholder="Ex: Maria Silva"
                 style={{width:"100%",boxSizing:"border-box",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",fontSize:13,color:T.text,background:T.bg,fontFamily:"'Poppins',sans-serif"}}/>
-              <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Para registro de quem confirmou o pagamento.</p>
+              <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Obrigatório — registro de quem confirmou o pagamento, com data e horário.</p>
             </div>
             <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
               <button onClick={()=>{setShowConfirm(false);setPayerName("");}} disabled={paying}
                 style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 18px",cursor:"pointer",fontWeight:600,fontSize:13,opacity:paying?0.5:1}}>
                 Cancelar
               </button>
-              <button onClick={confirmarPagamento} disabled={paying}
-                style={{background:paying?"#1f3d24":"linear-gradient(135deg,#047857,#059669)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",cursor:paying?"default":"pointer",fontWeight:700,fontSize:13,display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 4px 14px rgba(5,150,105,0.35)"}}>
+              <button onClick={confirmarPagamento} disabled={paying || !payerName.trim()}
+                style={{background:(paying||!payerName.trim())?"#1f3d24":"linear-gradient(135deg,#047857,#059669)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",cursor:(paying||!payerName.trim())?"default":"pointer",fontWeight:700,fontSize:13,display:"inline-flex",alignItems:"center",gap:8,boxShadow:"0 4px 14px rgba(5,150,105,0.35)",opacity:(paying||!payerName.trim())?0.6:1}}>
                 <CheckCircle2 size={15} strokeWidth={2.5}/>
                 {paying ? "Confirmando..." : "Confirmar"}
               </button>
@@ -380,6 +403,33 @@ export default function EnvioPublico({ numero, envioRef }) {
             <p style={{margin:"16px 0 0",fontSize:11,color:T.textSm,textAlign:"center"}}>
               Esta ação só pode ser revertida pela equipe administrativa.
             </p>
+          </div>
+        </div>
+      )}
+
+      {statusChange && (
+        <div className="no-print" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(4px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:T.card,borderRadius:18,padding:32,maxWidth:420,width:"100%",boxShadow:"0 30px 80px rgba(0,0,0,0.4)",border:`1px solid ${T.border}`}}>
+            <h3 style={{margin:"0 0 8px",fontSize:18,color:T.text,fontWeight:800,letterSpacing:"-0.02em"}}>Confirmar alteração</h3>
+            <p style={{margin:"0 0 22px",color:T.textMd,fontSize:13}}>
+              Mudar status de <b>{statusChange.statusAtual}</b> para <b style={{color:STATUS_NOTA_COLOR[statusChange.novoStatus]}}>{statusChange.novoStatus}</b>.
+            </p>
+            <div style={{marginBottom:22}}>
+              <label style={{display:"block",fontSize:10,color:T.textSm,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:700}}>Seu nome</label>
+              <input value={statusChangeName} onChange={e=>setStatusChangeName(e.target.value)} placeholder="Ex: Maria Silva" autoFocus
+                style={{width:"100%",boxSizing:"border-box",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",fontSize:13,color:T.text,background:T.bg,fontFamily:"'Poppins',sans-serif"}}/>
+              <p style={{margin:"6px 0 0",fontSize:11,color:T.textSm}}>Obrigatório — fica registrado com a data e o horário da alteração.</p>
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button onClick={()=>{setStatusChange(null);setStatusChangeName("");}} disabled={savingStatus}
+                style={{background:T.surface,color:T.text,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 18px",cursor:"pointer",fontWeight:600,fontSize:13,opacity:savingStatus?0.5:1}}>
+                Cancelar
+              </button>
+              <button onClick={confirmStatusChange} disabled={savingStatus || !statusChangeName.trim()}
+                style={{background:(savingStatus||!statusChangeName.trim())?"#1f3d24":"linear-gradient(135deg,#047857,#059669)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",cursor:(savingStatus||!statusChangeName.trim())?"default":"pointer",fontWeight:700,fontSize:13,opacity:(savingStatus||!statusChangeName.trim())?0.6:1}}>
+                {savingStatus ? "Salvando..." : "Confirmar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

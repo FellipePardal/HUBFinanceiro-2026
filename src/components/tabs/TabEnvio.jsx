@@ -233,11 +233,17 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
   const STATUS_NOTA = ["Pendente","Pago","Alteração"];
   const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Pago":"#22c55e","Alteração":"#ef4444"};
 
+  // Pede quem está alterando -- mesmo rastro de data/hora/nome que a página pública
+  // do envio já registra, pra saber quem mexeu no status mesmo quando é a própria
+  // equipe corrigindo algo, não só o responsável pelo pagamento.
   const updateNotaStatus = (envioId, notaId, tipo, novoStatus) => {
+    const nome = (window.prompt("Seu nome (fica registrado com a alteração):") || "").trim();
+    if (!nome) return;
+    const agora = new Date().toISOString();
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
       const campo = tipo === "jogo" ? "notasResumo" : tipo === "mensal" ? "mensaisResumo" : "livemodeResumo";
-      return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus} : n)};
+      return {...e, [campo]: (e[campo]||[]).map(n => n.id === notaId ? {...n, statusNota: novoStatus, statusAlteradoEm: agora, statusAlteradoPor: nome} : n)};
     }));
   };
 
@@ -729,6 +735,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
                           {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
                         </select>
+                        {n.statusAlteradoEm && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap"}}>{new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` · ${n.statusAlteradoPor}`:""}</div>}
                       </td>
                       <td style={TS.td}>{n.hasFile && (
                         <div style={{display:"flex",gap:4}}>
@@ -777,6 +784,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                         ) : (
                           <span style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700}}>{n.statusNota||"Pendente"}</span>
                         )}
+                        {n.statusAlteradoEm && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap"}}>{new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` · ${n.statusAlteradoPor}`:""}</div>}
                       </td>
                       <td style={TS.td}>{n.hasFile && (
                         <div style={{display:"flex",gap:4}}>
@@ -820,6 +828,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"4px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
                           {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
                         </select>
+                        {n.statusAlteradoEm && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap"}}>{new Date(n.statusAlteradoEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}{n.statusAlteradoPor?` · ${n.statusAlteradoPor}`:""}</div>}
                       </td>
                       <td style={TS.td}>{n.hasFile && (
                         <div style={{display:"flex",gap:4}}>

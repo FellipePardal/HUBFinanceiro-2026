@@ -40,7 +40,7 @@ function abreviar(nome) {
 
 // ─── Componente Principal ──────────────────────────────────────────────────
 // Modelo de dado: { id, jogoId, prestador, valores:{transporte_locado,uber,hospedagem,outros}, status, obs, hasFile, reembolso? }
-export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, eventosLog, setEventosLog, setNotas, historicoKey = 'nf_historico', T }) {
+export default function TabLogistica({ logistica, setLogistica, jogos, fornecedores, eventosLog, setEventosLog, notas = [], setNotas, historicoKey = 'nf_historico', T }) {
   const fornecedoresList = Array.isArray(fornecedores) ? fornecedores : [];
   const eventos = Array.isArray(eventosLog) ? eventosLog : [];
   const [tab, setTab] = useState("grade");
@@ -220,7 +220,14 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
   const TABS = [
     {value:"grade",    label:"Grade Jogo × Prestador"},
     {value:"graficos", label:"Gráficos"},
+    {value:"nfs",      label:"NFs de Reembolso"},
   ];
+
+  // NFs de reembolso Livemode, com a quebra por jogo (servicosDetalhe: "jogoId_reembolso_log")
+  // -- lugar dedicado pra ver o vínculo NF↔jogo sem precisar abrir Notas Fiscais.
+  const reembolsos = (notas || []).filter(n => n.tipo === "reembolso_livemode")
+    .sort((a,b) => (b.id||0) - (a.id||0));
+  const totalReembolsos = reembolsos.reduce((s,n) => s + (n.valorNF||0), 0);
 
   // Estilos reutilizados
   const inputInlineStyle = {
@@ -578,6 +585,51 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
             </div>
           </Card>
         </div>
+      )}
+
+      {/* NFS DE REEMBOLSO — lugar dedicado pra ver a quebra NF ↔ jogo */}
+      {tab === "nfs" && (
+        <Card T={T}>
+          <div style={{padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`}}>
+            <h4 style={{margin:0,color:T.text,fontSize:13,fontWeight:700}}>NFs de Reembolso Logística</h4>
+            <span className="num" style={{color:teal,fontWeight:800,fontSize:15}}>{fmt(totalReembolsos)}</span>
+          </div>
+          {reembolsos.length === 0 ? (
+            <p style={{color:T.textSm,fontSize:12,padding:20,margin:0}}>Nenhuma NF de reembolso registrada ainda.</p>
+          ) : (
+            <div style={{padding:"4px 0"}}>
+              {reembolsos.map(n => {
+                const porJogo = Object.entries(n.servicosDetalhe || {})
+                  .map(([k, valor]) => {
+                    const jogoId = parseInt(k.split("_")[0]);
+                    const jogo = jogos.find(j => j.id === jogoId);
+                    return { jogoId, jogo, valor };
+                  })
+                  .sort((a,b) => (a.jogo?.rodada||0) - (b.jogo?.rodada||0));
+                return (
+                  <div key={n.id} style={{padding:"12px 20px",borderTop:`1px solid ${T.border}`}}>
+                    <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
+                      <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
+                      <span style={{color:T.text,fontWeight:600,fontSize:13}}>{n.fornecedor}</span>
+                      {n.numeroNF && <span style={{color:T.textSm,fontSize:11}}>NF {n.numeroNF}</span>}
+                      {n.rodadasLabel && <Pill label={n.rodadasLabel} color={teal}/>}
+                      {n.dataEmissao && <span style={{color:T.textSm,fontSize:11}}>Emissão {n.dataEmissao}</span>}
+                      <span className="num" style={{marginLeft:"auto",color:purple,fontWeight:700,fontSize:14}}>{fmt(n.valorNF)}</span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,paddingLeft:4}}>
+                      {porJogo.map(({jogoId, jogo, valor}) => (
+                        <span key={jogoId} style={{fontSize:11,color:T.textMd,background:T.bg,borderRadius:6,padding:"3px 8px",border:`1px solid ${T.border}`}}>
+                          {jogo ? `Rd${jogo.rodada} ${abreviar(jogo.mandante)}×${abreviar(jogo.visitante)}` : `jogo ${jogoId}`}
+                          {" · "}<b className="num">{fmt(valor)}</b>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       )}
 
       {showReembolso && <ReembolsoLogisticaModal jogos={jogos} fornecedores={fornecedoresList} onSave={registrarReembolso} onClose={()=>setShowReembolso(false)} T={T}/>}

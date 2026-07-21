@@ -1430,28 +1430,17 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                 </table>
               </div>
 
-              {[
-                { titulo: "NFs Avulsas neste jogo", cor: T.warning, filtro: n => n.tipo === "avulsa" },
-                { titulo: "Reembolso Logística neste jogo", cor: "#65B32E", filtro: n => n.tipo === "reembolso_livemode" },
-              ].map(({ titulo, cor, filtro }) => {
-                const nfsDoGrupo = nfsDoJogo.filter(filtro);
-                if (nfsDoGrupo.length === 0) return null;
-                return (
-                <div key={titulo} style={{padding:"10px 16px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
-                  <p style={{color:cor,fontSize:10,fontWeight:700,margin:"0 0 6px",letterSpacing:"0.06em",textTransform:"uppercase"}}>{titulo}</p>
-                  {nfsDoGrupo.map(n => {
+              {nfsDoJogo.filter(n => n.tipo === "avulsa").length > 0 && (
+                <div style={{padding:"10px 16px",borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
+                  <p style={{color:T.warning,fontSize:10,fontWeight:700,margin:"0 0 6px",letterSpacing:"0.06em",textTransform:"uppercase"}}>NFs Avulsas neste jogo</p>
+                  {nfsDoJogo.filter(n => n.tipo === "avulsa").map(n => {
                     const descricao = n.descricao || (n.servicosLabels || [])[0] || "Avulsa";
-                    const isReembolso = n.tipo === "reembolso_livemode";
-                    const valorExibido = isReembolso
-                      ? (n.servicosDetalhe?.[`${jogo.id}_reembolso_log`] || 0)
-                      : n.valorNF;
                     return (
                       <div key={n.id} style={{display:"flex",gap:12,alignItems:"center",fontSize:12,padding:"4px 0",flexWrap:"wrap"}}>
                         <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
                         <span style={{color:T.text,fontWeight:600}}>{n.fornecedor}</span>
-                        <Pill label={descricao} color={cor}/>
-                        <span className="num" style={{color:purple,fontWeight:700}}>{fmt(valorExibido)}</span>
-                        {isReembolso && <span style={{fontSize:10,color:T.textSm}}>({fmt(n.valorNF)} total)</span>}
+                        <Pill label={descricao} color={T.warning}/>
+                        <span className="num" style={{color:purple,fontWeight:700}}>{fmt(n.valorNF)}</span>
                         {n.numeroNF && <span style={{color:T.textSm,fontSize:11}}>NF {n.numeroNF}</span>}
                         {n.dataEmissao && <span style={{color:T.textSm,fontSize:11}}>Emissão {n.dataEmissao}</span>}
                         <span style={{marginLeft:"auto",display:"flex",gap:4}}>
@@ -1464,8 +1453,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     );
                   })}
                 </div>
-                );
-              })}
+              )}
             </Card>
           );
         })}

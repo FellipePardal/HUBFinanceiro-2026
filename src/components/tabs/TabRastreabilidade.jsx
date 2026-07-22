@@ -18,20 +18,6 @@ const mesDeData = dataStr => {
 const SUBKEY_TO_CAT = {};
 CATS.forEach(cat => cat.subs.forEach(sub => { SUBKEY_TO_CAT[sub.key] = cat; }));
 
-// Lançamentos de Logística (TabLogistica) alimentam transporte/uber/hospedagem/outros_log
-// do orçamento por uma fonte separada das Notas Fiscais — ver logRealizadoPorJogo em
-// Paulistao.jsx/App.jsx. Cada campo bruto vira uma linha aqui, já no subKey final,
-// para que a soma bata exatamente com o que o dashboard mostra.
-const LOG_CAMPO_INFO = {
-  transporte_locado: { label:"Transporte Locado", subKey:"transporte" },
-  passagem:          { label:"Passagem",          subKey:"transporte" },
-  uber:              { label:"Uber",              subKey:"uber" },
-  hospedagem:        { label:"Hospedagem",         subKey:"hospedagem" },
-  clara:             { label:"Clara",              subKey:"hospedagem" },
-  espresso:          { label:"Espresso",           subKey:"hospedagem" },
-  outros:            { label:"Outros (Log.)",      subKey:"outros_log" },
-};
-const LOG_CATS_COM_AJUSTE = ["passagem", "hospedagem"];
 
 // Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId.
 // Aplica o mesmo ALIAS_SUBKEY do motor de cálculo (TabNotas.jsx) para que subKeys
@@ -74,12 +60,11 @@ const TIPOS = [
   { value:"avulsa",     label:"Avulsa" },
   { value:"mensal",     label:"Mensal" },
   { value:"fixo",       label:"Fixo" },
-  { value:"logistica",  label:"Logística" },
   { value:"livemode",   label:"Livemode" },
   { value:"reembolso",  label:"Reembolso Livemode" },
 ];
 
-export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, logistica = [], notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
+export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
   const TS = tableStyles(T);
   const purple = "#a855f7";
 
@@ -174,32 +159,6 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     };
   }), [notasMensais, servicoInfo]);
 
-  const linhasLogistica = useMemo(() => {
-    const out = [];
-    (logistica || []).filter(l => l && l.jogoId != null).forEach(l => {
-      const jogo = jogos.find(j => j.id === l.jogoId);
-      Object.entries(LOG_CAMPO_INFO).forEach(([campo, info]) => {
-        const base = parseFloat(l.valores?.[campo]) || 0;
-        const ajuste = LOG_CATS_COM_AJUSTE.includes(campo) ? (parseFloat(l.ajustes?.[campo]?.valor) || 0) : 0;
-        const valor = base + ajuste;
-        if (valor === 0) return;
-        out.push({
-          id: `${l.id}_${campo}`, origem:"logistica", tipo:"logistica",
-          fornecedor: l.prestador || "—",
-          numeroNF: "", codigo: "",
-          valorNF: valor, scale: 1,
-          rodada: jogo?.rodada ?? null, mes: mesDeData(jogo?.data),
-          jogoLabel: jogo ? `${jogo.mandante} x ${jogo.visitante}` : "",
-          descricao: info.label + (ajuste ? ` (c/ ajuste: ${l.ajustes?.[campo]?.motivo || "s/ motivo"})` : ""),
-          categorias: [SUBKEY_TO_CAT[info.subKey]?.label || "Logística"],
-          dataEmissao: "", hasFile: !!l.arquivos?.[campo],
-          _papel: {}, _subKeyFinal: info.subKey,
-        });
-      });
-    });
-    return out;
-  }, [logistica, jogos]);
-
   // NFs Livemode/liveU: alimentam jogo.realizado.infra em bloco (TabLivemode.syncInfra),
   // sem quebra por jogo/subserviço — mostradas aqui pra fechar a ponta de rastreabilidade,
   // já que antes elas não apareciam em lugar nenhum fora da própria aba Livemode.
@@ -222,7 +181,12 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     ];
   }, [notasLivemode, notasLiveU]);
 
-  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal, ...linhasLogistica, ...linhasLivemode], [linhasJogo, linhasMensal, linhasLogistica, linhasLivemode]);
+  // Rastreabilidade é 100% Notas Fiscais — lançamentos de Logística (rascunho pra
+  // consolidar e pedir o reembolso à Livemode) não entram aqui, só a NF em si
+  // (já coberta por linhasJogo via tipo "reembolso_livemode"). Contá-los junto
+  // inflaria o total com dinheiro ainda não faturado, ou duplicaria quando a
+  // NF de reembolso sair.
+  const linhas = useMemo(() => [...linhasJogo, ...linhasMensal, ...linhasLivemode], [linhasJogo, linhasMensal, linhasLivemode]);
 
   const matchFiltroInicial = linha => {
     if (!filtroInicial) return true;
@@ -230,7 +194,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     if (filtroInicial.outrosMensais) return !!linha._isOutrosMensais;
     if (filtroInicial.subKeys) {
       if (linha.origem === "jogo") return Object.keys(linha._papel).some(sk => filtroInicial.subKeys.includes(sk));
-      if (linha.origem === "logistica" || linha.origem === "livemode") return filtroInicial.subKeys.includes(linha._subKeyFinal);
+      if (linha.origem === "livemode") return filtroInicial.subKeys.includes(linha._subKeyFinal);
       if (linha.origem === "mensal") return !!filtroInicial.catKey && linha._catKeyMensal === filtroInicial.catKey;
     }
     return true;
@@ -303,8 +267,8 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return [...map.values()].sort((a,b) => b.valor - a.valor);
   }, [agrupamento, linhasFiltradas, filtroInicial]);
 
-  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", logistica:"Logística", livemode:"Livemode", reembolso:"Reembolso Livemode" };
-  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", logistica:"#16A34A", livemode:"#a855f7", reembolso:"#64748b" };
+  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", livemode:"Livemode", reembolso:"Reembolso Livemode" };
+  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", livemode:"#a855f7", reembolso:"#64748b" };
 
   const LinhaRow = ({ l }) => (
     <tr style={TS.tr}>

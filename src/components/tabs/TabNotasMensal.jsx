@@ -3,6 +3,7 @@ import { KPI, Pill } from "../shared";
 import { fmt } from "../../utils";
 import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
+import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText, Edit2, Check } from "lucide-react";
 
@@ -238,7 +239,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
   );
 }
 
-export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], T, role = 'admin' }) {
+export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], envios = [], setEnvios, T, role = 'admin' }) {
   const canEdit = role === 'admin';
   const [mesSel, setMesSel] = useState(new Date().getMonth());
   const [filtroCat, setFiltroCat] = useState("Todas");
@@ -278,11 +279,23 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
   };
 
   const deleteNota = id => {
-    if (window.confirm("Excluir esta nota?")) {
-      const nota = notas.find(n => n.id === id);
-      deleteNFFile(id);
-      setNotas(ns => ns.filter(n => n.id !== id));
-      if (nota) pushHistoricoMensal({ ...nota, decisao: "excluida", excluidoEm: new Date().toISOString() });
+    const nota = notas.find(n => n.id === id);
+    const enviosAfetados = (envios || []).filter(e => (e.mensaisIds || []).includes(id));
+    const temEnvio = enviosAfetados.length > 0;
+    const msg = temEnvio
+      ? `Excluir esta nota? Ela está no ${enviosAfetados[0].nome || `Envio ${enviosAfetados[0].numero}`} e também será removida de lá.`
+      : "Excluir esta nota?";
+    if (!window.confirm(msg)) return;
+    deleteNFFile(id);
+    setNotas(ns => ns.filter(n => n.id !== id));
+    if (nota) pushHistoricoMensal({ ...nota, decisao: "excluida", excluidoEm: new Date().toISOString() });
+    if (setEnvios && temEnvio) {
+      setEnvios(evs => evs.map(e => {
+        if (!(e.mensaisIds || []).includes(id)) return e;
+        const mensaisIds = (e.mensaisIds || []).filter(mid => mid !== id);
+        const mensaisResumo = (e.mensaisResumo || []).filter(n => n.id !== id);
+        return normalizeEnvioMetricas({ ...e, mensaisIds, mensaisResumo });
+      }));
     }
   };
 

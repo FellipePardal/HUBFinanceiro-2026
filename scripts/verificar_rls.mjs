@@ -61,9 +61,15 @@ async function main() {
     const insNegado = ins.status === 401 || ins.status === 403;
     linha('INSERT chave protegida', 'negado', `HTTP ${ins.status}${insNegado ? '' : ' (PASSOU!)'}`, insNegado);
 
-    // tentativa de DELETE (deve ser NEGADA / não apagar nada)
-    const del = await fetch(`${U}/rest/v1/app_state?key=eq.${probe}`, { method: 'DELETE', headers: H });
-    linha('DELETE chave protegida', 'negado/0 linhas', `HTTP ${del.status}`, del.status === 401 || del.status === 403 || del.status === 200);
+    // tentativa de DELETE numa chave financeira REAL (notas): pede o que foi
+    // apagado de volta. Com RLS, o anon não enxerga a linha => 0 apagadas.
+    const del = await fetch(`${U}/rest/v1/app_state?key=eq.notas`, {
+      method: 'DELETE', headers: { ...H, Prefer: 'return=representation' },
+    });
+    let apagadas = 0;
+    try { apagadas = (await del.json()).length; } catch (_) {}
+    const deleteSeguro = del.status === 401 || del.status === 403 || (del.status === 200 && apagadas === 0);
+    linha('DELETE em "notas" (real)', '0 linhas apagadas', `HTTP ${del.status}, ${apagadas} apagada(s)`, deleteSeguro);
 
     // limpeza: se o INSERT passou (RLS ainda off), remove o lixo com service key se houver
     if (!insNegado) {

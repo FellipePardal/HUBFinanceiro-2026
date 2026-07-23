@@ -47,6 +47,12 @@ $$;
 -- ── Liga o RLS ───────────────────────────────────────────────────────────────
 alter table public.app_state enable row level security;
 
+-- Policy permissiva legada "allow_all" (ALL / roles=public / using=true): ficava
+-- inofensiva com o RLS desligado, mas ao ligar o RLS ela libera TODO MUNDO (anon
+-- incluso) e anula as regras abaixo. Tem que sair. (Descoberta ao aplicar em prod
+-- em 2026-07-23 — o anon continuava lendo tudo até dropar isto.)
+drop policy if exists "allow_all" on public.app_state;
+
 -- ── Policies (idempotente: dropa antes de recriar) ──────────────────────────
 drop policy if exists "app_state auth all"     on public.app_state;
 drop policy if exists "app_state anon read"    on public.app_state;

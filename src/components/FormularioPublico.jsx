@@ -23,6 +23,25 @@ const getIS = T => ({ background:T.surfaceAlt, border:`1px solid ${T.border}`, b
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 const HIDE_SPINNERS = `input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield}`;
 
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+// ── Serviços mensais (Brasileirão) ────────────────────────────────────────────
+// Cada linha aponta pra ONDE o realizado é preenchido quando a NF é aprovada:
+//   • servicoId != null  → serviço fixo (servicosCalc soma notas_mensais por servicoId)
+//   • servicoId == null  → categoria variável ("Outro" cai em "Outros Mensais";
+//                          "Seg. Espacial" é rateada entre os jogos do mês)
+// `descricao` guarda o nome real do serviço pra rastreabilidade quando a categoria
+// gravada é genérica (Grafismo/Outro). Mapeamento definido com o cliente 2026-07-23.
+const SERVICOS_MENSAIS = [
+  { label:"Antipirataria",                            servicoId:7,    categoria:"Antipirataria (Serviço LiveMode)" },
+  { label:"Manutenção e Atualização de projetos VMIX", servicoId:12,  categoria:"Grafismo" },
+  { label:"Assistente de credenciamento",             servicoId:null, categoria:"Outro" },
+  { label:"Estatísticas",                             servicoId:8,    categoria:"Estatísticas" },
+  { label:"Monitoração",                              servicoId:null, categoria:"Outro" },
+  { label:"Segmento Espacial",                        servicoId:null, categoria:"Seg. Espacial" },
+  { label:"Edição",                                   servicoId:9,    categoria:"Ferramenta de Clipping" },
+];
+
 function extrairServicos(jogo) {
   const s = [];
   CATS.forEach(cat => { cat.subs.forEach(sub => {
@@ -61,23 +80,58 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
   );
 }
 
-const STEPS = ["Rodada","Jogos","Serviços","Valores","Nota Fiscal"];
-
-export default function FormularioPublico() {
-  const [darkMode, setDarkMode] = useState(() => {
-    try { return localStorage.getItem("ffu_darkmode_v1") !== "false"; } catch { return true; }
-  });
-  const T = darkMode ? DARK_T : LIGHT_T;
+// Passo "Dados da Nota Fiscal" — compartilhado entre o fluxo de jogo e o mensal.
+function NFDataStep({ nfData, setNfData, arquivo, setArquivo, fileRef, fornecedores, resumo, T }) {
   const IS = getIS(T);
-  const toggleDark = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    try { localStorage.setItem("ffu_darkmode_v1", String(next)); } catch {}
-  };
-  const [jogos, setJogos] = useState([]);
-  const [fornecedores, setFornecedores] = useState([]);
-  const [loading, setLoading] = useState(true);
+  return (
+    <div>
+      <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Dados da Nota Fiscal</h3>
+      <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Preencha os dados e anexe o arquivo</p>
+      <div style={{marginBottom:14}}>
+        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor / Razão Social</label>
+        <FornecedorInput value={nfData.fornecedor} onChange={v => setNfData(d => ({...d, fornecedor:v}))} fornecedores={fornecedores} T={T}/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota Fiscal</label>
+        <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF:e.target.value}))} style={IS}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Emissão</label>
+          <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+        </div>
+        <div>
+          <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Envio</label>
+          <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+        </div>
+      </div>
+      <div style={{marginBottom:14}}>
+        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações (opcional)</label>
+        <input value={nfData.obs} onChange={e => setNfData(d => ({...d, obs:e.target.value}))} style={IS}/>
+      </div>
+      <div style={{marginBottom:16}}>
+        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF</label>
+        <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
+        <div onClick={() => fileRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0]||null);}}
+          style={{border:`2px dashed ${arquivo?BRAND:T.muted}`,borderRadius:10,padding:"20px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
+          {arquivo
+            ? <p style={{margin:0,color:BRAND,fontSize:14,fontWeight:600}}>{arquivo.name}<br/><span style={{fontSize:12,fontWeight:400}}>({(arquivo.size/1024).toFixed(0)} KB)</span></p>
+            : <p style={{margin:0,color:T.textSm,fontSize:13}}>Toque para selecionar ou arraste o arquivo<br/><span style={{fontSize:11}}>PDF, PNG, JPG (máx. 10MB)</span></p>}
+        </div>
+      </div>
+      {resumo}
+    </div>
+  );
+}
 
+const STEPS_JOGO = ["Rodada","Jogos","Serviços","Valores","Nota Fiscal"];
+const STEPS_MENSAL = ["Mês","Serviço","Valor","Nota Fiscal"];
+
+// ── Formulário POR JOGO ────────────────────────────────────────────────────────
+function FormJogo({ jogos, fornecedores, onDone, T }) {
+  const IS = getIS(T);
   const [step, setStep] = useState(0);
   const [rodadaSel, setRodadaSel] = useState(null);
   const [qtdJogos, setQtdJogos] = useState(1);
@@ -87,16 +141,7 @@ export default function FormularioPublico() {
   const [nfData, setNfData] = useState({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", obs:""});
   const [arquivo, setArquivo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
   const fileRef = useRef(null);
-
-  useEffect(() => {
-    Promise.all([getState('jogos'), getState('fornecedores')]).then(([j, f]) => {
-      if (j) setJogos(j);
-      if (f) setFornecedores(f);
-      setLoading(false);
-    });
-  }, []);
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
@@ -157,18 +202,375 @@ export default function FormularioPublico() {
       }
       const current = (await getState('nf_submissions')) || [];
       await setState('nf_submissions', [...current, ...submissions]);
-      setDone(true);
+      onDone();
     } catch (err) {
       alert("Erro ao enviar a NF, tente novamente: " + err.message);
     }
     setSubmitting(false);
   };
 
-  const reset = () => {
-    setStep(0); setRodadaSel(null); setQtdJogos(1); setJogosSel([]);
-    setServicosSel({}); setValores({}); setNfData({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", obs:""});
-    setArquivo(null); setDone(false);
+  return (
+    <>
+      {/* Progress */}
+      <div style={{display:"flex",gap:6,marginBottom:24}}>
+        {STEPS_JOGO.map((s, i) => (
+          <div key={s} style={{flex:1,textAlign:"center"}}>
+            <div style={{height:4,borderRadius:2,background:i<=step?BRAND:T.border,marginBottom:6,boxShadow:i<=step?`0 0 12px ${BRAND}aa`:"none"}}/>
+            <span style={{fontSize:10,color:i<=step?BRAND:T.textSm,fontWeight:i===step?700:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:T.card,borderRadius:16,padding:"24px 20px",minHeight:200}}>
+
+        {/* STEP 0: Rodada */}
+        {step === 0 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual a rodada?</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada referente à nota fiscal</p>
+            <select value={rodadaSel||""} onChange={e => setRodadaSel(parseInt(e.target.value))}
+              style={{...IS,fontSize:16,fontWeight:600,padding:"14px",color:rodadaSel?T.text:T.textSm}}>
+              <option value="" disabled>Selecione a rodada...</option>
+              {rodadas.map(r => <option key={r} value={r}>Rodada {r}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* STEP 1: Jogos */}
+        {step === 1 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Quantos jogos?</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Essa NF cobre quantos jogos da rodada {rodadaSel}?</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+              {[1,2].map(n => (
+                <button key={n} onClick={() => { setQtdJogos(n); setJogosSel([]); }} style={{padding:"14px",borderRadius:10,border:`2px solid ${qtdJogos===n?BRAND:T.border}`,cursor:"pointer",fontSize:15,fontWeight:700,
+                  background:qtdJogos===n?T.brandSoft:T.bg,color:qtdJogos===n?BRAND:T.textMd,textAlign:"center"}}>
+                  {n} jogo{n>1?"s":""}
+                </button>
+              ))}
+            </div>
+            <p style={{color:T.textMd,fontSize:12,margin:"0 0 10px",fontWeight:600}}>Selecione o{qtdJogos>1?"s":""} jogo{qtdJogos>1?"s":""}:</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {jogosRodada.map(j => {
+                const sel = jogosSel.includes(j.id);
+                return (
+                  <button key={j.id} onClick={() => toggleJogo(j.id)}
+                    style={{padding:"14px 16px",borderRadius:12,border:`2px solid ${sel?BRAND:T.border}`,cursor:"pointer",
+                      background:sel?T.brandSoft:T.bg,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14,color:T.text}}>{j.mandante} x {j.visitante}</div>
+                      <div style={{color:T.textSm,fontSize:12,marginTop:2}}>{j.data} · {j.cidade}</div>
+                    </div>
+                    <Pill label={j.categoria} color={j.categoria==="B1"?BRAND:"#f59e0b"}/>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: Serviços */}
+        {step === 2 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Serviços prestados</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione os serviços que você realizou</p>
+            {jogosSel.map(jogoId => {
+              const jogo = divulgados.find(j => j.id === jogoId);
+              if (!jogo) return null;
+              const servicos = extrairServicos(jogo);
+              const selected = servicosSel[jogoId] || [];
+              const byCat = {};
+              servicos.forEach(s => { if (!byCat[s.catLabel]) byCat[s.catLabel] = {color:s.catColor,items:[]}; byCat[s.catLabel].items.push(s); });
+              return (
+                <div key={jogoId} style={{marginBottom:20}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                    <Pill label={jogo.categoria} color={jogo.categoria==="B1"?BRAND:"#f59e0b"}/>
+                    <span style={{fontWeight:700,fontSize:14,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
+                  </div>
+                  {Object.entries(byCat).map(([catName, {color, items}]) => (
+                    <div key={catName} style={{marginBottom:12}}>
+                      <p style={{color,fontSize:12,fontWeight:700,margin:"0 0 8px"}}>{catName}</p>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                        {items.map(s => {
+                          const sel = selected.includes(s.subKey);
+                          return (
+                            <button key={s.subKey} onClick={() => toggleServico(jogoId, s.subKey)}
+                              style={{padding:"10px 12px",borderRadius:8,border:`2px solid ${sel?color:T.border}`,cursor:"pointer",fontSize:13,fontWeight:sel?700:400,
+                                background:sel?color+"22":"transparent",color:sel?color:T.textMd,textAlign:"center"}}>
+                              {s.subLabel}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* STEP 3: Valores */}
+        {step === 3 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Valores</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Informe o valor de cada serviço</p>
+            {jogosSel.map(jogoId => {
+              const jogo = divulgados.find(j => j.id === jogoId);
+              if (!jogo) return null;
+              const subs = servicosSel[jogoId] || [];
+              const allServicos = extrairServicos(jogo);
+              return (
+                <div key={jogoId} style={{marginBottom:20}}>
+                  {jogosSel.length > 1 && (
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                      <Pill label={jogo.categoria} color={jogo.categoria==="B1"?BRAND:"#f59e0b"}/>
+                      <span style={{fontWeight:700,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
+                    </div>
+                  )}
+                  {subs.map(sk => {
+                    const s = allServicos.find(x => x.subKey === sk);
+                    if (!s) return null;
+                    const key = `${jogoId}_${sk}`;
+                    return (
+                      <div key={sk} style={{marginBottom:10}}>
+                        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>{s.subLabel}</label>
+                        <div style={{display:"flex",alignItems:"center",gap:0}}>
+                          <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
+                          <input type="number" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
+                            placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:600,color:BRAND,fontSize:16}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            <div style={{background:T.bg,borderRadius:10,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:T.textMd,fontWeight:600,fontSize:14}}>Total</span>
+              <span style={{fontSize:20,fontWeight:700,color:BRAND}}>{fmt(totalGeral)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: Dados NF */}
+        {step === 4 && (
+          <NFDataStep nfData={nfData} setNfData={setNfData} arquivo={arquivo} setArquivo={setArquivo} fileRef={fileRef} fornecedores={fornecedores} T={T}
+            resumo={
+              <div style={{background:T.bg,borderRadius:10,padding:"14px 16px"}}>
+                <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo</p>
+                {jogosSel.map(jogoId => {
+                  const jogo = divulgados.find(j => j.id === jogoId);
+                  if (!jogo) return null;
+                  const subs = servicosSel[jogoId] || [];
+                  const allServicos = extrairServicos(jogo);
+                  const total = subs.reduce((s, sk) => s + (valores[`${jogoId}_${sk}`] || 0), 0);
+                  return (
+                    <div key={jogoId} style={{marginBottom:8}}>
+                      <div style={{fontWeight:600,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</div>
+                      <div style={{fontSize:11,color:T.textSm,margin:"2px 0"}}>{subs.map(sk => allServicos.find(x => x.subKey === sk)?.subLabel).filter(Boolean).join(", ")}</div>
+                      <div style={{fontSize:13,color:BRAND,fontWeight:700}}>{fmt(total)}</div>
+                    </div>
+                  );
+                })}
+                <div style={{borderTop:`1px solid ${T.border}`,marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:14,fontWeight:700,color:T.text}}>Total</span>
+                  <span style={{fontSize:18,fontWeight:700,color:BRAND}}>{fmt(totalGeral)}</span>
+                </div>
+              </div>
+            }
+          />
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div style={{display:"grid",gridTemplateColumns:step===0?"1fr":"1fr 1fr",gap:10,marginTop:16}}>
+        {step > 0 && (
+          <button onClick={() => setStep(s => s-1)} style={{...btnS,background:"#475569"}}>Voltar</button>
+        )}
+        {step < 4 ? (
+          <button onClick={() => setStep(s => s+1)} disabled={!canNext()}
+            style={{...btnS,background:canNext()?BRAND:"#334155",opacity:canNext()?1:0.5}}>
+            Próximo
+          </button>
+        ) : (
+          <button onClick={handleSubmit} disabled={!canNext()||submitting}
+            style={{...btnS,background:canNext()&&!submitting?BRAND:"#334155",opacity:canNext()&&!submitting?1:0.5,fontSize:16}}>
+            {submitting ? "Enviando..." : "Enviar NF"}
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── Formulário MENSAL ──────────────────────────────────────────────────────────
+function FormMensal({ fornecedores, onDone, T }) {
+  const IS = getIS(T);
+  const [step, setStep] = useState(0);
+  const [mesSel, setMesSel] = useState(new Date().getMonth());
+  const [servicoSel, setServicoSel] = useState(null);
+  const [valor, setValorState] = useState("");
+  const [nfData, setNfData] = useState({ fornecedor:"", numeroNF:"", dataEmissao:"", dataEnvio:"", obs:"" });
+  const [arquivo, setArquivo] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const fileRef = useRef(null);
+
+  const canNext = () => {
+    if (step === 0) return mesSel != null;
+    if (step === 1) return servicoSel != null;
+    if (step === 2) return (parseFloat(valor) || 0) > 0;
+    if (step === 3) return nfData.fornecedor.length > 0;
+    return false;
   };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const submissionId = Date.now();
+      let hasFile = false;
+      if (arquivo) {
+        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      }
+      const submission = {
+        id: submissionId, tipo:"mensal", ...nfData,
+        valorNF: parseFloat(valor) || 0,
+        mes: mesSel, mesLabel: MESES[mesSel],
+        servicoId: servicoSel.servicoId,        // pode ser null (categoria variável)
+        servicoNome: servicoSel.categoria,      // vira `categoria` na aprovação
+        servicosLabels: [servicoSel.label],
+        // guarda o nome real do serviço p/ rastreabilidade quando a categoria é
+        // genérica (Grafismo/Outro); a obs do fornecedor, se houver, vence.
+        descricao: nfData.obs?.trim() || servicoSel.label,
+        status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
+      };
+      const current = (await getState('nf_submissions')) || [];
+      await setState('nf_submissions', [...current, submission]);
+      onDone();
+    } catch (err) {
+      alert("Erro ao enviar a NF, tente novamente: " + err.message);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <>
+      {/* Progress */}
+      <div style={{display:"flex",gap:6,marginBottom:24}}>
+        {STEPS_MENSAL.map((s, i) => (
+          <div key={s} style={{flex:1,textAlign:"center"}}>
+            <div style={{height:4,borderRadius:2,background:i<=step?BRAND:T.border,marginBottom:6,boxShadow:i<=step?`0 0 12px ${BRAND}aa`:"none"}}/>
+            <span style={{fontSize:10,color:i<=step?BRAND:T.textSm,fontWeight:i===step?700:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:T.card,borderRadius:16,padding:"24px 20px",minHeight:200}}>
+
+        {step === 0 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual o mês de referência?</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione o mês da competência</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {MESES.map((m, i) => (
+                <button key={m} onClick={() => setMesSel(i)}
+                  style={{padding:"12px",borderRadius:10,border:`2px solid ${mesSel===i?BRAND:T.border}`,cursor:"pointer",fontSize:14,fontWeight:mesSel===i?700:400,
+                    background:mesSel===i?T.brandSoft:T.bg,color:mesSel===i?BRAND:T.textMd,textAlign:"center"}}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual o serviço?</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione o serviço prestado em {MESES[mesSel]}</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {SERVICOS_MENSAIS.map(s => {
+                const sel = servicoSel?.label === s.label;
+                return (
+                  <button key={s.label} onClick={() => setServicoSel(s)}
+                    style={{padding:"14px 16px",borderRadius:10,border:`2px solid ${sel?BRAND:T.border}`,cursor:"pointer",
+                      background:sel?T.brandSoft:T.bg,color:sel?BRAND:T.textMd,textAlign:"left",fontWeight:sel?700:400,fontSize:14}}>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Valor da NF</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>{servicoSel?.label} · {MESES[mesSel]}</p>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
+              <input type="number" value={valor} onChange={e => setValorState(e.target.value)}
+                placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:700,color:BRAND,fontSize:20}} autoFocus/>
+            </div>
+            {(parseFloat(valor)||0) > 0 && (
+              <div style={{background:T.bg,borderRadius:10,padding:"14px 16px",marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{color:T.textMd,fontWeight:600,fontSize:14}}>Total</span>
+                <span style={{fontSize:20,fontWeight:700,color:BRAND}}>{fmt(parseFloat(valor)||0)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === 3 && (
+          <NFDataStep nfData={nfData} setNfData={setNfData} arquivo={arquivo} setArquivo={setArquivo} fileRef={fileRef} fornecedores={fornecedores} T={T}
+            resumo={
+              <div style={{background:T.bg,borderRadius:10,padding:"14px 16px"}}>
+                <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo</p>
+                <div style={{fontWeight:600,fontSize:13,color:T.text}}>{servicoSel?.label}</div>
+                <div style={{fontSize:11,color:T.textSm,margin:"2px 0"}}>{MESES[mesSel]}</div>
+                <div style={{fontSize:13,color:BRAND,fontWeight:700}}>{fmt(parseFloat(valor)||0)}</div>
+              </div>
+            }
+          />
+        )}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:step===0?"1fr":"1fr 1fr",gap:10,marginTop:16}}>
+        {step > 0 && <button onClick={() => setStep(s => s-1)} style={{...btnS,background:"#475569"}}>Voltar</button>}
+        {step < 3
+          ? <button onClick={() => setStep(s => s+1)} disabled={!canNext()} style={{...btnS,background:canNext()?BRAND:"#334155",opacity:canNext()?1:0.5}}>Próximo</button>
+          : <button onClick={handleSubmit} disabled={!canNext()||submitting} style={{...btnS,background:canNext()&&!submitting?BRAND:"#334155",opacity:canNext()&&!submitting?1:0.5,fontSize:16}}>{submitting?"Enviando...":"Enviar NF"}</button>
+        }
+      </div>
+    </>
+  );
+}
+
+// ── Root ───────────────────────────────────────────────────────────────────────
+export default function FormularioPublico() {
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem("ffu_darkmode_v1") !== "false"; } catch { return true; }
+  });
+  const T = darkMode ? DARK_T : LIGHT_T;
+  const toggleDark = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    try { localStorage.setItem("ffu_darkmode_v1", String(next)); } catch {}
+  };
+  const [jogos, setJogos] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tipo, setTipo] = useState(null); // null | "jogo" | "mensal"
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    Promise.all([getState('jogos'), getState('fornecedores')]).then(([j, f]) => {
+      if (j) setJogos(j);
+      if (f) setFornecedores(f);
+      setLoading(false);
+    });
+  }, []);
+
+  const reset = () => { setTipo(null); setDone(false); };
 
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -204,233 +606,49 @@ export default function FormularioPublico() {
             <p style={{color:T.textMd,fontSize:13,margin:"0 0 28px"}}>Sua NF será analisada pela equipe. Obrigado!</p>
             <button onClick={reset} style={{...btnS,background:`linear-gradient(135deg,#047857,${BRAND})`,maxWidth:280,margin:"0 auto",boxShadow:"0 4px 14px rgba(16,185,129,0.35)"}}>Enviar outra NF</button>
           </div>
-        ) : (<>
 
-          {/* Progress */}
-          <div style={{display:"flex",gap:6,marginBottom:24}}>
-            {STEPS.map((s, i) => (
-              <div key={s} style={{flex:1,textAlign:"center"}}>
-                <div style={{height:4,borderRadius:2,background:i<=step?BRAND:T.border,marginBottom:6,boxShadow:i<=step?`0 0 12px ${BRAND}aa`:"none"}}/>
-                <span style={{fontSize:10,color:i<=step?BRAND:T.textSm,fontWeight:i===step?700:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>{s}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{background:T.card,borderRadius:16,padding:"24px 20px",minHeight:200}}>
-
-            {/* STEP 0: Rodada */}
-            {step === 0 && (
-              <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual a rodada?</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione a rodada referente à nota fiscal</p>
-                <select value={rodadaSel||""} onChange={e => setRodadaSel(parseInt(e.target.value))}
-                  style={{...IS,fontSize:16,fontWeight:600,padding:"14px",color:rodadaSel?T.text:T.textSm}}>
-                  <option value="" disabled>Selecione a rodada...</option>
-                  {rodadas.map(r => <option key={r} value={r}>Rodada {r}</option>)}
-                </select>
-              </div>
-            )}
-
-            {/* STEP 1: Jogos */}
-            {step === 1 && (
-              <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Quantos jogos?</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Essa NF cobre quantos jogos da rodada {rodadaSel}?</p>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
-                  {[1,2].map(n => (
-                    <button key={n} onClick={() => { setQtdJogos(n); setJogosSel([]); }} style={{padding:"14px",borderRadius:10,border:`2px solid ${qtdJogos===n?BRAND:T.border}`,cursor:"pointer",fontSize:15,fontWeight:700,
-                      background:qtdJogos===n?T.brandSoft:T.bg,color:qtdJogos===n?BRAND:T.textMd,textAlign:"center"}}>
-                      {n} jogo{n>1?"s":""}
-                    </button>
-                  ))}
+        ) : !tipo ? (
+          /* Seletor de tipo */
+          <div style={{background:T.card,borderRadius:16,padding:"28px 20px"}}>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Tipo de nota fiscal</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 20px"}}>Selecione o tipo de NF que deseja enviar</p>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <button onClick={() => setTipo("jogo")}
+                style={{padding:"18px 20px",borderRadius:12,border:`2px solid ${T.border}`,cursor:"pointer",background:T.bg,textAlign:"left",
+                  display:"flex",alignItems:"center",gap:16,transition:"border-color 0.15s"}}
+                onMouseEnter={e => e.currentTarget.style.borderColor = BRAND}
+                onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                <div style={{width:44,height:44,borderRadius:10,background:T.brandSoft,border:`1px solid ${T.brandBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>⚽</div>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15,color:T.text}}>Por Jogo</div>
+                  <div style={{fontSize:12,color:T.textSm,marginTop:2}}>Serviços prestados em jogos específicos da rodada</div>
                 </div>
-                <p style={{color:T.textMd,fontSize:12,margin:"0 0 10px",fontWeight:600}}>Selecione o{qtdJogos>1?"s":""} jogo{qtdJogos>1?"s":""}:</p>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {jogosRodada.map(j => {
-                    const sel = jogosSel.includes(j.id);
-                    return (
-                      <button key={j.id} onClick={() => toggleJogo(j.id)}
-                        style={{padding:"14px 16px",borderRadius:12,border:`2px solid ${sel?BRAND:T.border}`,cursor:"pointer",
-                          background:sel?T.brandSoft:T.bg,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div>
-                          <div style={{fontWeight:700,fontSize:14,color:T.text}}>{j.mandante} x {j.visitante}</div>
-                          <div style={{color:T.textSm,fontSize:12,marginTop:2}}>{j.data} · {j.cidade}</div>
-                        </div>
-                        <Pill label={j.categoria} color={j.categoria==="B1"?BRAND:"#f59e0b"}/>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2: Serviços */}
-            {step === 2 && (
-              <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Serviços prestados</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione os serviços que você realizou</p>
-                {jogosSel.map(jogoId => {
-                  const jogo = divulgados.find(j => j.id === jogoId);
-                  if (!jogo) return null;
-                  const servicos = extrairServicos(jogo);
-                  const selected = servicosSel[jogoId] || [];
-                  const byCat = {};
-                  servicos.forEach(s => { if (!byCat[s.catLabel]) byCat[s.catLabel] = {color:s.catColor,items:[]}; byCat[s.catLabel].items.push(s); });
-                  return (
-                    <div key={jogoId} style={{marginBottom:20}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                        <Pill label={jogo.categoria} color={jogo.categoria==="B1"?BRAND:"#f59e0b"}/>
-                        <span style={{fontWeight:700,fontSize:14,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
-                      </div>
-                      {Object.entries(byCat).map(([catName, {color, items}]) => (
-                        <div key={catName} style={{marginBottom:12}}>
-                          <p style={{color,fontSize:12,fontWeight:700,margin:"0 0 8px"}}>{catName}</p>
-                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                            {items.map(s => {
-                              const sel = selected.includes(s.subKey);
-                              return (
-                                <button key={s.subKey} onClick={() => toggleServico(jogoId, s.subKey)}
-                                  style={{padding:"10px 12px",borderRadius:8,border:`2px solid ${sel?color:T.border}`,cursor:"pointer",fontSize:13,fontWeight:sel?700:400,
-                                    background:sel?color+"22":"transparent",color:sel?color:T.textMd,textAlign:"center"}}>
-                                  {s.subLabel}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* STEP 3: Valores */}
-            {step === 3 && (
-              <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Valores</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Informe o valor de cada serviço</p>
-                {jogosSel.map(jogoId => {
-                  const jogo = divulgados.find(j => j.id === jogoId);
-                  if (!jogo) return null;
-                  const subs = servicosSel[jogoId] || [];
-                  const allServicos = extrairServicos(jogo);
-                  return (
-                    <div key={jogoId} style={{marginBottom:20}}>
-                      {jogosSel.length > 1 && (
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                          <Pill label={jogo.categoria} color={jogo.categoria==="B1"?BRAND:"#f59e0b"}/>
-                          <span style={{fontWeight:700,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</span>
-                        </div>
-                      )}
-                      {subs.map(sk => {
-                        const s = allServicos.find(x => x.subKey === sk);
-                        if (!s) return null;
-                        const key = `${jogoId}_${sk}`;
-                        return (
-                          <div key={sk} style={{marginBottom:10}}>
-                            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>{s.subLabel}</label>
-                            <div style={{display:"flex",alignItems:"center",gap:0}}>
-                              <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
-                              <input type="number" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
-                                placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:600,color:BRAND,fontSize:16}}/>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-                <div style={{background:T.bg,borderRadius:10,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:T.textMd,fontWeight:600,fontSize:14}}>Total</span>
-                  <span style={{fontSize:20,fontWeight:700,color:BRAND}}>{fmt(totalGeral)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 4: Dados NF */}
-            {step === 4 && (
-              <div>
-                <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Dados da Nota Fiscal</h3>
-                <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Preencha os dados e anexe o arquivo</p>
-                <div style={{marginBottom:14}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Fornecedor / Razão Social</label>
-                  <FornecedorInput value={nfData.fornecedor} onChange={v => setNfData(d => ({...d, fornecedor:v}))} fornecedores={fornecedores} T={T}/>
-                </div>
-                <div style={{marginBottom:14}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota Fiscal</label>
-                  <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF:e.target.value}))} style={IS}/>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                  <div>
-                    <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Emissão</label>
-                    <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
-                  </div>
-                  <div>
-                    <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Envio</label>
-                    <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
-                  </div>
-                </div>
-                <div style={{marginBottom:14}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações (opcional)</label>
-                  <input value={nfData.obs} onChange={e => setNfData(d => ({...d, obs:e.target.value}))} style={IS}/>
-                </div>
-                <div style={{marginBottom:16}}>
-                  <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF</label>
-                  <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
-                  <div onClick={() => fileRef.current?.click()}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0]||null);}}
-                    style={{border:`2px dashed ${arquivo?BRAND:T.muted}`,borderRadius:10,padding:"20px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
-                    {arquivo
-                      ? <p style={{margin:0,color:BRAND,fontSize:14,fontWeight:600}}>{arquivo.name}<br/><span style={{fontSize:12,fontWeight:400}}>({(arquivo.size/1024).toFixed(0)} KB)</span></p>
-                      : <p style={{margin:0,color:T.textSm,fontSize:13}}>Toque para selecionar ou arraste o arquivo<br/><span style={{fontSize:11}}>PDF, PNG, JPG (máx. 10MB)</span></p>}
-                  </div>
-                </div>
-                {/* Resumo */}
-                <div style={{background:T.bg,borderRadius:10,padding:"14px 16px"}}>
-                  <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo</p>
-                  {jogosSel.map(jogoId => {
-                    const jogo = divulgados.find(j => j.id === jogoId);
-                    if (!jogo) return null;
-                    const subs = servicosSel[jogoId] || [];
-                    const allServicos = extrairServicos(jogo);
-                    const total = subs.reduce((s, sk) => s + (valores[`${jogoId}_${sk}`] || 0), 0);
-                    return (
-                      <div key={jogoId} style={{marginBottom:8}}>
-                        <div style={{fontWeight:600,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</div>
-                        <div style={{fontSize:11,color:T.textSm,margin:"2px 0"}}>{subs.map(sk => allServicos.find(x => x.subKey === sk)?.subLabel).filter(Boolean).join(", ")}</div>
-                        <div style={{fontSize:13,color:BRAND,fontWeight:700}}>{fmt(total)}</div>
-                      </div>
-                    );
-                  })}
-                  <div style={{borderTop:`1px solid ${T.border}`,marginTop:8,paddingTop:8,display:"flex",justifyContent:"space-between"}}>
-                    <span style={{fontSize:14,fontWeight:700,color:T.text}}>Total</span>
-                    <span style={{fontSize:18,fontWeight:700,color:BRAND}}>{fmt(totalGeral)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div style={{display:"grid",gridTemplateColumns:step===0?"1fr":"1fr 1fr",gap:10,marginTop:16}}>
-            {step > 0 && (
-              <button onClick={() => setStep(s => s-1)} style={{...btnS,background:"#475569"}}>Voltar</button>
-            )}
-            {step < 4 ? (
-              <button onClick={() => setStep(s => s+1)} disabled={!canNext()}
-                style={{...btnS,background:canNext()?BRAND:"#334155",opacity:canNext()?1:0.5}}>
-                Próximo
               </button>
-            ) : (
-              <button onClick={handleSubmit} disabled={!canNext()||submitting}
-                style={{...btnS,background:canNext()&&!submitting?BRAND:"#334155",opacity:canNext()&&!submitting?1:0.5,fontSize:16}}>
-                {submitting ? "Enviando..." : "Enviar NF"}
+              <button onClick={() => setTipo("mensal")}
+                style={{padding:"18px 20px",borderRadius:12,border:`2px solid ${T.border}`,cursor:"pointer",background:T.bg,textAlign:"left",
+                  display:"flex",alignItems:"center",gap:16,transition:"border-color 0.15s"}}
+                onMouseEnter={e => e.currentTarget.style.borderColor = BRAND}
+                onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                <div style={{width:44,height:44,borderRadius:10,background:"rgba(124,58,237,0.14)",border:"1px solid rgba(124,58,237,0.32)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>📅</div>
+                <div>
+                  <div style={{fontWeight:700,fontSize:15,color:T.text}}>Mensal</div>
+                  <div style={{fontSize:12,color:T.textSm,marginTop:2}}>Antipirataria, VMIX, Estatísticas, Monitoração, Edição, Seg. Espacial…</div>
+                </div>
               </button>
-            )}
+            </div>
           </div>
-        </>)}
+
+        ) : tipo === "jogo" ? (
+          <FormJogo jogos={jogos} fornecedores={fornecedores} onDone={() => setDone(true)} T={T}/>
+        ) : (
+          <FormMensal fornecedores={fornecedores} onDone={() => setDone(true)} T={T}/>
+        )}
+
+        {tipo && !done && (
+          <button onClick={() => setTipo(null)} style={{...btnS,background:"transparent",color:T.textSm,fontSize:12,marginTop:8,border:`1px solid ${T.border}`}}>
+            ← Voltar ao início
+          </button>
+        )}
       </div>
 
       <div style={{textAlign:"center",padding:"20px",color:T.textSm,fontSize:10}}>

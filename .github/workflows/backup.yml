@@ -1,0 +1,59 @@
+name: Backup app_state
+
+# Backup automático do estado do HUB (tabela public.app_state no Supabase).
+# - Todo dia: backup só dos DADOS (leve, ~1-2 MB) — as notas/jogos/envios/serviços
+#   de todos os campeonatos. É o que não pode ser perdido.
+# - Aos domingos: backup COMPLETO, incluindo os arquivos das NFs (~180 MB).
+# Os backups ficam como "artifacts" desta Action (aba Actions > run > Artifacts),
+# baixáveis a qualquer momento. Não vão pro repositório (não incham o Git).
+#
+# Credenciais: por padrão usa a mesma chave anon pública do app. Quando o RLS
+# entrar, crie o secret SUPABASE_KEY (service_role) em Settings > Secrets and
+# variables > Actions — o script passa a usá-lo automaticamente, sem mudar nada.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # todo dia às 06:00 UTC (03:00 BRT)
+  workflow_dispatch:       # permite rodar manualmente pelo botão "Run workflow"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Backup dos dados (diário)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: node scripts/backup.mjs
+
+      - name: Upload backup dos dados
+        uses: actions/upload-artifact@v4
+        with:
+          name: app_state-data-${{ github.run_id }}
+          path: backups/app_state_data_*.json
+          retention-days: 90
+
+      - name: É domingo?
+        id: dow
+        run: echo "domingo=$([ "$(date -u +%u)" = "7" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      - name: Backup completo (semanal, com arquivos das NFs)
+        if: steps.dow.outputs.domingo == 'yes'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: node scripts/backup.mjs --full
+
+      - name: Upload backup completo
+        if: steps.dow.outputs.domingo == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app_state-full-${{ github.run_id }}
+          path: backups/app_state_full_*.json
+          retention-days: 30

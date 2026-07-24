@@ -1056,8 +1056,15 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   const { portal: _portalRaw } = usePortalLink('brasileirao');
   const portal = usarPortal ? _portalRaw : null;
 
+  // Fornecedores editados à mão na planilha: o mapa __manual (guardado dentro do
+  // próprio fornecedoresJogo, então persiste e sincroniza junto) diz quais chaves
+  // o sync com o Portal deve RESPEITAR. Sem isso, toda correção manual era
+  // sobrescrita pelo valor do Portal no próximo carregamento da aba.
+  const manualMap = fornecedoresJogo.__manual; // pode ser undefined; não criar {} novo aqui (identidade entra nos deps do sync)
+
   // Sincroniza fornecedoresJogo com o Portal (matriz). Converte o nome operacional do Portal
   // no apelido canônico cadastrado no Hub (quando bate por match tolerante).
+  // Chaves marcadas em __manual ficam de fora — edição manual tem a palavra final.
   useEffect(() => {
     if (!portal || !setFornecedoresJogo) return;
     const updates = {};
@@ -1065,6 +1072,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
     function aplicarSubKey(jogo, subKey) {
       const key = `${jogo.id}_${subKey}`;
+      if (manualMap?.[key]) return; // edição manual vence o Portal
       const opers = getOperacionaisPorSubKey(jogo.id, subKey, portal, jogo.categoria);
       if (opers.length === 0) return;
       const canonicos = opers.map(n => {
@@ -1092,8 +1100,28 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     if (changed) {
       setFornecedoresJogo(prev => ({ ...prev, ...updates }));
     }
+    // manualMap nos deps: desmarcar uma chave (voltar ao automático) reaplica o
+    // valor do Portal na hora, sem precisar recarregar a página.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [portal, jogos, fornecedores]);
+  }, [portal, jogos, fornecedores, manualMap]);
+
+  // Edição manual: grava o valor e marca a chave como manual (valor vazio
+  // desmarca — o campo volta a seguir o Portal automaticamente).
+  const editarFornecedorJogo = (key, v) => {
+    setFornecedoresJogo(prev => {
+      const manual = { ...(prev.__manual || {}) };
+      if (v && v.trim()) manual[key] = true;
+      else delete manual[key];
+      return { ...prev, [key]: v, __manual: manual };
+    });
+  };
+  const voltarFornecedorAuto = (key) => {
+    setFornecedoresJogo(prev => {
+      const manual = { ...(prev.__manual || {}) };
+      delete manual[key];
+      return { ...prev, [key]: "", __manual: manual }; // sync reaplica o Portal em seguida
+    });
+  };
 
   const [tab, setTab] = useState("rodada");
   const [rodadaSel, setRodadaSel] = useState(null);
@@ -1469,12 +1497,20 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                           <td style={{...TS.td, fontWeight:600}}>{s.subLabel}</td>
                           <td style={TS.td}><Pill label={s.catLabel} color={s.catColor}/></td>
                           <td style={TS.td}>
-                            <InlineFornecedor
-                              value={fornecedoresJogo[`${jogo.id}_${s.subKey}`] || ""}
-                              onChange={v => setFornecedoresJogo(prev => ({...prev, [`${jogo.id}_${s.subKey}`]: v}))}
-                              fornecedores={fornecedores}
-                              T={T}
-                            />
+                            <div style={{display:"flex",alignItems:"center",gap:4}}>
+                              <InlineFornecedor
+                                value={fornecedoresJogo[`${jogo.id}_${s.subKey}`] || ""}
+                                onChange={v => editarFornecedorJogo(`${jogo.id}_${s.subKey}`, v)}
+                                fornecedores={fornecedores}
+                                T={T}
+                              />
+                              {manualMap?.[`${jogo.id}_${s.subKey}`] && (
+                                <span
+                                  title="Definido manualmente — não segue o Portal. Clique para voltar ao automático."
+                                  onClick={() => voltarFornecedorAuto(`${jogo.id}_${s.subKey}`)}
+                                  style={{cursor:"pointer",color:"#f59e0b",fontSize:9,lineHeight:1,flexShrink:0}}>✎</span>
+                              )}
+                            </div>
                           </td>
                           <td className="num" style={{...TS.td, color:T.textSm, fontSize:12}}>{fmt(s.valorRef)}</td>
                           <td style={{...TS.td, fontSize:12}}>

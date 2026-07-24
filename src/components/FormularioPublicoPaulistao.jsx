@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
-import { getState, setState, fileToDataUrl, saveNFFile } from "../lib/supabase";
+import { getState, appendState, fileToDataUrl, saveNFFile } from "../lib/supabase";
 
 const DARK_T = {
   bg:"#060912", card:"#0f1623", border:"#1e293b", muted:"#334155",
@@ -213,9 +213,9 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
         servicosDetalhe,
         status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
       };
-      const current = (await getState('paulistao_nf_submissions')) || [];
-      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
-      await setState('paulistao_nf_submissions', [...current, submission]);
+      // Append atômico no servidor: envios simultâneos de outros fornecedores
+      // não se sobrescrevem, e reenvio deste form (mesmo clientRef) não duplica.
+      await appendState('paulistao_nf_submissions', submission);
       onDone();
     } catch (err) {
       alert("Erro ao enviar a NF, tente novamente: " + err.message);
@@ -444,9 +444,8 @@ function FormMensal({ fornecedores, onDone, T }) {
         servicosLabels: [servicoSel.nome],
         status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
       };
-      const current = (await getState('paulistao_nf_submissions')) || [];
-      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
-      await setState('paulistao_nf_submissions', [...current, submission]);
+      // Append atômico no servidor: ver comentário no FormJogo.
+      await appendState('paulistao_nf_submissions', submission);
       onDone();
     } catch (err) {
       alert("Erro ao enviar a NF, tente novamente: " + err.message);

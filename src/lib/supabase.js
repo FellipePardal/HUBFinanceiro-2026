@@ -47,6 +47,43 @@ export async function setState(key, value) {
   if (error) throw error;
 }
 
+// ─── OPERAÇÕES ATÔMICAS DE LISTA (RPC) ───────────────────────────────────────
+// append/remove viram um UPDATE atômico no Postgres (migration
+// 20260724000000_atomic_list_ops): escritas concorrentes serializam no lock de
+// linha, então duas NFs chegando juntas (ou duas pessoas aprovando em paralelo)
+// não se sobrescrevem mais. Se a função ainda não existir no banco, cai no
+// caminho antigo de ler-modificar-gravar (melhor do que quebrar o formulário).
+const rpcIndisponivel = err =>
+  err?.code === '42883' || err?.code === 'PGRST202' || /function .*does not exist/i.test(err?.message || '');
+
+// Acrescenta `entry` (objeto ou array de objetos) na lista `key`. Se algum
+// elemento com o mesmo clientRef já estiver lá (reenvio após falha), não grava.
+export async function appendState(key, entry) {
+  const { error } = await supabase.rpc('append_app_state_list', { k: key, entry });
+  if (!error) return;
+  if (!rpcIndisponivel(error)) throw error;
+  console.warn(`RPC append_app_state_list indisponível — usando caminho legado para "${key}"`);
+  const itens = Array.isArray(entry) ? entry : [entry];
+  const ref = itens[0]?.clientRef;
+  const atual = (await getState(key)) || [];
+  if (ref && atual.some(s => s.clientRef === ref)) return;
+  await setState(key, [...atual, ...itens]);
+}
+
+// Remove da lista `key` o elemento com esse id. Retorna true se removeu,
+// false se o item já não estava lá (alguém decidiu antes) — quem chama usa
+// isso pra não repetir efeitos colaterais (ex.: criar a nota duas vezes).
+export async function removeFromStateList(key, id) {
+  const { data, error } = await supabase.rpc('remove_app_state_list', { k: key, item_id: String(id) });
+  if (!error) return data === true;
+  if (!rpcIndisponivel(error)) throw error;
+  console.warn(`RPC remove_app_state_list indisponível — usando caminho legado para "${key}"`);
+  const atual = (await getState(key)) || [];
+  if (!atual.some(s => String(s.id) === String(id))) return false;
+  await setState(key, atual.filter(s => String(s.id) !== String(id)));
+  return true;
+}
+
 // Lista as versões anteriores de `key` (mais recente primeiro). Use para
 // inspecionar antes de decidir restaurar.
 export async function getBackups(key) {

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 import { Pill } from "./shared";
 import { CATS } from "../constants";
-import { getState, setState, fileToDataUrl, saveNFFile } from "../lib/supabase";
+import { getState, appendState, fileToDataUrl, saveNFFile } from "../lib/supabase";
 
 const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra"]);
 const DARK_T = {
@@ -204,9 +204,9 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
           servicosValores, status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
         });
       }
-      const current = (await getState('nf_submissions')) || [];
-      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
-      await setState('nf_submissions', [...current, ...submissions]);
+      // Append atômico no servidor: envios simultâneos de outros fornecedores
+      // não se sobrescrevem, e reenvio deste form (mesmo clientRef) não duplica.
+      await appendState('nf_submissions', submissions);
       onDone();
     } catch (err) {
       alert("Erro ao enviar a NF, tente novamente: " + err.message);
@@ -451,9 +451,8 @@ function FormMensal({ fornecedores, onDone, T }) {
         descricao: nfData.obs?.trim() || servicoSel.label,
         status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
       };
-      const current = (await getState('nf_submissions')) || [];
-      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
-      await setState('nf_submissions', [...current, submission]);
+      // Append atômico no servidor: ver comentário no FormJogo.
+      await appendState('nf_submissions', submission);
       onDone();
     } catch (err) {
       alert("Erro ao enviar a NF, tente novamente: " + err.message);

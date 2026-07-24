@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, appendState, removeFromStateList } from "../../lib/supabase";
 import { pushHistorico } from "../../lib/historico";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
@@ -610,40 +610,16 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
 
   useEffect(() => { loadAll(); }, []);
 
-  // Recebidas não tem realtime (só carrega ao montar + botão "Atualizar"), então o
-  // array em memória pode estar desatualizado se uma NF nova chegou pelo formulário
-  // ou outra pessoa mexeu na fila enquanto esta aba estava aberta. Escrever a partir
-  // desse array desatualizado sobrescreveria a versão mais nova no Supabase, fazendo
-  // submissões "sumirem" ou parecerem duplicadas. Por isso relemos o estado atual do
-  // Supabase logo antes de aplicar qualquer mudança, em vez de confiar só na cópia local.
-  //
-  // Além de reler, TODAS as escritas passam por uma fila única (opQueue): duas
-  // aprovações em sequência rápida rodavam read-modify-write em paralelo e a
-  // segunda gravava por cima da primeira, fazendo o item aprovado "voltar".
+  // Recebidas não tem realtime (só carrega ao montar + botão "Atualizar"), e a
+  // fila é compartilhada entre abas/pessoas. As mudanças usam as operações
+  // ATÔMICAS do servidor (appendState/removeFromStateList em lib/supabase.js),
+  // que serializam escritas concorrentes no Postgres — ninguém sobrescreve
+  // ninguém. A opQueue ainda serializa as ações DESTE client, pra duas decisões
+  // rápidas não intercalarem seus passos (remover → nota → histórico).
   const enqueue = (fn) => {
     const run = opQueue.current.then(fn, fn);
     opQueue.current = run.catch(() => {});
     return run;
-  };
-  const persistSubmissions = (updater) => {
-    setSubmissions(updater); // otimista: a UI reage no clique, não segundos depois
-    return enqueue(async () => {
-      const atual = (await getState(submissionsKey)) || [];
-      const next = updater(atual);
-      await setSupabaseState(submissionsKey, next);
-      setSubmissions(next);
-      return next;
-    });
-  };
-  const persistHistorico = (updater) => {
-    setHistorico(updater);
-    return enqueue(async () => {
-      const atual = (await getState(historicoKey)) || [];
-      const next = updater(atual);
-      await setSupabaseState(historicoKey, next);
-      setHistorico(next);
-      return next;
-    });
   };
 
   const startEdit = (sub) => {
@@ -736,23 +712,23 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     setSubmissions(subs => subs.filter(s => s.id !== sub.id)); // some da lista já no clique
     try {
       await enqueue(async () => {
-        // Relê a fila no servidor: se a submissão já saiu de lá (duplo clique,
-        // outra aba, outra pessoa), NÃO aprova de novo — era isso que gravava
-        // duas notas iguais quando o botão era clicado duas vezes.
-        const atual = (await getState(submissionsKey)) || [];
-        if (!atual.some(s => s.id === sub.id)) return;
+        // Remoção ATÔMICA no servidor: se retornar false, a submissão já tinha
+        // saído da fila (duplo clique, outra aba, outra pessoa) e NÃO aprovamos
+        // de novo — era isso que gravava duas notas iguais. Duas pessoas
+        // aprovando itens diferentes ao mesmo tempo também não se sobrescrevem.
+        const removed = await removeFromStateList(submissionsKey, sub.id);
+        if (!removed) return;
         const nota = montarNotaAprovada(sub, editVals);
-        // 1) tira da fila e 2) cria a nota — o essencial. O histórico vem por
-        // último e é best-effort: se falhar, a aprovação em si já está de pé.
-        await setSupabaseState(submissionsKey, atual.filter(s => s.id !== sub.id));
-        setSubmissions(prev => prev.filter(s => s.id !== sub.id));
         if (sub.tipo === "mensal" && addNotaMensal) addNotaMensal(nota);
         else addNota(nota);
+        // Histórico por último, best-effort: a aprovação em si já está de pé.
+        // clientRef sai da entrada — ele é chave de dedupe dos ENVIOS do
+        // formulário; deixá-lo aqui faria o irmão multi-jogo ser engolido.
         try {
-          const hist = (await getState(historicoKey)) || [];
-          const nextHist = [...hist, { ...sub, decisao: "aprovada", decidoEm: new Date().toISOString() }];
-          await setSupabaseState(historicoKey, nextHist);
-          setHistorico(nextHist);
+          const { clientRef: _cr, ...subLimpo } = sub;
+          const entry = { ...subLimpo, decisao: "aprovada", decidoEm: new Date().toISOString() };
+          await appendState(historicoKey, entry);
+          setHistorico(h => [...h, entry]);
         } catch (err) {
           console.error("Aprovada, mas falhou ao registrar no histórico:", err);
         }
@@ -773,22 +749,22 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     setSubmissions(subs => subs.filter(s => s.id !== sub.id));
     try {
       await enqueue(async () => {
-        const atual = (await getState(submissionsKey)) || [];
-        if (!atual.some(s => s.id === sub.id)) return; // já decidida em outro lugar
-        // Histórico primeiro (é o registro que permite "Recuperar"), depois tira
-        // da fila. Se já houver a entrada (retry de falha parcial), não duplica.
-        const hist = (await getState(historicoKey)) || [];
-        const nextHist = hist.some(x => x.id === sub.id && x.decisao === "rejeitada")
-          ? hist
-          : [...hist, { ...sub, decisao: "rejeitada", decidoEm: new Date().toISOString() }];
-        await setSupabaseState(historicoKey, nextHist);
-        await setSupabaseState(submissionsKey, atual.filter(s => s.id !== sub.id));
-        setSubmissions(prev => prev.filter(s => s.id !== sub.id));
-        setHistorico(nextHist);
+        const removed = await removeFromStateList(submissionsKey, sub.id);
+        if (!removed) return; // já decidida em outro lugar
+        const { clientRef: _cr, ...subLimpo } = sub;
+        const entry = { ...subLimpo, decisao: "rejeitada", decidoEm: new Date().toISOString() };
+        try {
+          await appendState(historicoKey, entry);
+          setHistorico(h => [...h, entry]);
+        } catch (err) {
+          // Sem registro no histórico a NF sumiria sem rastro — devolve pra fila.
+          await appendState(submissionsKey, sub).catch(() => {});
+          throw err;
+        }
       });
     } catch (err) {
       console.error("Falha ao rejeitar submissão:", err);
-      alert("Falha ao rejeitar — nada foi gravado. Tente de novo.\n\n" + (err?.message || err));
+      alert("Falha ao rejeitar — a NF continua na fila. Tente de novo.\n\n" + (err?.message || err));
       loadAll();
     } finally {
       setProcessing(p => { const n = { ...p }; delete n[sub.id]; return n; });
@@ -796,16 +772,42 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
   };
 
   const recuperar = async (item) => {
-    await persistSubmissions(subs => subs.some(s => s.id === item.id)
-      ? subs
-      : [...subs, { ...item, decisao: undefined, decidoEm: undefined }]);
-    await persistHistorico(h => h.filter(x => x.id !== item.id));
+    if (processing[item.id]) return;
+    setProcessing(p => ({ ...p, [item.id]: true }));
+    setHistorico(h => h.filter(x => x.id !== item.id)); // otimista
+    try {
+      await enqueue(async () => {
+        // Volta pra fila sem clientRef (senão o dedupe de reenvio do formulário
+        // engoliria a recuperação) e sem os campos de decisão.
+        const { clientRef: _cr, ...limpo } = item;
+        const devolvida = { ...limpo, decisao: undefined, decidoEm: undefined };
+        const naFila = (await getState(submissionsKey)) || [];
+        if (!naFila.some(s => s.id === item.id)) {
+          await appendState(submissionsKey, devolvida);
+        }
+        await removeFromStateList(historicoKey, item.id);
+        setHistorico(h => h.filter(x => x.id !== item.id));
+        setSubmissions(prev => prev.some(s => s.id === item.id) ? prev : [...prev, devolvida]);
+      });
+    } catch (err) {
+      console.error("Falha ao recuperar submissão:", err);
+      alert("Falha ao recuperar — tente de novo.\n\n" + (err?.message || err));
+      loadAll();
+    } finally {
+      setProcessing(p => { const n = { ...p }; delete n[item.id]; return n; });
+    }
   };
 
   const excluirDefinitivo = async (id) => {
     if (!window.confirm("Excluir definitivamente do histórico?")) return;
     deleteNFFile(id);
-    await persistHistorico(h => h.filter(x => x.id !== id));
+    setHistorico(h => h.filter(x => x.id !== id)); // otimista
+    try {
+      await enqueue(() => removeFromStateList(historicoKey, id));
+    } catch (err) {
+      console.error("Falha ao excluir do histórico:", err);
+      loadAll();
+    }
   };
 
   if (loading) return <p style={{color:T.textSm,padding:20}}>Carregando submissões...</p>;

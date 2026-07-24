@@ -85,8 +85,9 @@ function NFDataStep({ nfData, setNfData, arquivo, setArquivo, fileRef, fornecedo
         <FornecedorInput value={nfData.fornecedor} onChange={v => setNfData(d => ({...d, fornecedor:v}))} fornecedores={fornecedores} T={T}/>
       </div>
       <div style={{marginBottom:14}}>
-        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota Fiscal</label>
-        <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF:e.target.value}))} style={IS}/>
+        <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Nº da Nota Fiscal <span style={{color:"#ef4444"}}>*</span></label>
+        <input value={nfData.numeroNF} onChange={e => setNfData(d => ({...d, numeroNF:e.target.value}))} placeholder="obrigatório" style={IS}/>
+        {!nfData.numeroNF.trim() && <p style={{color:"#ef4444",fontSize:11,margin:"4px 0 0"}}>Informe o número da nota fiscal para enviar</p>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <div>
@@ -151,7 +152,7 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
     if (step === 1) return jogosSel.length === qtdJogos;
     if (step === 2) return Object.values(servicosSel).some(a => a.length > 0);
     if (step === 3) return Object.values(valores).some(v => v > 0);
-    if (step === 4) return nfData.fornecedor.length > 0;
+    if (step === 4) return nfData.fornecedor.length > 0 && nfData.numeroNF.trim().length > 0;
     return false;
   };
 
@@ -423,7 +424,7 @@ function FormMensal({ fornecedores, onDone, T }) {
     if (step === 0) return mesSel != null;
     if (step === 1) return servicoSel != null;
     if (step === 2) return (parseFloat(valor) || 0) > 0;
-    if (step === 3) return nfData.fornecedor.length > 0;
+    if (step === 3) return nfData.fornecedor.length > 0 && nfData.numeroNF.trim().length > 0;
     return false;
   };
 

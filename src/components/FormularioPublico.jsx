@@ -142,6 +142,10 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
   const [arquivo, setArquivo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef(null);
+  // Identificador estável deste preenchimento: se o envio falhar no meio e o
+  // fornecedor clicar "Enviar" de novo, o retry NÃO duplica a submissão
+  // (checamos no servidor se este clientRef já chegou antes de gravar).
+  const clientRef = useRef("cr_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9)).current;
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
@@ -193,7 +197,7 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
           try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
         }
         submissions.push({
-          id: submissionId, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
+          id: submissionId, clientRef, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
           jogoLabel: `${jogo.mandante} x ${jogo.visitante}`, mandante: jogo.mandante, visitante: jogo.visitante,
           servicosKeys: subs.map(sk => `${jogo.id}_${sk}`),
           servicosLabels: allServicos.filter(s => subs.includes(s.subKey)).map(s => s.subLabel),
@@ -201,6 +205,7 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
         });
       }
       const current = (await getState('nf_submissions')) || [];
+      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
       await setState('nf_submissions', [...current, ...submissions]);
       onDone();
     } catch (err) {
@@ -415,6 +420,8 @@ function FormMensal({ fornecedores, onDone, T }) {
   const [arquivo, setArquivo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef(null);
+  // Retry após falha não duplica: ver comentário no FormJogo.
+  const clientRef = useRef("cr_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9)).current;
 
   const canNext = () => {
     if (step === 0) return mesSel != null;
@@ -433,7 +440,7 @@ function FormMensal({ fornecedores, onDone, T }) {
         try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
       }
       const submission = {
-        id: submissionId, tipo:"mensal", ...nfData,
+        id: submissionId, clientRef, tipo:"mensal", ...nfData,
         valorNF: parseFloat(valor) || 0,
         mes: mesSel, mesLabel: MESES[mesSel],
         servicoId: servicoSel.servicoId,        // pode ser null (categoria variável)
@@ -445,6 +452,7 @@ function FormMensal({ fornecedores, onDone, T }) {
         status:"pendente", hasFile, enviadoEm: new Date().toISOString(),
       };
       const current = (await getState('nf_submissions')) || [];
+      if (current.some(s => s.clientRef === clientRef)) { onDone(); return; } // já chegou num envio anterior
       await setState('nf_submissions', [...current, submission]);
       onDone();
     } catch (err) {

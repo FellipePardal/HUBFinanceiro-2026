@@ -585,6 +585,8 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
   const [previewSub, setPreviewSub] = useState(null);
   const [previewSrc, setPreviewSrc] = useState(null);
   const [previewLoadingNF, setPreviewLoadingNF] = useState(false);
+  const [processing, setProcessing] = useState({}); // sub.id -> true enquanto aprova/rejeita
+  const opQueue = useRef(Promise.resolve());
 
   const openPreviewSub = async (sub) => {
     setPreviewSub(sub);
@@ -614,19 +616,34 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
   // desse array desatualizado sobrescreveria a versão mais nova no Supabase, fazendo
   // submissões "sumirem" ou parecerem duplicadas. Por isso relemos o estado atual do
   // Supabase logo antes de aplicar qualquer mudança, em vez de confiar só na cópia local.
-  const persistSubmissions = async (updater) => {
-    const atual = (await getState(submissionsKey)) || [];
-    const next = updater(atual);
-    setSubmissions(next);
-    await setSupabaseState(submissionsKey, next);
-    return next;
+  //
+  // Além de reler, TODAS as escritas passam por uma fila única (opQueue): duas
+  // aprovações em sequência rápida rodavam read-modify-write em paralelo e a
+  // segunda gravava por cima da primeira, fazendo o item aprovado "voltar".
+  const enqueue = (fn) => {
+    const run = opQueue.current.then(fn, fn);
+    opQueue.current = run.catch(() => {});
+    return run;
   };
-  const persistHistorico = async (updater) => {
-    const atual = (await getState(historicoKey)) || [];
-    const next = updater(atual);
-    setHistorico(next);
-    await setSupabaseState(historicoKey, next);
-    return next;
+  const persistSubmissions = (updater) => {
+    setSubmissions(updater); // otimista: a UI reage no clique, não segundos depois
+    return enqueue(async () => {
+      const atual = (await getState(submissionsKey)) || [];
+      const next = updater(atual);
+      await setSupabaseState(submissionsKey, next);
+      setSubmissions(next);
+      return next;
+    });
+  };
+  const persistHistorico = (updater) => {
+    setHistorico(updater);
+    return enqueue(async () => {
+      const atual = (await getState(historicoKey)) || [];
+      const next = updater(atual);
+      await setSupabaseState(historicoKey, next);
+      setHistorico(next);
+      return next;
+    });
   };
 
   const startEdit = (sub) => {
@@ -651,28 +668,32 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     setEditServicos(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
   };
 
-  const aprovar = async (sub) => {
-    let valorNF, nota;
+  // Monta a nota final a partir da submissão (com os valores editados, se houver).
+  // A nota sai com decisao:"aprovada" — o addNota do TabNotas usa isso pra NÃO
+  // gravar a entrada "registrada" no histórico (o aprovar já grava a "aprovada";
+  // antes entravam as duas, com o mesmo id, e o histórico ficava duplicado).
+  const montarNotaAprovada = (sub, editVals) => {
+    const decididas = { decisao: "aprovada", decidoEm: new Date().toISOString() };
     if (sub.tipo === "mensal") {
-      valorNF = editingId === sub.id ? (editServicos._mensal || 0) : (sub.valorNF || 0);
+      const valorNF = editVals ? (editVals._mensal || 0) : (sub.valorNF || 0);
       const nfNum = (sub.numeroNF || "SN").replace(/\s/g, "");
-      nota = {
+      return {
         ...sub,
+        ...decididas,
         valorNF,
         valor: valorNF,
         categoria: sub.servicoNome || sub.servicosLabels?.[0] || "",
         status: "Conferida",
         codigo: `MENSAL_${(sub.mesLabel||"").replace(/\s/g,"")}_${Math.round(valorNF)}_NF${nfNum}`,
       };
-      if (addNotaMensal) addNotaMensal(nota);
-      else addNota(nota);
-    } else {
-      const sv = editingId === sub.id ? editServicos : (sub.servicosValores || {});
+    }
+    {
+      const sv = editVals || (sub.servicosValores || {});
       const isMultiJogo = Array.isArray(sub.jogoIds) && sub.jogoIds.length > 1;
       const servicosDetalhe = sub.servicosDetalhe || (isMultiJogo
         ? Object.fromEntries(Object.entries(sv).map(([k, v]) => [k.includes("_") ? k : `${sub.jogoId}_${k}`, v]))
         : null);
-      valorNF = servicosDetalhe
+      const valorNF = servicosDetalhe
         ? Object.values(servicosDetalhe).reduce((s, v) => s + (v || 0), 0)
         : Object.values(sv).reduce((s, v) => s + (v || 0), 0);
       const jogo = divulgados.find(j => j.id === sub.jogoId) || divulgados.find(j => (sub.jogoIds || []).includes(j.id));
@@ -691,8 +712,9 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
       });
       const mandante = jogo?.mandante || sub.jogoLabel?.split(/\s*x\s*/)[0] || "";
       const visitante = jogo?.visitante || sub.jogoLabel?.split(/\s*x\s*/)[1] || "";
-      nota = {
+      return {
         ...sub,
+        ...decididas,
         servicosValores,
         ...(servicosDetalhe ? { servicosDetalhe } : {}),
         servicosKeys,
@@ -703,22 +725,80 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
         status: "Conferida",
         codigo: gerarCodigo(sub.rodada, mandante, visitante, valorNF, sub.numeroNF),
       };
-      addNota(nota);
     }
-    await persistHistorico(h => [...h, {...sub, decisao:"aprovada", decidoEm: new Date().toISOString()}]);
-    await persistSubmissions(subs => subs.filter(s => s.id !== sub.id));
-    setEditingId(null);
   };
 
-  const rejeitar = async (id) => {
+  const aprovar = async (sub) => {
+    if (processing[sub.id]) return;
+    const editVals = editingId === sub.id ? { ...editServicos } : null;
+    setProcessing(p => ({ ...p, [sub.id]: true }));
+    setEditingId(null);
+    setSubmissions(subs => subs.filter(s => s.id !== sub.id)); // some da lista já no clique
+    try {
+      await enqueue(async () => {
+        // Relê a fila no servidor: se a submissão já saiu de lá (duplo clique,
+        // outra aba, outra pessoa), NÃO aprova de novo — era isso que gravava
+        // duas notas iguais quando o botão era clicado duas vezes.
+        const atual = (await getState(submissionsKey)) || [];
+        if (!atual.some(s => s.id === sub.id)) return;
+        const nota = montarNotaAprovada(sub, editVals);
+        // 1) tira da fila e 2) cria a nota — o essencial. O histórico vem por
+        // último e é best-effort: se falhar, a aprovação em si já está de pé.
+        await setSupabaseState(submissionsKey, atual.filter(s => s.id !== sub.id));
+        setSubmissions(prev => prev.filter(s => s.id !== sub.id));
+        if (sub.tipo === "mensal" && addNotaMensal) addNotaMensal(nota);
+        else addNota(nota);
+        try {
+          const hist = (await getState(historicoKey)) || [];
+          const nextHist = [...hist, { ...sub, decisao: "aprovada", decidoEm: new Date().toISOString() }];
+          await setSupabaseState(historicoKey, nextHist);
+          setHistorico(nextHist);
+        } catch (err) {
+          console.error("Aprovada, mas falhou ao registrar no histórico:", err);
+        }
+      });
+    } catch (err) {
+      console.error("Falha ao aprovar submissão:", err);
+      alert("Falha ao aprovar a NF — nada foi gravado. Tente de novo.\n\n" + (err?.message || err));
+      loadAll(); // volta pro estado real do servidor (o item reaparece)
+    } finally {
+      setProcessing(p => { const n = { ...p }; delete n[sub.id]; return n; });
+    }
+  };
+
+  const rejeitar = async (sub) => {
+    if (processing[sub.id]) return;
     if (!window.confirm("Rejeitar esta submissão?")) return;
-    const sub = submissions.find(s => s.id === id);
-    await persistHistorico(h => [...h, {...sub, decisao:"rejeitada", decidoEm: new Date().toISOString()}]);
-    await persistSubmissions(subs => subs.filter(s => s.id !== id));
+    setProcessing(p => ({ ...p, [sub.id]: true }));
+    setSubmissions(subs => subs.filter(s => s.id !== sub.id));
+    try {
+      await enqueue(async () => {
+        const atual = (await getState(submissionsKey)) || [];
+        if (!atual.some(s => s.id === sub.id)) return; // já decidida em outro lugar
+        // Histórico primeiro (é o registro que permite "Recuperar"), depois tira
+        // da fila. Se já houver a entrada (retry de falha parcial), não duplica.
+        const hist = (await getState(historicoKey)) || [];
+        const nextHist = hist.some(x => x.id === sub.id && x.decisao === "rejeitada")
+          ? hist
+          : [...hist, { ...sub, decisao: "rejeitada", decidoEm: new Date().toISOString() }];
+        await setSupabaseState(historicoKey, nextHist);
+        await setSupabaseState(submissionsKey, atual.filter(s => s.id !== sub.id));
+        setSubmissions(prev => prev.filter(s => s.id !== sub.id));
+        setHistorico(nextHist);
+      });
+    } catch (err) {
+      console.error("Falha ao rejeitar submissão:", err);
+      alert("Falha ao rejeitar — nada foi gravado. Tente de novo.\n\n" + (err?.message || err));
+      loadAll();
+    } finally {
+      setProcessing(p => { const n = { ...p }; delete n[sub.id]; return n; });
+    }
   };
 
   const recuperar = async (item) => {
-    await persistSubmissions(subs => [...subs, {...item, decisao:undefined, decidoEm:undefined}]);
+    await persistSubmissions(subs => subs.some(s => s.id === item.id)
+      ? subs
+      : [...subs, { ...item, decisao: undefined, decidoEm: undefined }]);
     await persistHistorico(h => h.filter(x => x.id !== item.id));
   };
 
@@ -730,11 +810,16 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
 
   if (loading) return <p style={{color:T.textSm,padding:20}}>Carregando submissões...</p>;
 
+  // O nf_historico é trilha de auditoria de TODAS as notas (registrada, avulsa,
+  // excluída...). Aqui só interessam as decisões da fila do formulário — sem esse
+  // filtro, cada NF registrada manualmente aparecia aqui rotulada de "Rejeitada".
+  const historicoForm = historico.filter(x => x.decisao === "aprovada" || x.decisao === "rejeitada");
+
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <div style={{display:"flex",gap:4}}>
-          {[{k:"pendentes",l:`Pendentes (${submissions.length})`},{k:"historico",l:`Histórico (${historico.length})`}].map(t => (
+          {[{k:"pendentes",l:`Pendentes (${submissions.length})`},{k:"historico",l:`Histórico (${historicoForm.length})`}].map(t => (
             <button key={t.k} onClick={() => setViewTab(t.k)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
               background:viewTab===t.k?"#8b5cf6":"transparent",color:viewTab===t.k?"#fff":T.textMd}}>
               {t.l}
@@ -751,12 +836,18 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
       )}
       {viewTab === "pendentes" && submissions.map(sub => {
         const isEditing = editingId === sub.id;
+        const busy = !!processing[sub.id];
         const jogo = divulgados.find(j => j.id === sub.jogoId);
         const allServicos = jogo ? extrairServicos(jogo) : [];
         const svAtual = isEditing ? editServicos : (sub.servicosValores || {});
         const valorAtual = sub.tipo === "mensal"
           ? (isEditing ? (editServicos._mensal || 0) : (sub.valorNF || 0))
           : Object.values(svAtual).reduce((s, v) => s + (v || 0), 0);
+        // Mesmo fornecedor + mesmo nº de NF + mesmo valor em outra pendente ou em
+        // nota já aprovada = provável reenvio do formulário; sinaliza pro operador.
+        const chaveDup = s => `${(s.fornecedor||"").trim().toLowerCase()}|${(s.numeroNF||"").trim()}|${s.valorNF||0}`;
+        const possivelDuplicata = submissions.some(s => s.id !== sub.id && chaveDup(s) === chaveDup(sub))
+          || notas.some(n => chaveDup(n) === chaveDup(sub));
 
         return (
           <div key={sub.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
@@ -767,6 +858,7 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
                   ? <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{sub.mesLabel} · {sub.servicoNome}</span>
                   : <span style={{color:T.textSm,fontSize:12,marginLeft:12}}>{sub.jogoLabel} · Rd {sub.rodada}</span>}
                 {sub.numeroNF && <span style={{color:T.textSm,fontSize:11,marginLeft:8}}>NF {sub.numeroNF}</span>}
+                {possivelDuplicata && <span style={{marginLeft:8}}><Pill label="Possível duplicata" color="#f59e0b"/></span>}
               </div>
               <span style={{color:"#8b5cf6",fontWeight:700,fontSize:16}}>{fmt(valorAtual)}</span>
             </div>
@@ -821,10 +913,10 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {sub.hasFile && <button onClick={() => openPreviewSub(sub)} style={{...btnStyle,background:"#0ea5e9",padding:"6px 20px",fontSize:12}}>Ver NF</button>}
-              {!isEditing && <button onClick={() => startEdit(sub)} style={{...btnStyle,background:"#3b82f6",padding:"6px 20px",fontSize:12}}>Editar</button>}
-              {isEditing && <button onClick={() => setEditingId(null)} style={{...btnStyle,background:"#475569",padding:"6px 20px",fontSize:12}}>Cancelar</button>}
-              <button onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12}}>Aprovar</button>
-              <button onClick={() => rejeitar(sub.id)} style={{...btnStyle,background:"#7f1d1d",padding:"6px 20px",fontSize:12}}>Rejeitar</button>
+              {!isEditing && <button disabled={busy} onClick={() => startEdit(sub)} style={{...btnStyle,background:"#3b82f6",padding:"6px 20px",fontSize:12,opacity:busy?0.5:1}}>Editar</button>}
+              {isEditing && <button disabled={busy} onClick={() => setEditingId(null)} style={{...btnStyle,background:"#475569",padding:"6px 20px",fontSize:12,opacity:busy?0.5:1}}>Cancelar</button>}
+              <button disabled={busy} onClick={() => aprovar(sub)} style={{...btnStyle,background:"#22c55e",padding:"6px 20px",fontSize:12,opacity:busy?0.6:1,cursor:busy?"wait":"pointer"}}>{busy ? "Aprovando..." : "Aprovar"}</button>
+              <button disabled={busy} onClick={() => rejeitar(sub)} style={{...btnStyle,background:"#7f1d1d",padding:"6px 20px",fontSize:12,opacity:busy?0.6:1,cursor:busy?"wait":"pointer"}}>Rejeitar</button>
             </div>
           </div>
         );
@@ -833,18 +925,18 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
       {/* Histórico */}
       {viewTab === "historico" && (
         <>
-          {historico.length === 0 && (
+          {historicoForm.length === 0 && (
             <div style={{background:T.card,borderRadius:12,padding:40,textAlign:"center"}}>
               <p style={{color:T.textSm,fontSize:13,margin:0}}>Nenhum registro no histórico</p>
             </div>
           )}
-          {[...historico].reverse().map(item => (
-            <div key={item.id} style={{background:T.card,borderRadius:12,padding:"14px 20px",marginBottom:10,opacity:item.decisao==="rejeitada"?0.7:1}}>
+          {[...historicoForm].reverse().map((item, i) => (
+            <div key={`${item.id}_${item.decisao}_${item.decidoEm || i}`} style={{background:T.card,borderRadius:12,padding:"14px 20px",marginBottom:10,opacity:item.decisao==="rejeitada"?0.7:1}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <Pill label={item.decisao==="aprovada"?"Aprovada":"Rejeitada"} color={item.decisao==="aprovada"?"#22c55e":"#ef4444"}/>
                   <span style={{fontWeight:700,fontSize:13,color:T.text}}>{item.fornecedor}</span>
-                  <span style={{color:T.textSm,fontSize:11}}>{item.jogoLabel} · Rd {item.rodada}</span>
+                  <span style={{color:T.textSm,fontSize:11}}>{item.tipo === "mensal" ? `${item.mesLabel || ""}${item.servicoNome ? ` · ${item.servicoNome}` : ""}` : `${item.jogoLabel || ""}${item.rodada ? ` · Rd ${item.rodada}` : ""}`}</span>
                 </div>
                 <span style={{color:"#8b5cf6",fontWeight:700,fontSize:14}}>{fmt(item.valorNF)}</span>
               </div>

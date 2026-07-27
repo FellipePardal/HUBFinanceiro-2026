@@ -660,7 +660,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
             <table style={{...TS.table, minWidth:680}}>
               <thead>
                 <tr style={TS.thead}>
-                  {["Rd","Jogo","Orçado","Livemode","liveU","Total NFs","Saldo","Status"].map(h =>
+                  {["Rd","Jogo","Orçado","Livemode","liveU","Total NFs",...(role !== 'visualizador' ? ["Saldo"] : []),"Status"].map(h =>
                     <th key={h} style={{...TS.th, ...(["Orçado","Livemode","liveU","Total NFs","Saldo"].includes(h)?TS.thRight:TS.thLeft)}}>{h}</th>
                   )}
                 </tr>
@@ -681,7 +681,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                       <td className="num" style={{...TS.tdNum, color:realLM>0?green:T.textSm}}>{fmt(realLM)}</td>
                       <td className="num" style={{...TS.tdNum, color:realLU>0?amber:T.textSm}}>{fmt(realLU)}</td>
                       <td className="num" style={{...TS.tdNum, color:realTotal>0?teal:T.textSm, fontWeight:700}}>{fmt(realTotal)}</td>
-                      <td className="num" style={{...TS.tdNum, fontWeight:700, color:saldo<0?T.danger:teal}}>{fmt(saldo)}</td>
+                      {role !== 'visualizador' && <td className="num" style={{...TS.tdNum, fontWeight:700, color:saldo<0?T.danger:teal}}>{fmt(saldo)}</td>}
                       <td style={TS.td}>
                         <span style={{
                           display:"inline-flex",alignItems:"center",gap:4,
@@ -704,7 +704,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                     <td className="num" style={{...TS.tdNum, fontWeight:700, color:green}}>{fmt(totalValorNFs)}</td>
                     <td className="num" style={{...TS.tdNum, fontWeight:700, color:amber}}>{fmt(totalValorLiveU)}</td>
                     <td className="num" style={{...TS.tdNum, fontWeight:700, color:teal}}>{fmt(totalValorNFs + totalValorLiveU)}</td>
-                    <td className="num" style={{...TS.tdNum, fontWeight:700, color:totalOrcado-totalValorNFs-totalValorLiveU>=0?teal:T.danger}}>{fmt(totalOrcado - totalValorNFs - totalValorLiveU)}</td>
+                    {role !== 'visualizador' && <td className="num" style={{...TS.tdNum, fontWeight:700, color:totalOrcado-totalValorNFs-totalValorLiveU>=0?teal:T.danger}}>{fmt(totalOrcado - totalValorNFs - totalValorLiveU)}</td>}
                     <td style={TS.td}>
                       <span style={{fontSize:10,color:T.textSm}}>{jogosComNF.size}/{divulgados.length} com NF</span>
                     </td>

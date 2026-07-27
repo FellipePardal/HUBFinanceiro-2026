@@ -25,6 +25,45 @@ const entidadeNome = (id) =>
   id === "brasileirao-2026" ? "FFU - Futebol Forte União" :
   id === "paulistao-feminino-2026" ? "FPF - Federação Paulista de Futebol" : id;
 
+// Texto editável inline: clique para editar, Enter/sair salva, Esc cancela
+function InlineEditText({ value, onSave, T, textStyle = {}, width = 140 }) {
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState("");
+  const commit = async () => {
+    setEditing(false);
+    const v = local.trim();
+    if (v !== (value || "")) await onSave(v);
+  };
+  if (!editing) return (
+    <span
+      onClick={() => { setLocal(value || ""); setEditing(true); }}
+      title="Clique para editar"
+      style={{ ...textStyle, cursor: "pointer", borderBottom: "1px dashed transparent", display: "inline-block" }}
+      onMouseEnter={e => e.currentTarget.style.borderBottomColor = T.textSm}
+      onMouseLeave={e => e.currentTarget.style.borderBottomColor = "transparent"}
+    >
+      {value || <span style={{ color: T.textSm, fontStyle: "italic" }}>—</span>}
+    </span>
+  );
+  return (
+    <input
+      autoFocus
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") { setLocal(value || ""); setEditing(false); }
+      }}
+      style={{
+        background: T.surfaceAlt || T.bg, border: `1px solid ${T.border}`,
+        borderRadius: 6, padding: "3px 8px", fontSize: 12, color: T.text,
+        fontFamily: "'Poppins',sans-serif", outline: "none", width,
+      }}
+    />
+  );
+}
+
 function RoleBadge({ role }) {
   const m = ROLE_META[role] || { label: role, color: "#6B7280", bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.25)" };
   return (
@@ -293,6 +332,13 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
     setRoleUpdating(r => ({ ...r, [userId]: false }));
   };
 
+  const handleCampoChange = async (userId, campo, valor) => {
+    const v = valor || null;
+    await supabase.from('profiles').update({ [campo]: v }).eq('id', userId);
+    await supabase.rpc('log_audit_action', { p_action: 'profile_update', p_target_user_id: userId, p_details: { campo, valor: v } });
+    setUsers(us => us.map(u => u.id === userId ? { ...u, [campo]: v } : u));
+  };
+
   const handleToggleEntidade = async (u, entId) => {
     const atual = parseEntidades(u.entidade);
     const novas = atual.includes(entId) ? atual.filter(e => e !== entId) : [...atual, entId];
@@ -509,9 +555,12 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                               }}>
                                 {(u.nome || u.email || "?").charAt(0).toUpperCase()}
                               </div>
-                              <span style={{ fontWeight: isMe ? 600 : 400 }}>
-                                {u.nome || <span style={{ color: T.textSm, fontStyle: "italic" }}>—</span>}
-                              </span>
+                              <InlineEditText
+                                value={u.nome}
+                                onSave={v => handleCampoChange(u.id, 'nome', v)}
+                                T={T}
+                                textStyle={{ fontWeight: isMe ? 600 : 400, fontSize: 13, color: T.text }}
+                              />
                               {isMe && (
                                 <span style={{
                                   fontSize: 10, color: T.textSm, fontWeight: 500,
@@ -526,7 +575,12 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                             </div>
                           </td>
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
-                            {u.funcao || <span style={{ fontStyle:"italic", color:T.textSm }}>—</span>}
+                            <InlineEditText
+                              value={u.funcao}
+                              onSave={v => handleCampoChange(u.id, 'funcao', v)}
+                              T={T}
+                              textStyle={{ fontSize: 12, color: T.textMd }}
+                            />
                           </td>
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
                             {u.email || "—"}

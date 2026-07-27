@@ -32,7 +32,7 @@ import LivemodeLogo from "./LivemodeLogo";
 // Recebe `config` com id, nome, edicao, cor, fases — e tudo que diferencia
 // um campeonato do outro fica nesse objeto. Os jogos seed vêm de
 // initialJogos (definidos no momento da criação no NovoCampeonatoModal).
-export default function CampeonatoCustom({ config, initialJogos = [], initialServicos = [], onBack, onOpenHub, T, darkMode, setDarkMode }) {
+export default function CampeonatoCustom({ config, initialJogos = [], initialServicos = [], onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admin' }) {
   const { id: campId, nome, edicao, cor: PRIMARY, fases, formato = "mata_mata", numRodadas = 0 } = config;
   const { getFase, ordemFase } = makeFaseHelpers(fases);
   const isPC = formato === "pontos_corridos";
@@ -419,8 +419,8 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         </div>
         <div style={{ flex:1 }}/>
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          <IconButton icon={ocultar ? EyeOff : Eye} title={ocultar?"Mostrar valores":"Ocultar valores"}
-            onClick={()=>setOcultar(o=>!o)} active={ocultar} size={40} T={T}/>
+          {role !== 'visualizador' && <IconButton icon={ocultar ? EyeOff : Eye} title={ocultar?"Mostrar valores":"Ocultar valores"}
+            onClick={()=>setOcultar(o=>!o)} active={ocultar} size={40} T={T}/>}
           <IconButton icon={darkMode ? Sun : Moon} title={darkMode?"Modo claro":"Modo escuro"}
             onClick={()=>setDarkMode(d=>!d)} size={40} T={T}/>
         </div>

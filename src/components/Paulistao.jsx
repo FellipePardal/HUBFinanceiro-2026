@@ -469,8 +469,8 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         </div>
         <div style={{ flex:1 }}/>
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          <IconButton icon={ocultar ? EyeOff : Eye} title={ocultar?"Mostrar valores":"Ocultar valores"}
-            onClick={()=>setOcultar(o=>!o)} active={ocultar} size={40} T={T}/>
+          {role !== 'visualizador' && <IconButton icon={ocultar ? EyeOff : Eye} title={ocultar?"Mostrar valores":"Ocultar valores"}
+            onClick={()=>setOcultar(o=>!o)} active={ocultar} size={40} T={T}/>}
           <IconButton icon={darkMode ? Sun : Moon} title={darkMode?"Modo claro":"Modo escuro"}
             onClick={()=>setDarkMode(d=>!d)} size={40} T={T}/>
           <IconButton icon={LogOut} title="Sair" onClick={onSignOut} size={40} T={T}/>

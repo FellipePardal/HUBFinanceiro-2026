@@ -446,13 +446,13 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         <div style={{ flex:1 }}/>
 
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          <IconButton
+          {role !== 'visualizador' && <IconButton
             icon={ocultar ? EyeOff : Eye}
             title={ocultar?"Mostrar valores":"Ocultar valores"}
             onClick={()=>setOcultar(o=>!o)}
             active={ocultar}
             size={40} T={T}
-          />
+          />}
           <IconButton
             icon={darkMode ? Sun : Moon}
             title={darkMode?"Modo claro":"Modo escuro"}
@@ -1179,7 +1179,7 @@ export default function App() {
   if(paginaEfetiva?.startsWith("custom:")) {
     const id = paginaEfetiva.slice(7);
     const config = customCampeonatos.find(c => c.id === id);
-    if (config) return <>{<CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>}{roleWidget}</>;
+    if (config) return <>{<CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole}/>}{roleWidget}</>;
     setPagina("home");
     return null;
   }

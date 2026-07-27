@@ -220,16 +220,18 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
 }
 
 export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, customCampeonatos = [], onCriarCampeonato, onExcluirCampeonato, role = 'admin', entidade = null, onSignOut }) {
+  // entidade pode ter múltiplos valores separados por vírgula (definidos pelo admin)
+  const entidades = String(entidade || "").split(",").map(s => s.trim()).filter(Boolean);
   const filtroCamp = (c) => {
     if (role !== 'visualizador') return true;
-    if (!entidade || entidade === 'outro') return true;
-    if (entidade === 'brasileirao-2026') return c.id === 'brasileirao-2026';
-    if (entidade === 'paulistao-feminino-2026') return c.id !== 'brasileirao-2026';
-    return true;
+    if (entidades.length === 0 || entidades.includes('outro')) return true;
+    return entidades.some(e =>
+      e === 'brasileirao-2026' ? c.id === 'brasileirao-2026' :
+      e === 'paulistao-feminino-2026' ? c.id !== 'brasileirao-2026' : true);
   };
   const campVisiveis = CAMPEONATOS.filter(filtroCamp);
   const customVisiveis = role !== 'visualizador' ? customCampeonatos :
-    (entidade === 'brasileirao-2026' ? [] : customCampeonatos);
+    ((entidades.length === 0 || entidades.some(e => e !== 'brasileirao-2026')) ? customCampeonatos : []);
 
   const totalAtivos = campVisiveis.filter(c => !c.emBreve).length + customVisiveis.filter(c => c.status === "Em andamento").length;
 

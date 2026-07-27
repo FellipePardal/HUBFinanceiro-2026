@@ -13,6 +13,18 @@ const ROLE_META = {
   pendente:     { label: "Pendente",     color: "#9333EA", bg: "rgba(147,51,234,0.10)",  border: "rgba(147,51,234,0.25)" },
 };
 
+// ─── Entidade helpers ─────────────────────────────────────────────────────────
+// profiles.entidade aceita múltiplos valores separados por vírgula
+const ENTIDADE_OPTS = [
+  { id: "brasileirao-2026",        label: "FFU"   },
+  { id: "paulistao-feminino-2026", label: "FPF"   },
+  { id: "outro",                   label: "Outro" },
+];
+const parseEntidades = (val) => String(val || "").split(",").map(s => s.trim()).filter(Boolean);
+const entidadeNome = (id) =>
+  id === "brasileirao-2026" ? "FFU - Futebol Forte União" :
+  id === "paulistao-feminino-2026" ? "FPF - Federação Paulista de Futebol" : id;
+
 function RoleBadge({ role }) {
   const m = ROLE_META[role] || { label: role, color: "#6B7280", bg: "rgba(107,114,128,0.10)", border: "rgba(107,114,128,0.25)" };
   return (
@@ -207,7 +219,7 @@ function ApprovalModal({ user, T, onApprove, onDeny, onClose }) {
         <p style={{ margin:"0 0 20px", fontSize:12, color:T.textMd, fontFamily:FONT.ui, lineHeight:1.8 }}>
           <strong style={{ color:T.text }}>{user.nome || user.email}</strong>
           {user.funcao && <span> · {user.funcao}</span>}
-          {user.entidade && <><br/><span>{user.entidade === "brasileirao-2026" ? "FFU - Futebol Forte União" : user.entidade === "paulistao-feminino-2026" ? "FPF - Federação Paulista de Futebol" : user.entidade}</span></>}
+          {user.entidade && <><br/><span>{parseEntidades(user.entidade).map(entidadeNome).join(", ")}</span></>}
           <br/><span style={{ color:T.textSm }}>{user.email}</span>
         </p>
 
@@ -244,6 +256,7 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
   const [loading, setLoading]       = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState({});
+  const [entUpdating, setEntUpdating]   = useState({});
   const [approving, setApproving]   = useState(null);
 
   const loadUsers = async () => {
@@ -278,6 +291,17 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
     await supabase.rpc('log_audit_action', { p_action: 'role_change', p_target_user_id: userId, p_details: { new_role: newRole } });
     setUsers(us => us.map(u => u.id === userId ? { ...u, role: newRole } : u));
     setRoleUpdating(r => ({ ...r, [userId]: false }));
+  };
+
+  const handleToggleEntidade = async (u, entId) => {
+    const atual = parseEntidades(u.entidade);
+    const novas = atual.includes(entId) ? atual.filter(e => e !== entId) : [...atual, entId];
+    const newEntidade = novas.join(",") || null;
+    setEntUpdating(r => ({ ...r, [u.id]: true }));
+    await supabase.from('profiles').update({ entidade: newEntidade }).eq('id', u.id);
+    await supabase.rpc('log_audit_action', { p_action: 'entidade_change', p_target_user_id: u.id, p_details: { new_entidade: newEntidade } });
+    setUsers(us => us.map(x => x.id === u.id ? { ...x, entidade: newEntidade } : x));
+    setEntUpdating(r => ({ ...r, [u.id]: false }));
   };
 
   const handleApprove = async (userId, newRole) => {
@@ -508,11 +532,30 @@ export default function AdminUsuarios({ onBack, T, darkMode, setDarkMode, onSign
                             {u.email || "—"}
                           </td>
                           <td style={{ ...tdStyle, color: T.textMd, fontSize: 12 }}>
-                            {u.entidade ? (
-                              <span style={{ background:T.surfaceAlt||T.bg, border:`1px solid ${T.border}`, borderRadius:6, padding:"2px 8px", fontSize:11 }}>
-                                {u.entidade === "brasileirao-2026" ? "FFU" : u.entidade === "paulistao-feminino-2026" ? "FPF" : u.entidade}
-                              </span>
-                            ) : "—"}
+                            <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                              {ENTIDADE_OPTS.map(opt => {
+                                const ativa = parseEntidades(u.entidade).includes(opt.id);
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    disabled={!!entUpdating[u.id]}
+                                    onClick={() => handleToggleEntidade(u, opt.id)}
+                                    title={ativa ? `Remover acesso: ${entidadeNome(opt.id)}` : `Liberar acesso: ${entidadeNome(opt.id)}`}
+                                    style={{
+                                      background: ativa ? (T.brandSoft || "rgba(101,179,46,0.10)") : (T.surfaceAlt || T.bg),
+                                      border: `1px solid ${ativa ? (T.brand || "#65B32E") : T.border}`,
+                                      color: ativa ? (T.brand || "#65B32E") : T.textSm,
+                                      borderRadius: 6, padding: "2px 8px", fontSize: 11,
+                                      fontWeight: ativa ? 600 : 400,
+                                      cursor: "pointer", fontFamily: "'Poppins',sans-serif",
+                                      opacity: entUpdating[u.id] ? 0.5 : 1,
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </td>
                           <td style={tdStyle}>
                             {isMe ? (

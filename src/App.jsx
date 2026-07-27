@@ -1159,13 +1159,14 @@ export default function App() {
   // Visualizador não acessa hub-fornecedores
   const paginaEfetiva = (effectiveRole === 'visualizador' && pagina === 'hub-fornecedores') ? 'home' : pagina;
 
-  // Bloqueio por entidade para visualizador
+  // Bloqueio por entidade para visualizador (aceita múltiplas separadas por vírgula)
   const podeVerCamp = (campId) => {
     if (effectiveRole !== 'visualizador') return true;
-    if (!entidade || entidade === 'outro') return true;
-    if (entidade === 'brasileirao-2026') return campId === 'brasileirao-2026';
-    if (entidade === 'paulistao-feminino-2026') return campId !== 'brasileirao-2026';
-    return true;
+    const ents = String(entidade || "").split(",").map(s => s.trim()).filter(Boolean);
+    if (ents.length === 0 || ents.includes('outro')) return true;
+    return ents.some(e =>
+      e === 'brasileirao-2026' ? campId === 'brasileirao-2026' :
+      e === 'paulistao-feminino-2026' ? campId !== 'brasileirao-2026' : true);
   };
 
   if(paginaEfetiva==="brasileirao-2026") {

@@ -1497,20 +1497,24 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                           <td style={{...TS.td, fontWeight:600}}>{s.subLabel}</td>
                           <td style={TS.td}><Pill label={s.catLabel} color={s.catColor}/></td>
                           <td style={TS.td}>
-                            <div style={{display:"flex",alignItems:"center",gap:4}}>
-                              <InlineFornecedor
-                                value={fornecedoresJogo[`${jogo.id}_${s.subKey}`] || ""}
-                                onChange={v => editarFornecedorJogo(`${jogo.id}_${s.subKey}`, v)}
-                                fornecedores={fornecedores}
-                                T={T}
-                              />
-                              {manualMap?.[`${jogo.id}_${s.subKey}`] && (
-                                <span
-                                  title="Definido manualmente — não segue o Portal. Clique para voltar ao automático."
-                                  onClick={() => voltarFornecedorAuto(`${jogo.id}_${s.subKey}`)}
-                                  style={{cursor:"pointer",color:"#f59e0b",fontSize:9,lineHeight:1,flexShrink:0}}>✎</span>
-                              )}
-                            </div>
+                            {canEdit ? (
+                              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                <InlineFornecedor
+                                  value={fornecedoresJogo[`${jogo.id}_${s.subKey}`] || ""}
+                                  onChange={v => editarFornecedorJogo(`${jogo.id}_${s.subKey}`, v)}
+                                  fornecedores={fornecedores}
+                                  T={T}
+                                />
+                                {manualMap?.[`${jogo.id}_${s.subKey}`] && (
+                                  <span
+                                    title="Definido manualmente — não segue o Portal. Clique para voltar ao automático."
+                                    onClick={() => voltarFornecedorAuto(`${jogo.id}_${s.subKey}`)}
+                                    style={{cursor:"pointer",color:"#f59e0b",fontSize:9,lineHeight:1,flexShrink:0}}>✎</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{fontSize:11, color:T.textMd}}>{fornecedoresJogo[`${jogo.id}_${s.subKey}`] || "—"}</span>
+                            )}
                           </td>
                           <td className="num" style={{...TS.td, color:T.textSm, fontSize:12}}>{fmt(s.valorRef)}</td>
                           <td style={{...TS.td, fontSize:12}}>
@@ -1536,7 +1540,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                       {envioMap[n.id] && <Pill label={envioLabel(envioMap[n.id])} color={purple}/>}
                                       {n.hasFile
                                         ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                                        : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                                        : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
                                       {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                                     </span>
                                   ))}
@@ -1548,7 +1552,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                   {envioMap[nota.id] && <Pill label={envioLabel(envioMap[nota.id])} color={purple}/>}
                                   {nota.hasFile
                                     ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(nota)}/>
-                                    : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
+                                    : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
                                   {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(nota.id)}/>}
                                 </span>
                               )}
@@ -1576,7 +1580,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                         <span style={{marginLeft:"auto",display:"flex",gap:4}}>
                           {n.hasFile
                             ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                            : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                            : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
                           {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                         </span>
                       </div>
@@ -1684,7 +1688,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                       <div style={{display:"flex",gap:4}}>
                         {n.hasFile
                           ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                          : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                          : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
                         {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                       </div>
                     </td>

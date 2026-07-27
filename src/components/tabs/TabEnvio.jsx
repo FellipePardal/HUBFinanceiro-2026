@@ -350,7 +350,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       {view === "lista" && (<>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:12}}>
           <span style={{color:T.textMd,fontSize:13,fontWeight:600}}>{envios.length} envio{envios.length!==1?"s":""}</span>
-          <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setView("novo")}>Novo Envio</Button>
+          {canEdit && <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setView("novo")}>Novo Envio</Button>}
         </div>
 
         {envios.length === 0 && (
@@ -396,7 +396,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                 <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>{setEnvioDetalheId(envio.id);setView("detalhe");setEditandoNome(false);setAddingNotas(false);}}>Ver detalhes</Button>
                 <Button T={T} variant="secondary" size="sm" icon={Share2} onClick={()=>copiarLinkEnvio(envio)}>Compartilhar</Button>
                 <Button T={T} variant="secondary" size="sm" icon={ExternalLink} onClick={()=>window.open(envioPublicHash(envio),"_blank")}>Abrir página</Button>
-                <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>excluirEnvio(envio.id)}>Excluir</Button>
+                {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>excluirEnvio(envio.id)}>Excluir</Button>}
               </div>
             </div>
           </Card>

@@ -464,9 +464,9 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
                     <div style={{display:"flex",gap:4}}>
                       {n.hasFile
                         ? <Button T={T} variant="secondary" size="sm" icon={Eye}    onClick={()=>setPreview(n)}/>
-                        : <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
-                      <Button T={T} variant="secondary" size="sm" icon={Edit2} onClick={()=>startEdit(n)}/>
-                      <Button T={T} variant="danger"    size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                        : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                      {canEdit && <Button T={T} variant="secondary" size="sm" icon={Edit2} onClick={()=>startEdit(n)}/>}
+                      {canEdit && <Button T={T} variant="danger"    size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                     </div>
                   </td>
                 </tr>

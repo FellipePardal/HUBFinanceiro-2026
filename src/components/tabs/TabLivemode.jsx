@@ -400,8 +400,9 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
 }
 
 // ── Componente Principal ──
-export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, fornecedores, T, useOrcadoLivemode = false, servicosLm = SERVICOS_LM }) {
+export default function TabLivemode({ livemode, setLivemode, notasLivemode, setNotasLivemode, notasLiveU, setNotasLiveU, jogos, fornecedores, T, useOrcadoLivemode = false, servicosLm = SERVICOS_LM, role = 'admin' }) {
   const [tab, setTab] = useState("notas");
+  const canEdit = role === 'admin';
   const [showModal, setShowModal] = useState(false);
   const [showModalLiveU, setShowModalLiveU] = useState(false);
 
@@ -506,7 +507,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
         <KPI label="Orçado Total" value={fmt(totalOrcado)} sub={`${divulgados.length} jogos`} color={purple} T={T}/>
         <KPI label="NFs Livemode" value={String(totalNFs)} sub={fmt(totalValorNFs)} color={green} T={T}/>
         <KPI label="NFs liveU" value={String(totalLiveUNFs)} sub={fmt(totalValorLiveU)} color={amber} T={T}/>
-        <KPI label="Saldo" value={fmt(totalOrcado - totalValorNFs - totalValorLiveU)} sub={`${totalOrcado ? (((totalValorNFs+totalValorLiveU)/totalOrcado)*100).toFixed(1) : 0}% executado`} color={totalOrcado-totalValorNFs-totalValorLiveU>=0?teal:T.danger} T={T}/>
+        {role !== 'visualizador' && <KPI label="Saldo" value={fmt(totalOrcado - totalValorNFs - totalValorLiveU)} sub={`${totalOrcado ? (((totalValorNFs+totalValorLiveU)/totalOrcado)*100).toFixed(1) : 0}% executado`} color={totalOrcado-totalValorNFs-totalValorLiveU>=0?teal:T.danger} T={T}/>}
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:20}}>
@@ -545,10 +546,10 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
             }}>{t.label}</button>
           ))}
         </div>
-        <div style={{display:"flex",gap:8}}>
+        {canEdit && <div style={{display:"flex",gap:8}}>
           <Button T={T} variant="primary" size="md" icon={Plus} onClick={()=>setShowModal(true)}>Nova NF</Button>
           <Button T={T} variant="secondary" size="md" icon={Plus} onClick={()=>setShowModalLiveU(true)} style={{background:amber+"22",color:amber,border:`1px solid ${amber}44`}}>Nova NF liveU</Button>
-        </div>
+        </div>}
       </div>
 
       {/* ── ABA NOTAS LIVEMODE ── */}
@@ -587,7 +588,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                         <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
                         <td style={{...TS.td, color:T.textSm, fontSize:11}}>{n.obs||""}</td>
                         <td style={TS.td}>
-                          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>
+                          {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                         </td>
                       </tr>
                     ))}
@@ -635,7 +636,7 @@ export default function TabLivemode({ livemode, setLivemode, notasLivemode, setN
                         <td className="num" style={{...TS.td, color:T.textSm, fontSize:11}}>{n.dataEmissao||"—"}</td>
                         <td style={{...TS.td, color:T.textSm, fontSize:11}}>{n.obs||""}</td>
                         <td style={TS.td}>
-                          <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNotaLiveU(n.id)}/>
+                          {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNotaLiveU(n.id)}/>}
                         </td>
                       </tr>
                     ))}

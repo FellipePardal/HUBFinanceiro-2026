@@ -117,6 +117,14 @@ function extrairServicos(jogo, extraExcluir) {
   return servicos;
 }
 
+function labelServico(sk) {
+  for (const cat of CATS) {
+    const s = cat.subs.find(x => x.key === sk);
+    if (s) return s.label;
+  }
+  return sk;
+}
+
 function abreviar(nome) {
   if (!nome || nome === "A definir") return "TBD";
   const map = {"Fluminense":"FLU","Botafogo":"BOT","Flamengo":"FLA","Vasco":"VAS","Corinthians":"COR","Palmeiras":"PAL","São Paulo":"SAO","Athletico PR":"CAP","Grêmio":"GRE","Internacional":"INT","Cruzeiro":"CRU","Atlético MG":"CAM","Chapecoense":"CHA","Santos":"SAN","Vitória":"VIT","Mirassol":"MIR","Coritiba":"CFC"};
@@ -626,6 +634,10 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     setEditingId(sub.id);
     if (sub.tipo === "mensal") {
       setEditServicos({ _mensal: sub.valorNF || 0 });
+    } else if (sub.servicosDetalhe) {
+      // Submissão com detalhe granular ("jogoId_subKey"): edita o próprio
+      // detalhe — editar só o agregado por subKey perderia a quebra por jogo.
+      setEditServicos({...sub.servicosDetalhe});
     } else {
       setEditServicos({...(sub.servicosValores || {})});
     }
@@ -666,9 +678,15 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     {
       const sv = editVals || (sub.servicosValores || {});
       const isMultiJogo = Array.isArray(sub.jogoIds) && sub.jogoIds.length > 1;
-      const servicosDetalhe = sub.servicosDetalhe || (isMultiJogo
-        ? Object.fromEntries(Object.entries(sv).map(([k, v]) => [k.includes("_") ? k : `${sub.jogoId}_${k}`, v]))
-        : null);
+      // A edição do operador tem precedência sobre o detalhe do formulário:
+      // quando a submissão tem servicosDetalhe, o editVals já vem por
+      // "jogoId_subKey" (ver startEdit) — antes o detalhe ORIGINAL vencia aqui
+      // e a nota aprovada voltava com os valores errados de antes da correção.
+      const servicosDetalhe = (editVals && sub.servicosDetalhe)
+        ? {...editVals}
+        : sub.servicosDetalhe || (isMultiJogo
+          ? Object.fromEntries(Object.entries(sv).map(([k, v]) => [k.includes("_") ? k : `${sub.jogoId}_${k}`, v]))
+          : null);
       const valorNF = servicosDetalhe
         ? Object.values(servicosDetalhe).reduce((s, v) => s + (v || 0), 0)
         : Object.values(sv).reduce((s, v) => s + (v || 0), 0);
@@ -682,9 +700,11 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
             return acc;
           }, {})
         : sv;
-      const servicosLabels = sub.servicosLabels || Object.keys(servicosValores).map(sk => {
+      // Com edição, os labels são recalculados — os do formulário podem não
+      // refletir serviços adicionados/removidos pelo operador.
+      const servicosLabels = (!editVals && sub.servicosLabels) || Object.keys(servicosValores).map(sk => {
         const s = allServicos.find(x => x.subKey === sk);
-        return s ? s.subLabel : sk;
+        return s ? s.subLabel : labelServico(sk);
       });
       const mandante = jogo?.mandante || sub.jogoLabel?.split(/\s*x\s*/)[0] || "";
       const visitante = jogo?.visitante || sub.jogoLabel?.split(/\s*x\s*/)[1] || "";
@@ -884,6 +904,38 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
                     <input type="number" value={editServicos._mensal ?? ""} onChange={e => setEditValor("_mensal", e.target.value)}
                       style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:110,textAlign:"right",fontSize:13,fontWeight:700}} autoFocus/>
                   </div>
+                </>) : sub.servicosDetalhe ? (<>
+                  <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Editar serviços e valores:</p>
+                  {(sub.jogoIds?.length ? sub.jogoIds : [sub.jogoId]).map(jid => {
+                    const j = divulgados.find(x => x.id === jid);
+                    const servicosJogo = j ? extrairServicos(j) : [];
+                    // Lista os serviços do jogo + os que vieram no envio (mesmo fora da lista)
+                    const keys = new Set(servicosJogo.map(s => s.subKey));
+                    Object.keys(sub.servicosDetalhe).forEach(k => {
+                      if (String(k).startsWith(`${jid}_`)) keys.add(String(k).slice(String(jid).length + 1));
+                    });
+                    const multi = (sub.jogoIds || []).length > 1;
+                    return (
+                      <div key={jid} style={{marginBottom:multi?8:0}}>
+                        {multi && <p style={{color:T.textSm,fontSize:11,fontWeight:700,margin:"4px 0"}}>{j ? `${j.mandante} x ${j.visitante}` : `Jogo ${jid}`}</p>}
+                        {[...keys].map(sk => {
+                          const key = `${jid}_${sk}`;
+                          const ativo = editServicos[key] !== undefined;
+                          const label = servicosJogo.find(x => x.subKey === sk)?.subLabel || labelServico(sk);
+                          return (
+                            <div key={key} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,padding:"4px 0"}}>
+                              <input type="checkbox" checked={ativo} onChange={() => toggleEditServico(sub, key)}/>
+                              <span style={{flex:1,fontSize:12,color:ativo?T.text:T.textSm}}>{label}</span>
+                              {ativo && (
+                                <input type="number" value={editServicos[key]} onChange={e => setEditValor(key, e.target.value)}
+                                  style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:90,textAlign:"right",fontSize:12,fontWeight:600}}/>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </>) : (<>
                   <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Editar serviços e valores:</p>
                   {allServicos.map(s => {

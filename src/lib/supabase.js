@@ -5,8 +5,21 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Se o backend parar de responder (projeto pausado, quota estourada, outage),
+// o fetch fica pendurado pra sempre e o app trava no "Carregando..." sem nunca
+// mostrar erro (incidente 2026-08-03). O timeout transforma isso num erro real,
+// que cai nas telas de "Tentar novamente" existentes.
+const REQUEST_TIMEOUT_MS = 20000;
+const comTimeout = (promise, oQue) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(
+    () => reject(new Error(`O servidor não respondeu em ${REQUEST_TIMEOUT_MS / 1000}s (${oQue}). Verifique o status do projeto Supabase.`)),
+    REQUEST_TIMEOUT_MS
+  )),
+]);
+
 export async function getState(key) {
-  const { data, error } = await supabase.from('app_state').select('value').eq('key', key).single();
+  const { data, error } = await comTimeout(supabase.from('app_state').select('value').eq('key', key).single(), `ler ${key}`);
   if (error) {
     // PGRST116 = nenhuma linha encontrada: a key realmente não existe ainda, pode
     // seedar com defaults. Qualquer outro erro (rede, timeout, etc.) precisa
@@ -43,7 +56,7 @@ async function pushBackup(key, valorAtual) {
 export async function setState(key, value) {
   const atual = await getState(key).catch(() => null);
   if (atual != null) await pushBackup(key, atual);
-  const { error } = await supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await comTimeout(supabase.from('app_state').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' }), `gravar ${key}`);
   if (error) throw error;
 }
 
@@ -59,7 +72,7 @@ const rpcIndisponivel = err =>
 // Acrescenta `entry` (objeto ou array de objetos) na lista `key`. Se algum
 // elemento com o mesmo clientRef já estiver lá (reenvio após falha), não grava.
 export async function appendState(key, entry) {
-  const { error } = await supabase.rpc('append_app_state_list', { k: key, entry });
+  const { error } = await comTimeout(supabase.rpc('append_app_state_list', { k: key, entry }), `acrescentar em ${key}`);
   if (!error) return;
   if (!rpcIndisponivel(error)) throw error;
   console.warn(`RPC append_app_state_list indisponível — usando caminho legado para "${key}"`);
@@ -74,7 +87,7 @@ export async function appendState(key, entry) {
 // false se o item já não estava lá (alguém decidiu antes) — quem chama usa
 // isso pra não repetir efeitos colaterais (ex.: criar a nota duas vezes).
 export async function removeFromStateList(key, id) {
-  const { data, error } = await supabase.rpc('remove_app_state_list', { k: key, item_id: String(id) });
+  const { data, error } = await comTimeout(supabase.rpc('remove_app_state_list', { k: key, item_id: String(id) }), `remover de ${key}`);
   if (!error) return data === true;
   if (!rpcIndisponivel(error)) throw error;
   console.warn(`RPC remove_app_state_list indisponível — usando caminho legado para "${key}"`);

@@ -1017,6 +1017,7 @@ export default function App() {
   const [customCampeonatos, setCustomCampeonatos] = useState([]);
   const [showNovoCampModal, setShowNovoCampModal] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [roleError, setRoleError] = useState(false);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [roleOverride, setRoleOverride] = useState(null);
   const T = darkMode ? DARK : LIGHT;
@@ -1025,14 +1026,22 @@ export default function App() {
     let mounted = true;
 
     const loadRole = (userId) => {
-      supabase.from('profiles').select('role, entidade').eq('id', userId).single()
+      // Timeout: se o backend não responder (projeto pausado/outage), mostra a
+      // tela de erro com "Tentar novamente" em vez de "Carregando..." eterno.
+      const query = supabase.from('profiles').select('role, entidade').eq('id', userId).single();
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000));
+      Promise.race([query, timeout])
         .then(({ data }) => {
           if (mounted) {
             setRole(data?.role ?? 'visualizador');
             setEntidade(data?.entidade ?? null);
           }
         })
-        .catch(() => { if (mounted) { setRole('visualizador'); setEntidade(null); } });
+        .catch(err => {
+          if (!mounted) return;
+          if (err?.message === 'timeout') { setRoleError(true); return; }
+          setRole('visualizador'); setEntidade(null);
+        });
     };
 
     // IMPORTANTE: nenhuma chamada ao client supabase (query ou signOut) pode
@@ -1150,6 +1159,14 @@ export default function App() {
 
   // Tela de login para o HUB
   if (!user) return <LoginGate T={T} authError={authError} setAuthError={setAuthError}/>;
+
+  // Backend não respondeu ao carregar o perfil (projeto Supabase pausado/outage)
+  if (role === null && roleError) return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
+      <p style={{color:T.textMd,fontSize:15,maxWidth:420,lineHeight:1.6}}>O servidor não está respondendo. Verifique o status do projeto no painel do Supabase e tente de novo.</p>
+      <button onClick={() => window.location.reload()} style={{...btnStyle,background:"#65B32E"}}>Tentar novamente</button>
+    </div>
+  );
 
   // Aguarda role carregar (query de profiles é não-bloqueante)
   if (role === null) return <LoadingScreen T={T}/>;

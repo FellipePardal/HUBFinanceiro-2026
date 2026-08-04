@@ -27,6 +27,7 @@ import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReemb
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
 import { PAULISTAO_JOGOS_INIT, PAULISTAO_SERVICOS_INIT, getFase, ordemFase } from "../data/paulistao";
+import { useAgendaPortal } from "../hooks/useAgendaPortal";
 
 // Serviços Livemode — valores exclusivos do Paulistão F (sem Starlink, valores próprios
 // de Máquinas de Grafismo/Downlink/Distribuição). Não afeta Brasileirão nem outros
@@ -185,6 +186,10 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const setEventosLog     = createPersistedSetter(K.eventos_log,     setEventosLogRaw,     persistRefs);
   const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
+
+  // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
+  // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
+  useAgendaPortal({ tabela: 'paulistao_feminino_jogos', rodadaCol: 'rod', extras: [['dia', 'dia'], ['estadio', 'estadio']], jogos, setJogos, pronto: !loading });
 
   // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo,
   // não tem jogo pra receber o rateio -- o valor ia sendo descartado do realizado

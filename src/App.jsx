@@ -29,6 +29,7 @@ import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReemb
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
 import { useSessionTimeout } from "./hooks/useSessionTimeout";
+import { useAgendaPortal } from "./hooks/useAgendaPortal";
 
 
 // ─── BRASILEIRÃO ──────────────────────────────────────────────────────────────
@@ -141,6 +142,10 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const setEventosLog        = createPersistedSetter('eventos_log',       setEventosLogRaw,        persistRefs);
   const setLogistica         = createPersistedSetter('logistica',         setLogisticaRaw,         persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo  = createPersistedSetter('fornecedores_jogo', setFornecedoresJogoRaw,  persistRefs, { empty: {}, debounceMs: 500 });
+
+  // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
+  // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
+  useAgendaPortal({ tabela: 'brasileirao_jogos', rodadaCol: 'eu', jogos, setJogos, pronto: !loading });
 
   // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
   // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo
@@ -686,12 +691,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {/* usarPortal={false} TEMPORÁRIO (2026-08-04): sync com o Portal de Controle
-            desligado enquanto o Portal é reestruturado para virar a matriz — sem
-            isso, dados em transição no Portal seriam puxados pro Controle por Jogo.
-            O que já foi preenchido fica congelado; edição manual segue normal.
-            Religar quando o Portal estabilizar: basta remover a prop. */}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true} usarPortal={false}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}

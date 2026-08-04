@@ -30,7 +30,7 @@ const STEP = FULL ? 40 : 200;
 
 // PostgREST: no modo dados, filtra as linhas pesadas JÁ no servidor (não transfere
 // os arquivos nem as pilhas ::backup) — sem isso a query estoura o timeout.
-const FILTRO = FULL ? '' : '&key=not.like.nf_file_*&key=not.like.*::backup';
+const FILTRO = FULL ? '' : '&key=not.like.nf_file_*&key=not.like.*::backup*';
 
 async function getPage(off) {
   const url = `${U}/rest/v1/app_state?select=key,value,updated_at&order=key.asc&offset=${off}&limit=${STEP}${FILTRO}`;
@@ -73,7 +73,7 @@ async function main() {
   const rows = await fetchAll(); // no modo dados o filtro já veio do servidor
 
   const isFile = k => k.startsWith('nf_file_');
-  const isBackup = k => k.endsWith('::backup');
+  const isBackup = k => k.includes('::backup');
 
   const stamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
   const prefix = FULL ? 'app_state_full_' : 'app_state_data_';

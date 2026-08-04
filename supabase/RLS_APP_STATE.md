@@ -14,7 +14,7 @@ e **não consegue apagar nada**; o resto é só para usuários logados.
 | Ação | Chaves liberadas |
 |------|------------------|
 | Ler | `jogos`, `fornecedores`, `paulistao_jogos`, `paulistao_fornecedores`, `forn_tabelas_preco`, `forn_campeonatos`, `forn_cidades`, `nf_submissions`, `paulistao_nf_submissions`, `envios`, `*_envios`, `nf_file_*` |
-| Gravar (upsert) | `nf_submissions`, `paulistao_nf_submissions`, `forn_tabelas_preco`, `envios`, `*_envios` (+ seus `::backup`) |
+| Gravar (upsert) | `nf_submissions`, `paulistao_nf_submissions`, `forn_tabelas_preco`, `envios`, `*_envios` (+ seus `::backup*` — desde 2026-08 uma linha por versão: `::backup::vN`/`::backup::dN`) |
 | Inserir | `nf_file_*` (upload dos formulários) |
 | Apagar | **nada** |
 

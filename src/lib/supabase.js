@@ -32,22 +32,51 @@ export async function getState(key) {
   return data?.value ?? null;
 }
 
-const MAX_BACKUPS = 15;
+const MAX_BACKUPS = 5; // slots rolling v0..v4 (rotação: o mais antigo é sobrescrito)
 
-// Antes de qualquer escrita, guarda o valor ATUAL (o que está sendo substituído)
-// numa pilha própria (key + "::backup"), até MAX_BACKUPS versões. Isso não depende
-// de nenhum código estar certo — mesmo que um bug futuro grave o valor errado em
-// `jogos`/`notas`/etc., a versão de imediatamente antes fica preservada aqui, e dá
-// pra restaurar com restoreBackup(key). É a rede de segurança contra o incidente
-// de perda de dados de 2026-07 (ver getState/createPersistedSetter acima).
+// Antes de qualquer escrita, guarda o valor ATUAL (o que está sendo substituído).
+// É a rede de segurança contra o incidente de perda de dados de 2026-07: mesmo
+// que um bug futuro grave o valor errado em `jogos`/`notas`/etc., a versão de
+// imediatamente antes fica preservada e restaurável com restoreBackup(key).
+//
+// Formato (desde 2026-08): UMA LINHA POR VERSÃO, em vez da pilha antiga (uma
+// linha única com 15 cópias completas). A pilha obrigava a ler e regravar todas
+// as cópias a cada edição — foi o maior consumidor do Disk IO que derrubou o
+// projeto em 2026-08-03/04. Agora:
+//   • `key::backup::v0..v4` — últimas 5 versões, rotação pelo slot mais antigo.
+//   • `key::backup::d0..d6` — snapshot diário (slot = dia da semana UTC), gravado
+//     na 1ª escrita do dia; guarda o estado de "fim do dia anterior" por 7 dias.
+// Decidir o slot usa um SELECT só de key+updated_at (sem carregar valores), e a
+// rotação dispensa DELETE — custo por edição: 1 consulta barata + 1 cópia gravada.
+// A pilha legada `key::backup` não é mais gravada, mas segue legível no
+// getBackups até ser naturalmente irrelevante.
 async function pushBackup(key, valorAtual) {
-  if (key.startsWith('nf_file_') || key.endsWith('::backup')) return;
+  if (key.startsWith('nf_file_') || key.includes('::backup')) return;
   try {
-    const backupKey = `${key}::backup`;
-    const { data } = await supabase.from('app_state').select('value').eq('key', backupKey).single();
-    const pilha = Array.isArray(data?.value) ? data.value : [];
-    const nova = [{ at: new Date().toISOString(), value: valorAtual }, ...pilha].slice(0, MAX_BACKUPS);
-    await supabase.from('app_state').upsert({ key: backupKey, value: nova, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    const agora = new Date();
+    const at = agora.toISOString();
+    const { data } = await comTimeout(
+      supabase.from('app_state').select('key, updated_at').like('key', `${key}::backup::%`),
+      `listar backups de ${key}`
+    );
+    const rows = data || [];
+    // Slot rolling: o primeiro vazio, senão o mais antigo.
+    const slots = Array.from({ length: MAX_BACKUPS }, (_, i) => {
+      const k = `${key}::backup::v${i}`;
+      return { k, at: rows.find(r => r.key === k)?.updated_at || '' };
+    });
+    const alvo = slots.reduce((a, b) => (a.at <= b.at ? a : b));
+    const entry = { at, value: valorAtual };
+    const writes = [
+      supabase.from('app_state').upsert({ key: alvo.k, value: entry, updated_at: at }, { onConflict: 'key' }),
+    ];
+    // Snapshot diário: grava só na primeira escrita do dia (UTC) deste key.
+    const dKey = `${key}::backup::d${agora.getUTCDay()}`;
+    const dAt = rows.find(r => r.key === dKey)?.updated_at || '';
+    if (String(dAt).slice(0, 10) !== at.slice(0, 10)) {
+      writes.push(supabase.from('app_state').upsert({ key: dKey, value: entry, updated_at: at }, { onConflict: 'key' }));
+    }
+    await Promise.all(writes.map(w => comTimeout(w, `gravar backup de ${key}`)));
   } catch (err) {
     console.error(`Falha ao gravar backup de "${key}" (a escrita principal segue mesmo assim):`, err);
   }
@@ -97,11 +126,23 @@ export async function removeFromStateList(key, id) {
   return true;
 }
 
-// Lista as versões anteriores de `key` (mais recente primeiro). Use para
-// inspecionar antes de decidir restaurar.
+// Lista as versões anteriores de `key` (mais recente primeiro), juntando os
+// slots novos (::backup::vN e ::backup::dN) com a pilha legada (::backup).
+// Use para inspecionar antes de decidir restaurar.
 export async function getBackups(key) {
-  const data = await getState(`${key}::backup`);
-  return Array.isArray(data) ? data : [];
+  const { data, error } = await comTimeout(
+    supabase.from('app_state').select('value').like('key', `${key}::backup::%`),
+    `listar backups de ${key}`
+  );
+  if (error) throw error;
+  const novas = (data || []).map(r => r.value).filter(v => v && v.at);
+  const legada = await getState(`${key}::backup`).catch(() => null);
+  const antigas = Array.isArray(legada) ? legada : [];
+  // Dedupe por timestamp (o snapshot diário pode ser a mesma versão de um slot v)
+  const vistos = new Set();
+  return [...novas, ...antigas]
+    .filter(v => { if (vistos.has(v.at)) return false; vistos.add(v.at); return true; })
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
 // Restaura `key` para a versão `stepsBack` passos atrás (0 = a gravação

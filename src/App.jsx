@@ -686,7 +686,12 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="gráficos"      && <TabGraficos      divulgados={divulgados} savingRodada={savingRodada} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true}/>}
+        {/* usarPortal={false} TEMPORÁRIO (2026-08-04): sync com o Portal de Controle
+            desligado enquanto o Portal é reestruturado para virar a matriz — sem
+            isso, dados em transição no Portal seriam puxados pro Controle por Jogo.
+            O que já foi preenchido fica congelado; edição manual segue normal.
+            Religar quando o Portal estabilizar: basta remover a prop. */}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true} usarPortal={false}/>}
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}

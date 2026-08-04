@@ -1105,7 +1105,7 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
 export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false, role = 'admin', onReembolsoCriado }) {
   const canEdit = role === 'admin';
   const subsExcluir = subsExcluirExtra.length ? new Set([...SUBS_EXCLUIR, ...subsExcluirExtra]) : SUBS_EXCLUIR;
-  const { portal: _portalRaw } = usePortalLink('brasileirao');
+  const { portal: _portalRaw } = usePortalLink('brasileirao', { enabled: usarPortal });
   const portal = usarPortal ? _portalRaw : null;
 
   // Fornecedores editados à mão na planilha: o mapa __manual (guardado dentro do

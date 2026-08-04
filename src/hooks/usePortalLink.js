@@ -9,11 +9,14 @@ const TABLES_BY_CAMP = {
 
 // Carrega dados operacionais do Portal e mantém atualizados via realtime.
 // Retorna { portal: { controle, periferico }, loading }.
-export function usePortalLink(campeonato = 'brasileirao') {
+// `enabled=false` desliga tudo (nenhuma consulta, nenhum canal realtime) — usado
+// enquanto o Portal está em reestruturação para virar a matriz (2026-08).
+export function usePortalLink(campeonato = 'brasileirao', { enabled = true } = {}) {
   const [portal, setPortal] = useState({ controle: new Map(), periferico: new Map() });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     async function load() {
       const data = await loadPortalData(campeonato);
@@ -35,7 +38,7 @@ export function usePortalLink(campeonato = 'brasileirao') {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [campeonato]);
+  }, [campeonato, enabled]);
 
   return { portal, loading };
 }

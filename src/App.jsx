@@ -1035,19 +1035,29 @@ export default function App() {
         .catch(() => { if (mounted) { setRole('visualizador'); setEntidade(null); } });
     };
 
+    // IMPORTANTE: nenhuma chamada ao client supabase (query ou signOut) pode
+    // rodar DIRETO dentro deste callback. O supabase-js segura um lock interno
+    // de auth enquanto o onAuthStateChange executa, e qualquer query/signOut
+    // espera esse mesmo lock — deadlock: a query de profiles nunca resolve,
+    // `role` fica null e o hub trava no "Carregando..." pra sempre (pior ainda,
+    // o lock preso pendura TODOS os getState seguintes). O setTimeout(0) deixa
+    // o callback terminar e liberar o lock antes de tocar no client.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (session?.user) {
         if (session.user.app_metadata?.provider === 'google' &&
             !session.user.email?.endsWith('@livemode.com')) {
-          supabase.auth.signOut();
-          if (mounted) { setAuthError('Acesso restrito a contas @livemode.com'); setAuthLoading(false); }
+          setTimeout(() => supabase.auth.signOut(), 0);
+          setAuthError('Acesso restrito a contas @livemode.com');
+          setAuthLoading(false);
           return;
         }
-        if (mounted) { setUser(session.user); setAuthLoading(false); }
-        loadRole(session.user.id);
+        setUser(session.user);
+        setAuthLoading(false);
+        const userId = session.user.id;
+        setTimeout(() => loadRole(userId), 0);
       } else {
-        if (mounted) { setUser(null); setRole(null); setAuthLoading(false); }
+        setUser(null); setRole(null); setAuthLoading(false);
       }
     });
 

@@ -1,19 +1,252 @@
-import { useState, useMemo } from "react";
-import { RADIUS } from "../../../constants";
+import { useState, useMemo, useEffect } from "react";
+import { iSty, RADIUS } from "../../../constants";
 import { Button, Badge } from "../../ui";
-import {
-  Trophy, Building2, Camera, Users,
-} from "lucide-react";
 import { fmt } from "../../../utils";
+import {
+  criarTabelaFornecedor, getTabelaFornecedor,
+  getValorTabela, setValorTabela, contarCelulasPreenchidas,
+  unidadeLabel,
+} from "../../../data/catalogos";
+import {
+  Trophy, Building2, Camera, Users, Check, Plus, Trash2, Save,
+  AlertCircle, CalendarRange, MapPin, Package,
+} from "lucide-react";
 
 const CAT_META = {
   periferico: { label: "Periféricos",        color: "#3b82f6", Icon: Camera },
   equipe:     { label: "Equipe Operacional", color: "#f59e0b", Icon: Users  },
 };
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-function getAtrib(atribuicoes, itemId) {
-  return atribuicoes.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
+// ════════════════════════════════════════════════════════════════════════════
+// Tabelas de Preço — valores de cada fornecedor no catálogo do campeonato
+// ----------------------------------------------------------------------------
+// Fluxo: seleciona o campeonato → adiciona/seleciona um fornecedor → marca
+// quais itens do catálogo ele faz → preenche a matriz item × cidade.
+// Preenchimento direto (negociação anual, preços travados pela vigência).
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Editor da tabela de um fornecedor ────────────────────────────────────────
+function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave, onRemove, T }) {
+  const [tab, setTab]     = useState(tabelaInicial);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => { setTab(tabelaInicial); setDirty(false); }, [tabelaInicial?.id]);
+
+  const cidadesDoCamp = useMemo(() =>
+    (camp?.cidadeIds || []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
+    [camp, cidades]
+  );
+
+  const itensDoCatalogo = useMemo(() =>
+    (camp?.itens || []).filter(i => i.ativo !== false),
+    [camp]
+  );
+
+  const itensPorCat = useMemo(() => {
+    const map = { periferico: [], equipe: [] };
+    itensDoCatalogo.forEach(it => { const k = it.categoria || "equipe"; if (map[k]) map[k].push(it); });
+    return map;
+  }, [itensDoCatalogo]);
+
+  const feitos = useMemo(() => new Set(tab.itemIds || []), [tab.itemIds]);
+  const itensAtivos = itensDoCatalogo.filter(it => feitos.has(it.id));
+
+  const toggleItem = id => {
+    const s = new Set(tab.itemIds || []);
+    s.has(id) ? s.delete(id) : s.add(id);
+    setTab(t => ({ ...t, itemIds: Array.from(s) }));
+    setDirty(true);
+  };
+
+  const updateValor = (itemId, cidadeId, raw) => {
+    const v = raw === "" ? null : parseFloat(raw);
+    setTab(t => setValorTabela(t, itemId, cidadeId, v));
+    setDirty(true);
+  };
+
+  const updateCampo = (k, v) => { setTab(t => ({ ...t, [k]: v })); setDirty(true); };
+
+  const salvar = () => {
+    onSave({ ...tab, atualizadoEm: new Date().toISOString() });
+    setDirty(false);
+  };
+
+  const preenchidas = contarCelulasPreenchidas(tab);
+  const totalCelulas = itensAtivos.length * cidadesDoCamp.length;
+  const pct = totalCelulas ? Math.round((preenchidas / totalCelulas) * 100) : 0;
+
+  const cellSty = hasVal => ({
+    background: hasVal ? "rgba(16,185,129,0.08)" : "transparent",
+    border: `1px solid ${hasVal ? "rgba(16,185,129,0.30)" : T.border}`,
+    borderRadius: RADIUS.sm, color: T.text, padding: "5px 7px",
+    fontSize: 12, fontWeight: hasVal ? 700 : 400,
+    width: "100%", minWidth: 76, textAlign: "right",
+    boxSizing: "border-box",
+    fontFamily: "'JetBrains Mono',ui-monospace,monospace", outline: "none",
+  });
+  const stickyLeft = { position: "sticky", left: 0, background: T.surface || T.card, zIndex: 1 };
+  const IS = iSty(T);
+  const lbl = { fontSize: 11, fontWeight: 600, color: T.textMd, display: "block", marginBottom: 4, letterSpacing: "0.04em", textTransform: "uppercase" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+
+      {/* Header do editor */}
+      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, background: T.surfaceAlt || T.bg, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: T.text, letterSpacing: "-0.02em" }}>
+            {fornecedor?.apelido || "Fornecedor"}
+          </h2>
+          <Badge T={T} color={T.brand || "#10b981"} size="sm">{camp?.nome}</Badge>
+          {dirty && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 9px", background: "rgba(245,158,11,0.12)", color: T.warning || "#f59e0b", borderRadius: RADIUS.pill, fontSize: 10, fontWeight: 700 }}>
+              <AlertCircle size={11}/> Não salvo
+            </span>
+          )}
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: T.textMd }}>
+          {itensAtivos.length}/{itensDoCatalogo.length} serviços · {cidadesDoCamp.length} cidade{cidadesDoCamp.length !== 1 ? "s" : ""} ·{" "}
+          <span style={{ fontWeight: 700, color: pct === 100 && totalCelulas > 0 ? (T.brand || "#10b981") : T.text }}>
+            {preenchidas}/{totalCelulas} valores ({pct}%)
+          </span>
+        </p>
+        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+          <Button T={T} variant="primary"  size="sm" icon={Save}   onClick={salvar} disabled={!dirty}>Salvar</Button>
+          <Button T={T} variant="danger"   size="sm" icon={Trash2} onClick={() => onRemove(tab.id)}>Excluir tabela</Button>
+        </div>
+      </div>
+
+      {/* Corpo rolável */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+
+        {/* Vigência + observações */}
+        <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 12, marginBottom: 16 }}>
+          <div>
+            <label style={lbl}><CalendarRange size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 4 }}/>Vigência</label>
+            <input value={tab.vigencia || ""} onChange={e => updateCampo("vigencia", e.target.value)} placeholder="Ex: 2026–2027" style={IS}/>
+          </div>
+          <div>
+            <label style={lbl}>Observações</label>
+            <input value={tab.observacoes || ""} onChange={e => updateCampo("observacoes", e.target.value)} placeholder="Condições, exclusões, prazos..." style={IS}/>
+          </div>
+        </div>
+
+        {/* Itens do catálogo que o fornecedor faz */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.textMd, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>
+            Serviços que este fornecedor faz — catálogo do {camp?.nome}
+          </div>
+          {!itensDoCatalogo.length ? (
+            <p style={{ margin: 0, fontSize: 12, color: T.textSm, padding: "12px 14px", border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
+              O catálogo deste campeonato está vazio. Adicione itens em Catálogos → Campeonatos.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {Object.entries(itensPorCat).map(([catKey, items]) => {
+                if (!items.length) return null;
+                const { label, color, Icon } = CAT_META[catKey];
+                return (
+                  <div key={catKey}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                      <Icon size={11}/>{label}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {items.map(it => {
+                        const on = feitos.has(it.id);
+                        return (
+                          <button key={it.id} onClick={() => toggleItem(it.id)} style={{
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            padding: "5px 11px", borderRadius: RADIUS.pill, cursor: "pointer",
+                            border: `1px solid ${on ? color : T.border}`,
+                            background: on ? `${color}14` : "transparent",
+                            color: on ? color : T.textMd,
+                            fontSize: 12, fontWeight: 600, transition: "all .1s",
+                          }}>
+                            {on ? <Check size={11}/> : <Icon size={11}/>}
+                            {it.nome}
+                            <span style={{ fontSize: 9, fontWeight: 400, color: on ? color : T.textSm }}>{unidadeLabel(it.unidade)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Matriz item × cidade */}
+        {!itensAtivos.length ? (
+          <div style={{ padding: "24px", textAlign: "center", color: T.textSm, fontSize: 12, border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
+            Marque acima os serviços que o fornecedor faz para preencher os valores.
+          </div>
+        ) : !cidadesDoCamp.length ? (
+          <div style={{ padding: "24px", textAlign: "center", color: T.textSm, fontSize: 12, border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
+            Este campeonato não tem cidades-sede. Edite em Catálogos → Campeonatos.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto", padding: "0 0 8px" }}>
+            <table style={{ borderCollapse: "separate", borderSpacing: "3px 2px", fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...stickyLeft, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: T.textMd, textAlign: "left", whiteSpace: "nowrap" }}>Serviço</th>
+                  {cidadesDoCamp.map(c => (
+                    <th key={c.id} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: T.text, textAlign: "center", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}` }}>
+                      {c.nome}/{c.uf}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {["periferico", "equipe"].map(catKey => {
+                  const items = itensAtivos.filter(it => (it.categoria || "equipe") === catKey);
+                  if (!items.length) return null;
+                  const { label, color, Icon } = CAT_META[catKey];
+                  return [
+                    <tr key={`grp-${catKey}`}>
+                      <td colSpan={1 + cidadesDoCamp.length} style={{
+                        padding: "5px 12px", fontSize: 10, fontWeight: 800,
+                        color, letterSpacing: "0.05em", textTransform: "uppercase",
+                        background: `${color}10`,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <Icon size={10}/>{label}
+                        </div>
+                      </td>
+                    </tr>,
+                    ...items.map(item => (
+                      <tr key={item.id}>
+                        <td style={{ ...stickyLeft, padding: "4px 12px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{item.nome}</span>
+                          <small style={{ fontSize: 9, color: T.textSm, fontWeight: 400, marginLeft: 4 }}>{unidadeLabel(item.unidade)}</small>
+                        </td>
+                        {cidadesDoCamp.map(cid => {
+                          const val = getValorTabela(tab, item.id, cid.id);
+                          const hasVal = val !== null && val !== undefined;
+                          return (
+                            <td key={`${item.id}-${cid.id}`} style={{ padding: "2px 2px" }}>
+                              <input
+                                type="number"
+                                value={hasVal ? val : ""}
+                                onChange={e => updateValor(item.id, cid.id, e.target.value)}
+                                style={cellSty(hasVal)}
+                                placeholder="—"
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )),
+                  ];
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -21,117 +254,71 @@ export default function Tabelas({
   fornecedores,
   cidades,
   campeonatos,
-  setCampeonatos,
+  tabelas = [], setTabelas = () => {},
   filtroCampeonato = "todos",
   T,
 }) {
-  const [selectedId, setSelectedId] = useState(() => {
+  const [campId, setCampId] = useState(() => {
     if (filtroCampeonato !== "todos") return filtroCampeonato;
-    return campeonatos[0]?.id ?? null;
+    return campeonatos.find(c => c.ativo)?.id ?? campeonatos[0]?.id ?? null;
   });
+  const [fornSelId, setFornSelId] = useState(null);
+  const [novoFornId, setNovoFornId] = useState("");
 
-  const camp          = campeonatos.find(c => c.id === selectedId) ?? null;
-  const cidadesDoCamp = useMemo(() =>
-    (camp?.cidadeIds ?? []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
-    [camp, cidades]
-  );
-  const categorias = camp?.categorias ?? [];
-  const itens      = camp?.itens ?? [];
-  const atribuicoes = camp?.orcamento?.atribuicoes ?? [];
+  const camp = campeonatos.find(c => c.id === campId) ?? null;
 
   const fornById = useMemo(() =>
     Object.fromEntries(fornecedores.map(f => [String(f.id), f])),
     [fornecedores]
   );
 
-  const itensPorCat = useMemo(() => {
-    const map = { periferico: [], equipe: [] };
-    itens.forEach(it => {
-      const k = it.categoria ?? "equipe";
-      if (map[k]) map[k].push(it);
-    });
-    return map;
-  }, [itens]);
+  // Tabelas do campeonato selecionado, com fornecedor resolvido
+  const tabelasDoCamp = useMemo(() =>
+    (tabelas || [])
+      .filter(t => t.campeonatoId === campId)
+      .map(t => ({ ...t, _forn: fornById[String(t.fornecedorId)] }))
+      .filter(t => t._forn)
+      .sort((a, b) => (a._forn.apelido || "").localeCompare(b._forn.apelido || "")),
+    [tabelas, campId, fornById]
+  );
 
-  // ── writers (functional updater to avoid stale closure) ──────────────────
-  const setFornecedor = (itemId, val) => {
-    setCampeonatos(list => {
-      const c = list.find(x => x.id === selectedId);
-      if (!c) return list;
-      const prev = c.orcamento?.atribuicoes ?? [];
-      const cur  = prev.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
-      const upd  = { ...cur, fornecedorId: val ? Number(val) : null };
-      const next = prev.some(a => a.itemId === itemId)
-        ? prev.map(a => a.itemId === itemId ? upd : a)
-        : [...prev, upd];
-      return list.map(x => x.id === selectedId ? { ...x, orcamento: { atribuicoes: next } } : x);
-    });
+  // Fornecedores sem tabela neste campeonato (para o select de adicionar)
+  const fornsDisponiveis = useMemo(() => {
+    const comTabela = new Set(tabelasDoCamp.map(t => String(t.fornecedorId)));
+    return [...fornecedores]
+      .filter(f => !comTabela.has(String(f.id)))
+      .sort((a, b) => (a.apelido || "").localeCompare(b.apelido || ""));
+  }, [fornecedores, tabelasDoCamp]);
+
+  const tabelaSel = fornSelId ? getTabelaFornecedor(tabelas, fornSelId, campId) : null;
+  const fornSel   = fornSelId ? fornById[String(fornSelId)] : null;
+
+  const adicionarFornecedor = () => {
+    if (!novoFornId || !campId) return;
+    const nova = criarTabelaFornecedor({ fornecedorId: Number(novoFornId) || novoFornId, campeonatoId: campId });
+    setTabelas(list => [...(list || []), nova]);
+    setFornSelId(novoFornId);
+    setNovoFornId("");
   };
 
-  const setValor = (itemId, cidadeId, catCodigo, raw) => {
-    const v = raw === "" ? null : parseFloat(raw);
-    setCampeonatos(list => {
-      const c = list.find(x => x.id === selectedId);
-      if (!c) return list;
-      const prev   = c.orcamento?.atribuicoes ?? [];
-      const cur    = prev.find(a => a.itemId === itemId) ?? { itemId, fornecedorId: null, valores: {} };
-      const valores = { ...(cur.valores ?? {}) };
-      const byCity  = { ...(valores[cidadeId] ?? {}) };
-      if (v === null || isNaN(v)) delete byCity[catCodigo];
-      else byCity[catCodigo] = v;
-      if (!Object.keys(byCity).length) delete valores[cidadeId];
-      else valores[cidadeId] = byCity;
-      const upd  = { ...cur, valores };
-      const next = prev.some(a => a.itemId === itemId)
-        ? prev.map(a => a.itemId === itemId ? upd : a)
-        : [...prev, upd];
-      return list.map(x => x.id === selectedId ? { ...x, orcamento: { atribuicoes: next } } : x);
-    });
+  const salvarTabela = tab => {
+    setTabelas(list => (list || []).map(t => t.id === tab.id ? tab : t));
   };
 
-  // ── totais por cidade × categoria ─────────────────────────────────────────
-  const totais = useMemo(() => {
-    const map = {};
-    atribuicoes.forEach(a => {
-      Object.entries(a.valores ?? {}).forEach(([cidadeId, cats]) => {
-        Object.entries(cats).forEach(([cat, val]) => {
-          const k = `${cidadeId}:${cat}`;
-          map[k] = (map[k] ?? 0) + Number(val);
-        });
-      });
-    });
-    return map;
-  }, [atribuicoes]);
+  const removerTabela = id => {
+    if (!confirm("Excluir a tabela deste fornecedor neste campeonato? Os valores serão perdidos.")) return;
+    setTabelas(list => (list || []).filter(t => t.id !== id));
+    setFornSelId(null);
+  };
 
-  const hasTotais = Object.keys(totais).length > 0;
+  const selecionarCamp = id => { setCampId(id); setFornSelId(null); setNovoFornId(""); };
 
-  // ── styles ────────────────────────────────────────────────────────────────
-  const cellStyle = hasVal => ({
-    background: hasVal ? "rgba(16,185,129,0.08)" : "transparent",
-    border: `1px solid ${hasVal ? "rgba(16,185,129,0.30)" : T.border}`,
-    borderRadius: RADIUS.sm,
-    color: T.text,
-    padding: "4px 6px",
-    fontSize: 12,
-    fontWeight: hasVal ? 700 : 400,
-    width: "100%",
-    minWidth: 76,
-    textAlign: "right",
-    boxSizing: "border-box",
-    fontFamily: "'JetBrains Mono',ui-monospace,monospace",
-    outline: "none",
-  });
-
-  const stickyBg = T.surface || T.card;
-
-  // ── campeonato summary ────────────────────────────────────────────────────
-  const campNAtrib = atribuicoes.filter(a => a.fornecedorId).length;
-  const campNItens  = itens.length;
+  const IS = iSty(T);
 
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "220px 1fr",
+      gridTemplateColumns: "230px 250px 1fr",
       border: `1px solid ${T.border}`,
       borderRadius: RADIUS.lg,
       overflow: "hidden",
@@ -139,7 +326,7 @@ export default function Tabelas({
       background: T.surface || T.card,
     }}>
 
-      {/* ── Left: campeonato list ─────────────────────────────────────────── */}
+      {/* ── Coluna 1: campeonatos ─────────────────────────────────────────── */}
       <div style={{ borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Campeonatos</span>
@@ -150,13 +337,12 @@ export default function Tabelas({
               Nenhum campeonato. Crie em Catálogos.
             </div>
           ) : campeonatos.map(c => {
-            const isSel  = c.id === selectedId;
-            const nItens = (c.itens ?? []).length;
-            const nAtrib = (c.orcamento?.atribuicoes ?? []).filter(a => a.fornecedorId).length;
+            const isSel = c.id === campId;
+            const nTabs = (tabelas || []).filter(t => t.campeonatoId === c.id).length;
             return (
               <div
                 key={c.id}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => selecionarCamp(c.id)}
                 style={{
                   padding: "11px 14px",
                   cursor: "pointer",
@@ -166,7 +352,7 @@ export default function Tabelas({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-                  <Trophy size={12} color={c.ativo ? (T.brand || "#10b981") : T.textSm} />
+                  <Trophy size={12} color={c.ativo ? (T.brand || "#10b981") : T.textSm}/>
                   <span style={{
                     fontSize: 13, fontWeight: 700,
                     color: isSel ? (T.brand || "#10b981") : T.text,
@@ -174,7 +360,7 @@ export default function Tabelas({
                   }}>{c.nome}</span>
                 </div>
                 <div style={{ fontSize: 11, color: T.textSm }}>
-                  {nItens} item{nItens !== 1 ? "s" : ""} · {nAtrib}/{nItens} com fornecedor
+                  {(c.itens || []).length} item{(c.itens || []).length !== 1 ? "s" : ""} no catálogo · {nTabs} fornecedor{nTabs !== 1 ? "es" : ""}
                 </div>
               </div>
             );
@@ -182,249 +368,81 @@ export default function Tabelas({
         </div>
       </div>
 
-      {/* ── Right: orçamento editor ───────────────────────────────────────── */}
+      {/* ── Coluna 2: fornecedores com tabela ─────────────────────────────── */}
+      <div style={{ borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Fornecedores</span>
+        </div>
+
+        {/* Adicionar fornecedor */}
+        <div style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", gap: 6 }}>
+          <select value={novoFornId} onChange={e => setNovoFornId(e.target.value)} style={{ ...IS, flex: 1, minWidth: 0, fontSize: 12 }}>
+            <option value="">— Adicionar... —</option>
+            {fornsDisponiveis.map(f => <option key={f.id} value={f.id}>{f.apelido}</option>)}
+          </select>
+          <Button T={T} variant="primary" size="sm" icon={Plus} onClick={adicionarFornecedor} disabled={!novoFornId}/>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {!tabelasDoCamp.length ? (
+            <div style={{ padding: "24px 16px", textAlign: "center", color: T.textSm, fontSize: 12 }}>
+              Nenhum fornecedor neste campeonato ainda. Adicione acima.
+            </div>
+          ) : tabelasDoCamp.map(t => {
+            const isSel = String(t.fornecedorId) === String(fornSelId);
+            const nItens = (t.itemIds || []).length;
+            const nVals = contarCelulasPreenchidas(t);
+            return (
+              <div
+                key={t.id}
+                onClick={() => setFornSelId(t.fornecedorId)}
+                style={{
+                  padding: "10px 13px",
+                  cursor: "pointer",
+                  borderBottom: `1px solid ${T.border}`,
+                  borderLeft: `3px solid ${isSel ? (T.brand || "#10b981") : "transparent"}`,
+                  background: isSel ? (T.brandSoft || "rgba(16,185,129,0.06)") : "transparent",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <Building2 size={12} color={isSel ? (T.brand || "#10b981") : T.textSm}/>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isSel ? (T.brand || "#10b981") : T.text }}>{t._forn.apelido}</span>
+                </div>
+                <div style={{ fontSize: 11, color: T.textSm }}>
+                  {nItens} serviço{nItens !== 1 ? "s" : ""} · {nVals} valor{nVals !== 1 ? "es" : ""}
+                  {t.vigencia && <> · {t.vigencia}</>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Coluna 3: editor ──────────────────────────────────────────────── */}
       {!camp ? (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: T.textSm }}>
-          <Trophy size={32} color={T.border} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: T.textSm }}>
+          <Trophy size={32} color={T.border}/>
           <span style={{ fontSize: 13, fontWeight: 600 }}>Selecione um campeonato</span>
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-          {/* Header */}
-          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, background: T.surfaceAlt || T.bg, flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-              <Trophy size={16} color={T.brand || "#10b981"} />
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: T.text }}>{camp.nome}</h2>
-              {camp.ativo
-                ? <Badge T={T} color={T.brand || "#10b981"} size="sm">Ativo</Badge>
-                : <Badge T={T} color={T.textSm} size="sm">Inativo</Badge>}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              {categorias.map(cat => (
-                <span key={cat.codigo} style={{
-                  padding: "2px 7px", borderRadius: RADIUS.pill,
-                  background: T.brandSoft || "rgba(16,185,129,0.1)",
-                  color: T.brand || "#10b981", fontSize: 11, fontWeight: 700,
-                }}>{cat.codigo}</span>
-              ))}
-              <span style={{ fontSize: 12, color: T.textSm }}>{cidadesDoCamp.length} cidade{cidadesDoCamp.length !== 1 ? "s" : ""}</span>
-              <span style={{ fontSize: 12, color: T.textSm }}>·</span>
-              <span style={{ fontSize: 12, color: T.textSm }}>{campNAtrib}/{campNItens} itens com fornecedor</span>
-            </div>
-          </div>
-
-          {!itens.length ? (
-            <div style={{ padding: 32, textAlign: "center", color: T.textSm, fontSize: 12 }}>
-              Nenhum item neste campeonato. Edite em Catálogos → Campeonatos para adicionar itens.
-            </div>
-          ) : (
-            <div style={{ flex: 1, overflow: "auto", padding: "0 0 20px" }}>
-              <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 12 }}>
-                <colgroup>
-                  <col style={{ width: 160 }} />
-                  <col style={{ width: 160 }} />
-                  {cidadesDoCamp.flatMap(c =>
-                    categorias.map(cat => <col key={`${c.id}-${cat.codigo}`} style={{ width: 88 }} />)
-                  )}
-                </colgroup>
-
-                <thead>
-                  <tr>
-                    {/* Item col header */}
-                    <th style={{
-                      position: "sticky", top: 0, left: 0, zIndex: 3,
-                      background: T.surfaceAlt || T.bg,
-                      padding: "9px 14px", textAlign: "left",
-                      borderBottom: `1px solid ${T.border}`,
-                      borderRight: `1px solid ${T.border}`,
-                      fontSize: 11, fontWeight: 700, color: T.textMd,
-                      whiteSpace: "nowrap",
-                    }}>Item</th>
-
-                    {/* Fornecedor col header */}
-                    <th style={{
-                      position: "sticky", top: 0, left: 160, zIndex: 3,
-                      background: T.surfaceAlt || T.bg,
-                      padding: "9px 12px", textAlign: "left",
-                      borderBottom: `1px solid ${T.border}`,
-                      borderRight: `2px solid ${T.border}`,
-                      fontSize: 11, fontWeight: 700, color: T.textMd,
-                      whiteSpace: "nowrap",
-                    }}>Fornecedor</th>
-
-                    {/* Cidade × Categoria col headers */}
-                    {cidadesDoCamp.flatMap(cidade =>
-                      categorias.map((cat, i) => (
-                        <th key={`${cidade.id}-${cat.codigo}`} style={{
-                          position: "sticky", top: 0, zIndex: 2,
-                          background: T.surfaceAlt || T.bg,
-                          padding: "9px 8px", textAlign: "center",
-                          borderBottom: `1px solid ${T.border}`,
-                          borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
-                          fontSize: 11, fontWeight: 700, color: T.text,
-                          whiteSpace: "nowrap",
-                        }}>
-                          {cidade.nome.length > 10 ? cidade.uf : cidade.nome}/{cat.codigo}
-                        </th>
-                      ))
-                    )}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {["periferico", "equipe"].map(catKey => {
-                    const items = itensPorCat[catKey];
-                    if (!items.length) return null;
-                    const { label, color, Icon } = CAT_META[catKey];
-
-                    return [
-                      // Category group header row
-                      <tr key={`grp-${catKey}`}>
-                        <td
-                          colSpan={2 + cidadesDoCamp.length * categorias.length}
-                          style={{
-                            padding: "7px 14px",
-                            fontSize: 10, fontWeight: 800,
-                            color, letterSpacing: "0.06em", textTransform: "uppercase",
-                            background: `${color}10`,
-                            borderBottom: `1px solid ${T.border}`,
-                          }}
-                        >
-                          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <Icon size={10} />{label}
-                          </span>
-                        </td>
-                      </tr>,
-
-                      // Item rows
-                      ...items.map(item => {
-                        const atrib = getAtrib(atribuicoes, item.id);
-                        const forn  = atrib.fornecedorId ? fornById[String(atrib.fornecedorId)] : null;
-
-                        return (
-                          <tr key={item.id} style={{ borderBottom: `1px solid ${T.border}` }}>
-                            {/* Item name */}
-                            <td style={{
-                              position: "sticky", left: 0, zIndex: 1,
-                              background: stickyBg,
-                              padding: "7px 14px",
-                              borderRight: `1px solid ${T.border}`,
-                              fontWeight: 600, color: T.text, fontSize: 12,
-                              whiteSpace: "nowrap",
-                            }}>
-                              {item.nome}
-                            </td>
-
-                            {/* Fornecedor selector */}
-                            <td style={{
-                              position: "sticky", left: 160, zIndex: 1,
-                              background: stickyBg,
-                              padding: "5px 8px",
-                              borderRight: `2px solid ${T.border}`,
-                            }}>
-                              <select
-                                value={atrib.fornecedorId ?? ""}
-                                onChange={e => setFornecedor(item.id, e.target.value)}
-                                style={{
-                                  width: "100%",
-                                  background: "transparent",
-                                  border: `1px solid ${forn ? (T.brand || "#10b981") : T.border}`,
-                                  borderRadius: RADIUS.sm,
-                                  color: forn ? (T.brand || "#10b981") : T.textSm,
-                                  fontSize: 11,
-                                  fontWeight: forn ? 700 : 400,
-                                  padding: "4px 6px",
-                                  outline: "none",
-                                  cursor: "pointer",
-                                  fontFamily: "inherit",
-                                }}
-                              >
-                                <option value="">— Sem fornecedor —</option>
-                                {[...fornecedores]
-                                  .sort((a, b) => (a.apelido || "").localeCompare(b.apelido || ""))
-                                  .map(f => (
-                                    <option key={f.id} value={f.id}>{f.apelido}</option>
-                                  ))}
-                              </select>
-                            </td>
-
-                            {/* Value cells */}
-                            {cidadesDoCamp.flatMap(cidade =>
-                              categorias.map((cat, i) => {
-                                const val    = atrib.valores?.[cidade.id]?.[cat.codigo] ?? null;
-                                const hasVal = val !== null && val !== undefined;
-                                return (
-                                  <td
-                                    key={`${cidade.id}-${cat.codigo}`}
-                                    style={{
-                                      padding: "3px 3px",
-                                      borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
-                                    }}
-                                  >
-                                    <input
-                                      type="number"
-                                      key={`${selectedId}-${item.id}-${cidade.id}-${cat.codigo}`}
-                                      defaultValue={hasVal ? val : ""}
-                                      onBlur={e => setValor(item.id, cidade.id, cat.codigo, e.target.value)}
-                                      placeholder="—"
-                                      style={cellStyle(hasVal)}
-                                    />
-                                  </td>
-                                );
-                              })
-                            )}
-                          </tr>
-                        );
-                      }),
-                    ];
-                  })}
-
-                  {/* Total row */}
-                  {hasTotais && (
-                    <tr style={{ borderTop: `2px solid ${T.border}` }}>
-                      <td style={{
-                        position: "sticky", left: 0, zIndex: 1,
-                        background: T.surfaceAlt || T.bg,
-                        padding: "8px 14px",
-                        borderRight: `1px solid ${T.border}`,
-                        fontWeight: 800, color: T.textMd, fontSize: 12,
-                      }}>Total estimado</td>
-                      <td style={{
-                        position: "sticky", left: 160, zIndex: 1,
-                        background: T.surfaceAlt || T.bg,
-                        borderRight: `2px solid ${T.border}`,
-                      }} />
-                      {cidadesDoCamp.flatMap(cidade =>
-                        categorias.map((cat, i) => {
-                          const key   = `${cidade.id}:${cat.codigo}`;
-                          const total = totais[key];
-                          return (
-                            <td
-                              key={`tot-${cidade.id}-${cat.codigo}`}
-                              style={{
-                                padding: "7px 6px",
-                                textAlign: "right",
-                                fontFamily: "'JetBrains Mono',ui-monospace,monospace",
-                                fontWeight: 800,
-                                color: T.brand || "#10b981",
-                                fontSize: 12,
-                                background: T.surfaceAlt || T.bg,
-                                borderRight: i === categorias.length - 1 ? `1px solid ${T.border}` : "none",
-                              }}
-                            >
-                              {total ? fmt(total) : "—"}
-                            </td>
-                          );
-                        })
-                      )}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+      ) : !tabelaSel || !fornSel ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: T.textSm, padding: 24, textAlign: "center" }}>
+          <Package size={32} color={T.border}/>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Selecione um fornecedor para preencher a tabela</span>
+          <span style={{ fontSize: 12, color: T.textSm, maxWidth: 340, lineHeight: 1.5 }}>
+            Os itens e cidades vêm do catálogo do campeonato (sub-aba Catálogos).
+          </span>
         </div>
+      ) : (
+        <TabelaEditor
+          key={tabelaSel.id}
+          tabela={tabelaSel}
+          fornecedor={fornSel}
+          camp={camp}
+          cidades={cidades}
+          onSave={salvarTabela}
+          onRemove={removerTabela}
+          T={T}
+        />
       )}
     </div>
   );

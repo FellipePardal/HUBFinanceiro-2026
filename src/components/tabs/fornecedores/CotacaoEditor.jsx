@@ -131,9 +131,9 @@ export default function CotacaoEditor({
           <Card T={T} padding={0} style={{marginBottom:16}}>
             <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:T.text}}>Itens da tabela vigente</div>
+                <div style={{fontSize:13,fontWeight:700,color:T.text}}>Itens da tabela do fornecedor</div>
                 <div style={{fontSize:11,color:T.textSm,marginTop:2}}>
-                  Valores puxados de {cidade?.nome}/{cidade?.uf} × {jogo?.categoria}
+                  Valores puxados de {cidade?.nome}/{cidade?.uf}
                   {cotacao.tabelaIdSnapshot && <> · tabela <code style={{fontSize:10,color:T.textMd}}>{cotacao.tabelaIdSnapshot.slice(-8)}</code></>}
                 </div>
               </div>
@@ -145,7 +145,7 @@ export default function CotacaoEditor({
             <div style={{padding:"6px 0 4px"}}>
               {(cotacao.itensBase || []).length === 0 && (
                 <div style={{padding:"24px 18px",color:T.textSm,fontSize:12,textAlign:"center"}}>
-                  O catálogo do fornecedor está vazio. Cadastre itens em Cadastro → catálogo do fornecedor.
+                  O fornecedor não tem serviços marcados neste campeonato. Configure em Tabelas de Preço.
                 </div>
               )}
               {cotacao.itensBase.map(it => {
@@ -175,7 +175,7 @@ export default function CotacaoEditor({
                       </div>
                       {semPreco && (
                         <div style={{fontSize:11,color:T.warning||"#f59e0b",marginTop:3,display:"inline-flex",alignItems:"center",gap:4}}>
-                          <AlertCircle size={11}/> Sem valor na tabela vigente
+                          <AlertCircle size={11}/> Sem valor na tabela do fornecedor
                         </div>
                       )}
                     </div>

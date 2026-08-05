@@ -499,40 +499,7 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
   const update = patch => { setF(prev => ({ ...prev, ...patch })); setDirty(true); };
   const save   = () => { onSave(f); setDirty(false); };
 
-  // ── helpers for values matrix ────────────────────────────────────────────
-  // Um preço por serviço × cidade. O padrão (B1/B2...) já vem embutido no
-  // próprio serviço (UM B1, UM B2...), então não existe terceira dimensão.
-  const getVal = (forn, itemId, cidadeId) => {
-    const v = forn.tabelaValores?.[itemId]?.[cidadeId];
-    // formato legado: { B1: x, B2: y } — usa o primeiro valor preenchido
-    if (v && typeof v === "object") return Object.values(v).find(x => x != null) ?? null;
-    return v ?? null;
-  };
-
-  const updateVal = (itemId, cidadeId, raw) => {
-    const v = raw === "" ? null : parseFloat(raw);
-    setF(prev => {
-      const tv      = { ...(prev.tabelaValores || {}) };
-      const byItem  = { ...(tv[itemId]  || {}) };
-      if (v === null || isNaN(v)) delete byItem[cidadeId];
-      else byItem[cidadeId] = v;
-      if (!Object.keys(byItem).length) delete tv[itemId];
-      else tv[itemId] = byItem;
-      return { ...prev, tabelaValores: tv };
-    });
-    setDirty(true);
-  };
-
   // ── derived ──────────────────────────────────────────────────────────────
-  const servicosAtivos = useMemo(
-    () => itensMaster.filter(it => (f.servicosPrestados || []).includes(it.id)),
-    [itensMaster, f.servicosPrestados]
-  );
-  const cidadesAtivas = useMemo(
-    () => (f.cidadesAtuacao || []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
-    [cidades, f.cidadesAtuacao]
-  );
-
   const itensPorCat = useMemo(() => {
     const map = { periferico: [], equipe: [] };
     itensMaster.forEach(it => { const k = it.categoria || "equipe"; if (map[k]) map[k].push(it); });
@@ -570,19 +537,6 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
 
   const cyan   = "#06b6d4";
   const purple = "#a855f7";
-
-  // ── cell input style ──────────────────────────────────────────────────────
-  const cellSty = (hasValue) => ({
-    background: hasValue ? "rgba(16,185,129,0.08)" : "transparent",
-    border: `1px solid ${hasValue ? (T.brandBorder || T.border) : T.border}`,
-    borderRadius: RADIUS.sm, color: T.text, padding: "5px 7px",
-    fontSize: 12, fontWeight: hasValue ? 700 : 400,
-    width: "100%", minWidth: 72, textAlign: "right",
-    boxSizing: "border-box",
-    fontFamily: "'JetBrains Mono',ui-monospace,monospace", outline: "none",
-  });
-
-  const stickyLeft = { position: "sticky", left: 0, background: T.surface || T.card, zIndex: 1 };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -692,78 +646,7 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
           </div>
         </SecaoDetalhe>
 
-        {/* Section 4: Valores por Serviço — um preço por serviço × cidade */}
-        <SecaoDetalhe title="Valores por Serviço" color="#10b981" icon={DollarSign} defaultOpen T={T}>
-          {(!servicosAtivos.length || !cidadesAtivas.length) ? (
-            <div style={{ padding: "20px 20px 24px", textAlign: "center", color: T.textSm, fontSize: 12 }}>
-              Selecione serviços e cidades para ver a matriz
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto", padding: "0 0 8px" }}>
-              <table style={{ borderCollapse: "separate", borderSpacing: "3px 2px", fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...stickyLeft, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: T.textMd, textAlign: "left", whiteSpace: "nowrap" }}>Serviço</th>
-                    {cidadesAtivas.map(c => (
-                      <th key={c.id} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: T.text, textAlign: "center", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}` }}>
-                        {c.nome}/{c.uf}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {["periferico","equipe"].map(catKey => {
-                    const items = servicosAtivos.filter(it => (it.categoria || "equipe") === catKey);
-                    if (!items.length) return null;
-                    const { label, color, Icon } = CAT_META[catKey];
-                    return [
-                      <tr key={`grp-${catKey}`}>
-                        <td colSpan={1 + cidadesAtivas.length} style={{
-                          padding: "5px 12px", fontSize: 10, fontWeight: 800,
-                          color, letterSpacing: "0.05em", textTransform: "uppercase",
-                          background: `${color}10`,
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                            <Icon size={10} />{label}
-                          </div>
-                        </td>
-                      </tr>,
-                      ...items.map(item => (
-                        <tr key={item.id}>
-                          <td style={{ ...stickyLeft, padding: "4px 12px", whiteSpace: "nowrap" }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{item.nome}</span>
-                            {item.unidade && (
-                              <small style={{ fontSize: 9, color: T.textSm, fontWeight: 400, marginLeft: 4 }}>
-                                {unidadeLabel(item.unidade)}
-                              </small>
-                            )}
-                          </td>
-                          {cidadesAtivas.map(cid => {
-                            const val      = getVal(f, item.id, cid.id);
-                            const hasValue = val !== null && val !== undefined;
-                            return (
-                              <td key={`${item.id}-${cid.id}`} style={{ padding: "2px 2px" }}>
-                                <input
-                                  type="number"
-                                  value={hasValue ? val : ""}
-                                  onChange={e => updateVal(item.id, cid.id, e.target.value)}
-                                  style={cellSty(hasValue)}
-                                  placeholder="—"
-                                />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      )),
-                    ];
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SecaoDetalhe>
-
-        {/* Section 5: Tabela de Preços (Legado) */}
+        {/* Section 4: Tabela de Preços (Legado) */}
         <SecaoDetalhe title="Tabela de Preços (Legado)" color="#64748b" defaultOpen={false} T={T}>
           <TabelaPrecosFornecedor
             fornecedor={f}

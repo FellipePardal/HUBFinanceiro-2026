@@ -956,7 +956,6 @@ import FormularioPublico from "./components/FormularioPublico";
 import FormularioPublicoPaulistao from "./components/FormularioPublicoPaulistao";
 import EnvioPublico from "./components/EnvioPublico";
 import HubFornecedores from "./components/HubFornecedores";
-import TabelaPrecoPublica from "./components/TabelaPrecoPublica";
 import Paulistao from "./components/Paulistao";
 import CampeonatoCustom from "./components/CampeonatoCustom";
 import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
@@ -1156,8 +1155,6 @@ export default function App() {
   if (currentHash === "#formulario-paulistao") return <FormularioPublicoPaulistao/>;
   const envioMatch = currentHash.match(/^#envio\/(.+)$/);
   if (envioMatch) return <EnvioPublico envioRef={envioMatch[1]}/>;
-  const tabelaMatch = currentHash.match(/^#tabela\/([0-9a-fA-F-]+)$/);
-  if (tabelaMatch) return <TabelaPrecoPublica token={tabelaMatch[1]}/>;
 
   // Auth loading
   if (authLoading) return <LoadingScreen T={T}/>;

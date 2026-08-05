@@ -67,112 +67,62 @@ export const UNIDADES_MEDIDA = [
 export const unidadeLabel = key =>
   UNIDADES_MEDIDA.find(u => u.key === key)?.label || key || "—";
 
-// ── Tabelas de preço ───────────────────────────────────────────────────────
-// Cada tabela = um snapshot da matriz de preços de UM fornecedor para UM
-// campeonato. Persistida em app_state.forn_tabelas_preco como array.
+// ── Tabelas de preço por fornecedor × campeonato ───────────────────────────
+// Cada tabela = os valores negociados de UM fornecedor para o catálogo de UM
+// campeonato. Preenchimento direto pela equipe (a negociação acontece uma vez
+// ao ano; os preços ficam travados pela vigência, ex.: "2026–2027").
+// Persistida em app_state.forn_tabelas_preco como array.
 //
-// Estrutura de valores: objeto aninhado para tornar a edição na UI eficiente
-//   valores[itemId][cidadeId][categoriaCodigo] = number
-//
-// Status do ciclo de vida:
-//   rascunho   — admin criou e está montando localmente
-//   enviada    — admin gerou link e fornecedor preencheu/devolveu
-//   devolvida  — admin revisou e devolveu para ajustes
-//   vigente    — aprovada, valores em uso para cotações
-//   arquivada  — substituída por uma versão mais nova
-export const STATUS_TABELA = [
-  { key:"rascunho",  label:"Rascunho",  color:"#64748b" },
-  { key:"enviada",   label:"Enviada",   color:"#3b82f6" },
-  { key:"devolvida", label:"Devolvida", color:"#f59e0b" },
-  { key:"vigente",   label:"Vigente",   color:"#10b981" },
-  { key:"arquivada", label:"Arquivada", color:"#94a3b8" },
-];
-
-export const statusTabelaInfo = key =>
-  STATUS_TABELA.find(s => s.key === key) || STATUS_TABELA[0];
-
-export function criarTabelaVazia({ fornecedorId, campeonatoId }) {
+//   itemIds:  quais itens do catálogo do campeonato o fornecedor faz
+//   valores[itemId][cidadeId] = number  (o padrão B1/B2 já vem no nome do item)
+export function criarTabelaFornecedor({ fornecedorId, campeonatoId }) {
   const now = new Date().toISOString();
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     fornecedorId,
     campeonatoId,
-    status: "rascunho",
-    versao: 1,
-    observacoes: "",
+    itemIds: [],
     valores: {},
+    vigencia: "",
+    observacoes: "",
     criadoEm: now,
     atualizadoEm: now,
-    enviadaEm: null,
-    aprovadaEm: null,
-    token: null,
-    tokenExpiraEm: null,
-    tokenRevogado: false,
   };
 }
 
+// Tabela de um par (fornecedor, campeonato) — no máximo uma por par
+export function getTabelaFornecedor(tabelas, fornecedorId, campeonatoId) {
+  return (tabelas || []).find(t =>
+    String(t.fornecedorId) === String(fornecedorId) &&
+    t.campeonatoId === campeonatoId
+  ) || null;
+}
+
 // Lê um valor de célula com segurança
-export const getCelula = (tabela, itemId, cidadeId, categoria) =>
-  tabela?.valores?.[itemId]?.[cidadeId]?.[categoria] ?? null;
+export const getValorTabela = (tabela, itemId, cidadeId) =>
+  tabela?.valores?.[itemId]?.[cidadeId] ?? null;
 
 // Atualiza imutavelmente um valor de célula e devolve nova tabela
-export function setCelula(tabela, itemId, cidadeId, categoria, valor) {
+export function setValorTabela(tabela, itemId, cidadeId, valor) {
   const valores = { ...(tabela.valores || {}) };
   const porItem = { ...(valores[itemId] || {}) };
-  const porCidade = { ...(porItem[cidadeId] || {}) };
   if (valor === null || valor === "" || Number.isNaN(valor)) {
-    delete porCidade[categoria];
+    delete porItem[cidadeId];
   } else {
-    porCidade[categoria] = Number(valor);
+    porItem[cidadeId] = Number(valor);
   }
-  // Limpeza ascendente: se a cidade ficou vazia, remove do item; idem item
-  if (Object.keys(porCidade).length === 0) delete porItem[cidadeId];
-  else porItem[cidadeId] = porCidade;
+  // Limpeza ascendente: se o item ficou sem cidades, remove do objeto
   if (Object.keys(porItem).length === 0) delete valores[itemId];
   else valores[itemId] = porItem;
   return { ...tabela, valores, atualizadoEm: new Date().toISOString() };
 }
 
-// Conta células preenchidas — suporta tabela antiga e negociação com rodadas
-export function contarCelulasPreenchidas(tabelaOuNeg) {
-  let vals;
-  if (tabelaOuNeg?.rodadas?.length) vals = getRodadaAtual(tabelaOuNeg)?.valores || {};
-  else vals = tabelaOuNeg?.valores || {};
+export function contarCelulasPreenchidas(tabela) {
   let n = 0;
-  Object.values(vals).forEach(porItem => {
-    Object.values(porItem).forEach(porCidade => {
-      Object.values(porCidade).forEach(v => { if (v != null && v !== "") n++; });
-    });
+  Object.values(tabela?.valores || {}).forEach(porItem => {
+    Object.values(porItem).forEach(v => { if (v != null && v !== "") n++; });
   });
   return n;
-}
-
-// ── Token público ──────────────────────────────────────────────────────────
-// Gera/regenera o token de compartilhamento de uma tabela. O fornecedor abre
-// /#tabela/<token> sem login para preencher e devolver. Validade padrão 30d.
-export function gerarTokenTabela(tabela, diasValidade = 30) {
-  const token = (typeof crypto !== "undefined" && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `tok-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
-  return {
-    ...tabela,
-    token,
-    tokenExpiraEm: new Date(Date.now() + diasValidade * 86400000).toISOString(),
-    tokenRevogado: false,
-    atualizadoEm: new Date().toISOString(),
-  };
-}
-
-export function revogarTokenTabela(tabela) {
-  return { ...tabela, tokenRevogado: true, atualizadoEm: new Date().toISOString() };
-}
-
-// Estado do token: 'sem' | 'ativo' | 'expirado' | 'revogado'
-export function statusTokenTabela(tabela) {
-  if (!tabela?.token) return "sem";
-  if (tabela.tokenRevogado) return "revogado";
-  if (tabela.tokenExpiraEm && new Date(tabela.tokenExpiraEm) < new Date()) return "expirado";
-  return "ativo";
 }
 
 // ── Cotações ──────────────────────────────────────────────────────────────
@@ -188,30 +138,13 @@ export const STATUS_COTACAO_NOVO = [
 export const statusCotacaoInfo = key =>
   STATUS_COTACAO_NOVO.find(s => s.key === key) || STATUS_COTACAO_NOVO[0];
 
-// Encontra a tabela/negociação vigente de um par (fornecedor, campeonato).
-export function getTabelaVigente(tabelas, fornecedorId, campeonatoId) {
-  return (tabelas || []).find(t =>
-    String(t.fornecedorId) === String(fornecedorId) &&
-    t.campeonatoId === campeonatoId &&
-    (t.status === "vigente" || t.status === "aprovada")
-  ) || null;
-}
-
-// Devolve o objeto de valores vigente (suporta formato antigo e novo com rodadas)
-export function getValoresVigentes(tabela) {
-  if (tabela?.rodadas?.length) return getRodadaAtual(tabela)?.valores || {};
-  return tabela?.valores || {};
-}
-
-export function calcularItensBase({ tabela, fornecedor, jogo, campeonato }) {
+export function calcularItensBase({ tabela, jogo, campeonato }) {
   if (!tabela || !jogo) return [];
-  const itens = (campeonato?.itens?.length)
-    ? campeonato.itens.filter(i => i.ativo !== false)
-    : (fornecedor?.catalogo || []).filter(i => i.ativo !== false);
-  const vals = getValoresVigentes(tabela);
-  const fakeTab = { valores: vals };
+  // Só os itens do catálogo do campeonato que o fornecedor faz (itemIds)
+  const feitos = new Set(tabela.itemIds || []);
+  const itens = (campeonato?.itens || []).filter(i => i.ativo !== false && feitos.has(i.id));
   return itens.map(it => {
-    const valor = getCelula(fakeTab, it.id, jogo.cidadeId, jogo.categoria);
+    const valor = getValorTabela(tabela, it.id, jogo.cidadeId);
     return {
       itemId:    it.id,
       nome:      it.nome,
@@ -239,9 +172,9 @@ export function recalcularCotacao(cotacao) {
 }
 
 // Cria uma cotação nova já com valor-base calculado
-export function criarCotacao({ jogo, fornecedor, tabela }) {
+export function criarCotacao({ jogo, fornecedor, tabela, campeonato }) {
   const now = new Date().toISOString();
-  const itensBase = calcularItensBase({ tabela, fornecedor, jogo });
+  const itensBase = calcularItensBase({ tabela, jogo, campeonato });
   const cot = {
     id: `cot-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     jogoId:           jogo.id,
@@ -271,130 +204,6 @@ export const novoAdicional = () => ({
   valorTotal: 0,
   justificativa: "",
 });
-
-// ── Negociações com rodadas ────────────────────────────────────────────────
-// Substitui o modelo de Tabelas pelo modelo de Negociações com histórico de
-// rounds. Cada rodada representa uma proposta (nossa ou do fornecedor).
-//
-// Status: rascunho → aguardando_forn → em_analise → contraproposta → aprovada
-//         (qualquer estado pode ir para arquivada)
-export const STATUS_NEGOCIACAO = [
-  { key:"rascunho",        label:"Rascunho",              color:"#64748b" },
-  { key:"aguardando_forn", label:"Aguardando Fornecedor", color:"#3b82f6" },
-  { key:"em_analise",      label:"Em Análise",            color:"#f59e0b" },
-  { key:"contraproposta",  label:"Contra-proposta",       color:"#a855f7" },
-  { key:"aprovada",        label:"Aprovada",              color:"#10b981" },
-  { key:"arquivada",       label:"Arquivada",             color:"#94a3b8" },
-];
-
-export const statusNegociacaoInfo = key =>
-  STATUS_NEGOCIACAO.find(s => s.key === key) || STATUS_NEGOCIACAO[0];
-
-export function criarRodada({ numero = 1, propostaPor = "livemode", valores = {}, observacoes = "" } = {}) {
-  return {
-    numero,
-    propostaPor, // "livemode" | "fornecedor"
-    valores,
-    observacoes,
-    criadaEm: new Date().toISOString(),
-    enviadaEm: null,
-  };
-}
-
-export function criarNegociacao({ fornecedorId, campeonatoId = null, categorias = [{codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"},{codigo:"B3",nome:"B3"}], cidadeIds = [] }) {
-  return {
-    id: `neg-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
-    fornecedorId,
-    campeonatoId,
-    categorias,
-    cidadeIds,
-    status: "rascunho",
-    rodadas: [criarRodada({ numero: 1, propostaPor: "livemode" })],
-    atualizadoEm: new Date().toISOString(),
-    criadoEm: new Date().toISOString(),
-  };
-}
-
-export function getRodadaAtual(neg) {
-  if (!neg?.rodadas?.length) return null;
-  return neg.rodadas[neg.rodadas.length - 1];
-}
-
-// Cria nova rodada (contra-proposta) copiando os valores da rodada atual
-export function adicionarRodada(neg, propostaPor = "livemode") {
-  const atual = getRodadaAtual(neg);
-  const novaRodada = criarRodada({
-    numero: (atual?.numero || 0) + 1,
-    propostaPor,
-    valores: JSON.parse(JSON.stringify(atual?.valores || {})),
-    observacoes: "",
-  });
-  return {
-    ...neg,
-    rodadas: [...neg.rodadas, novaRodada],
-    atualizadoEm: new Date().toISOString(),
-  };
-}
-
-// Atualiza imutavelmente a ÚLTIMA rodada de uma negociação
-export function setCelulaRodada(neg, itemId, cidadeId, categoria, valor) {
-  if (!neg?.rodadas?.length) return neg;
-  const rodadas = [...neg.rodadas];
-  const idx = rodadas.length - 1;
-  const rodadaAtualizada = setCelula(rodadas[idx], itemId, cidadeId, categoria, valor);
-  rodadas[idx] = rodadaAtualizada;
-  return { ...neg, rodadas, atualizadoEm: new Date().toISOString() };
-}
-
-// Retorna % de variação entre primeira e última rodada (positivo = saving)
-export function calcularDeltaRodadas(neg) {
-  if (!neg?.rodadas || neg.rodadas.length < 2) return null;
-  const somarCelulas = vals =>
-    Object.values(vals || {}).flatMap(i =>
-      Object.values(i || {}).flatMap(c => Object.values(c || {}))
-    ).filter(x => x > 0);
-  const celsPrimeira = somarCelulas(neg.rodadas[0].valores);
-  const celsUltima   = somarCelulas(neg.rodadas[neg.rodadas.length - 1].valores);
-  if (!celsPrimeira.length || !celsUltima.length) return null;
-  const med = arr => arr.reduce((a,b)=>a+b,0) / arr.length;
-  const prim = med(celsPrimeira);
-  if (!prim) return null;
-  return ((prim - med(celsUltima)) / prim) * 100;
-}
-
-// Compara célula entre rodada anterior e atual (retorna null se não mudou)
-export function deltaCelula(neg, itemId, cidadeId, categoria) {
-  if (!neg?.rodadas || neg.rodadas.length < 2) return null;
-  const prev = neg.rodadas[neg.rodadas.length - 2];
-  const curr = neg.rodadas[neg.rodadas.length - 1];
-  const vPrev = getCelula(prev, itemId, cidadeId, categoria);
-  const vCurr = getCelula(curr, itemId, cidadeId, categoria);
-  if (vPrev == null || vCurr == null) return null;
-  if (vPrev === 0) return null;
-  return ((vPrev - vCurr) / vPrev) * 100;
-}
-
-// Migra tabela no formato antigo para o novo formato com rodadas
-export function migrarTabelaLegada(tabela) {
-  if (tabela?.rodadas) return tabela;
-  const statusMap = {
-    rascunho:  "rascunho",
-    enviada:   "aguardando_forn",
-    devolvida: "em_analise",
-    vigente:   "aprovada",
-    arquivada: "arquivada",
-  };
-  return {
-    ...tabela,
-    status: statusMap[tabela.status] || "rascunho",
-    rodadas: [criarRodada({
-      numero: tabela.versao || 1,
-      propostaPor: "livemode",
-      valores: tabela.valores || {},
-      observacoes: tabela.observacoes || "",
-    })],
-  };
-}
 
 // ── Catálogo master de itens de serviço ───────────────────────────────────
 // Lista global de serviços que podem ser precificados nas negociações.

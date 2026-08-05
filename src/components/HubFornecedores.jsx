@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { RADIUS, FONT } from "../constants";
 import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
-import { COTACAO_INIT, CAMPEONATOS_COTACAO, statusInfo } from "../data/negociacoes";
+import { COTACAO_INIT } from "../data/negociacoes";
+import { contarCelulasPreenchidas } from "../data/catalogos";
 import { CIDADES_INIT, CAMPEONATOS_FORN_INIT, ITENS_MASTER_INIT } from "../data/catalogos";
 import { JOGOS_FORN_INIT } from "../data/jogosFornecedores";
 import { ALL_JOGOS } from "../data";
@@ -102,24 +103,23 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   const setTabelas      = createPersistedSetter('forn_tabelas_preco',setTabelasRaw,      persistRefs);
   const setJogosForn    = createPersistedSetter('forn_jogos',        setJogosFornRaw,    persistRefs);
 
-  // Métricas consolidadas (todas as cotações, independente do filtro)
+  // Métricas consolidadas (todas as tabelas/cotações, independente do filtro)
   const metricasGlobais = useMemo(() => {
-    const all = cotacoes || [];
-    const ativas = all.filter(c => ["aberta","em_analise","negociando"].includes(c.status)).length;
-    const aprovadas = all.filter(c => c.status === "aprovada");
-    const savingTotal = aprovadas.reduce((s, c) => {
-      const p = Number(c.valorProposto||0), cp = Number(c.valorContraproposta||0);
-      return s + (p && cp ? Math.max(0, p - cp) : 0);
-    }, 0);
-    const fornecedoresUnicos = new Set(all.map(c => c.fornecedorId).filter(Boolean)).size;
-    const campeonatosAtivos = new Set(all.map(c => c.campeonatoId).filter(Boolean)).size;
-    return { ativas, savingTotal, fornecedoresUnicos, campeonatosAtivos };
-  }, [cotacoes]);
+    const preenchidas = (tabelas || []).filter(t => contarCelulasPreenchidas(t) > 0);
+    const aprovadas = (cotacoes || []).filter(c => c.status === "aprovada");
+    const totalAprovado = aprovadas.reduce((s, c) => s + Number(c.valorTotal || 0), 0);
+    return {
+      tabelasPreenchidas: preenchidas.length,
+      totalAprovado,
+      fornecedoresComTabela: new Set(preenchidas.map(t => String(t.fornecedorId))).size,
+      campeonatosCobertos: new Set(preenchidas.map(t => t.campeonatoId)).size,
+    };
+  }, [tabelas, cotacoes]);
 
   // Campeonato selecionado (para header e filtro)
   const campInfo = filtroCamp === FILTRO_TODOS
     ? null
-    : CAMPEONATOS_COTACAO.find(c => c.id === filtroCamp);
+    : campeonatos.find(c => c.id === filtroCamp);
 
   if (loadError) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"}}>
@@ -231,9 +231,9 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
                   lineHeight:1.1,
                 }}>Fornecedores & Negociações</h1>
                 <p style={{ color:T.textMd, fontSize:12, margin:"4px 0 0" }}>
-                  Cadastro, cotações, chat e análise preditiva —
+                  Cadastro, catálogos, tabelas de preço e cotações —
                   {campInfo ? (
-                    <> filtrado em <span style={{color:campInfo.cor,fontWeight:700}}>{campInfo.nome}</span></>
+                    <> filtrado em <span style={{color:T.brand||"#10b981",fontWeight:700}}>{campInfo.nome}</span></>
                   ) : (
                     <> visão consolidada de <span style={{color:T.text,fontWeight:700}}>todos os campeonatos</span></>
                   )}
@@ -267,7 +267,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
                 }}
               >
                 <option value={FILTRO_TODOS}>Todos os campeonatos</option>
-                {CAMPEONATOS_COTACAO.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {campeonatos.filter(c => c.ativo !== false).map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </div>
           </div>
@@ -281,10 +281,10 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
             filter:ocultar?"blur(8px)":"none",
             transition:"filter 0.2s",
           }}>
-            <Stat T={T} label="Cotações Ativas" value={String(metricasGlobais.ativas)}         sub="Em negociação"         color={T.info||"#3b82f6"}    icon={Handshake}/>
-            <Stat T={T} label="Saving Consolidado" value={fmtK(metricasGlobais.savingTotal)}   sub="Aprovadas · cross-camp" color={T.brand||"#10b981"}   icon={Wallet}/>
-            <Stat T={T} label="Fornecedores Engajados" value={String(metricasGlobais.fornecedoresUnicos)} sub={`de ${fornecedores.length} cadastrados`} color={T.warning||"#f59e0b"} icon={Building2}/>
-            <Stat T={T} label="Campeonatos com Cotação" value={String(metricasGlobais.campeonatosAtivos)} sub={`de ${CAMPEONATOS_COTACAO.length} mapeados`}  color="#a855f7" icon={Trophy}/>
+            <Stat T={T} label="Tabelas Preenchidas" value={String(metricasGlobais.tabelasPreenchidas)} sub="Fornecedor × campeonato" color={T.info||"#3b82f6"}    icon={Handshake}/>
+            <Stat T={T} label="Aprovado em Cotações" value={fmtK(metricasGlobais.totalAprovado)}       sub="Todas as cotações aprovadas" color={T.brand||"#10b981"}   icon={Wallet}/>
+            <Stat T={T} label="Fornecedores com Tabela" value={String(metricasGlobais.fornecedoresComTabela)} sub={`de ${fornecedores.length} cadastrados`} color={T.warning||"#f59e0b"} icon={Building2}/>
+            <Stat T={T} label="Campeonatos Cobertos" value={String(metricasGlobais.campeonatosCobertos)} sub={`de ${campeonatos.length} no catálogo`}  color="#a855f7" icon={Trophy}/>
           </div>
         </div>
 

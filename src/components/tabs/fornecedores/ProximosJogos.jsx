@@ -4,7 +4,7 @@ import { fmt } from "../../../utils";
 import { KPI } from "../../shared";
 import { Card, PanelTitle, Button, Badge, Chip, tableStyles } from "../../ui";
 import { filtrarJogos, classificarTemporal } from "../../../lib/portalMatriz";
-import { getTabelaVigente, getValoresVigentes, getCelula } from "../../../data/catalogos";
+import { getTabelaFornecedor, getValorTabela } from "../../../data/catalogos";
 import {
   Calendar, MapPin, Tag, Search, Plus, Pencil, Trash2, Clock,
   DollarSign, AlertTriangle, CheckCircle2, AlertCircle,
@@ -27,7 +27,7 @@ const fmtData = iso => {
   catch { return iso; }
 };
 
-// Calcula cobertura e custo projetado de um jogo com base nas tabelas aprovadas
+// Calcula cobertura e custo projetado de um jogo com base nas tabelas preenchidas
 function calcularCobertura(jogo, tabelas, fornecedores, campeonatos) {
   const camp = campeonatos.find(c=>c.id===jogo.campeonatoId);
   if (!camp) return { status:"sem_cobertura", fornecedores:[], custoTotal:0, custoMin:0 };
@@ -37,14 +37,12 @@ function calcularCobertura(jogo, tabelas, fornecedores, campeonatos) {
 
   const fornComCobertura = [];
   fornecedores.forEach(f => {
-    const tab = getTabelaVigente(tabelas, f.id, jogo.campeonatoId);
+    const tab = getTabelaFornecedor(tabelas, f.id, jogo.campeonatoId);
     if (!tab) return;
-    const vals = getValoresVigentes(tab);
-    const fakeTab = { valores: vals };
     let total = 0;
     let cobertos = 0;
     itens.forEach(it => {
-      const v = getCelula(fakeTab, it.id, jogo.cidadeId, jogo.categoria);
+      const v = getValorTabela(tab, it.id, jogo.cidadeId);
       if (v != null && v > 0) { total += Number(v); cobertos++; }
     });
     if (cobertos > 0) {
@@ -320,7 +318,7 @@ export default function ProximosJogos({
       <Card T={T} padding={0}>
         <PanelTitle T={T}
           title="Calendário de Jogos + Projeção"
-          subtitle={`${jogosFiltrados.length} jogo${jogosFiltrados.length!==1?"s":""} · ordenados por data · custo baseado nas negociações aprovadas`}
+          subtitle={`${jogosFiltrados.length} jogo${jogosFiltrados.length!==1?"s":""} · ordenados por data · custo baseado nas tabelas de preço preenchidas`}
           color={T.info||"#3b82f6"}
         />
         {jogosFiltrados.length===0?(

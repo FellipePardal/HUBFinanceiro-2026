@@ -5,7 +5,7 @@ import { KPI } from "../../shared";
 import { Card, PanelTitle, Button, Badge, Chip, tableStyles } from "../../ui";
 import {
   STATUS_COTACAO_NOVO, statusCotacaoInfo,
-  getTabelaVigente, criarCotacao, getValoresVigentes, getCelula,
+  getTabelaFornecedor, criarCotacao, getValorTabela,
 } from "../../../data/catalogos";
 import {
   Plus, Search, Pencil, Trash2, AlertCircle, FileSpreadsheet,
@@ -20,18 +20,18 @@ const fmtData = iso => {
   catch { return iso; }
 };
 
-// Calcula estimativa de custo para um fornecedor × jogo com base na tabela vigente
+// Calcula estimativa de custo para um fornecedor × jogo com base na tabela dele
 function estimarCusto(fornecedor, jogo, tabelas, campeonatos) {
-  const tab = getTabelaVigente(tabelas, fornecedor.id, jogo.campeonatoId);
+  const tab = getTabelaFornecedor(tabelas, fornecedor.id, jogo.campeonatoId);
   if (!tab) return null;
   const camp = campeonatos.find(c=>c.id===jogo.campeonatoId);
-  const itens = camp?.itens?.length ? camp.itens.filter(i=>i.ativo!==false) : (fornecedor.catalogo||[]).filter(i=>i.ativo!==false);
-  const vals = getValoresVigentes(tab);
-  const fakeTab = { valores: vals };
+  const feitos = new Set(tab.itemIds || []);
+  const itens = (camp?.itens || []).filter(i => i.ativo !== false && feitos.has(i.id));
+  if (!itens.length) return null;
   let total = 0;
   let cobertos = 0;
   itens.forEach(it => {
-    const v = getCelula(fakeTab, it.id, jogo.cidadeId, jogo.categoria);
+    const v = getValorTabela(tab, it.id, jogo.cidadeId);
     if (v != null && v > 0) { total += Number(v); cobertos++; }
   });
   return { total, cobertos, totalItens: itens.length, tabelaId: tab.id };
@@ -67,12 +67,12 @@ function NovaCotacaoModal({ jogosForn, fornecedores, tabelas, campeonatos, cidad
   },[jogo, fornecedores, tabelas, campeonatos]);
 
   const fornSelecionado = fornecedores.find(f=>String(f.id)===String(fornecedorId));
-  const tabelaVigente   = jogo && fornSelecionado ? getTabelaVigente(tabelas, fornSelecionado.id, jogo.campeonatoId) : null;
-  const podeCriar = jogo && fornSelecionado && tabelaVigente;
+  const tabelaForn      = jogo && fornSelecionado ? getTabelaFornecedor(tabelas, fornSelecionado.id, jogo.campeonatoId) : null;
+  const podeCriar = jogo && fornSelecionado && tabelaForn;
 
   const handleCriar = () => {
     if (!podeCriar) return;
-    onCreate(criarCotacao({ jogo, fornecedor: fornSelecionado, tabela: tabelaVigente, campeonato: camp }));
+    onCreate(criarCotacao({ jogo, fornecedor: fornSelecionado, tabela: tabelaForn, campeonato: camp }));
   };
 
   return (
@@ -108,7 +108,7 @@ function NovaCotacaoModal({ jogosForn, fornecedores, tabelas, campeonatos, cidad
               <div style={{padding:"16px",background:T.warning?`${T.warning}1a`:"rgba(245,158,11,0.12)",border:`1px solid ${T.warning||"#f59e0b"}`,borderRadius:RADIUS.md,marginBottom:14,display:"flex",gap:8,alignItems:"flex-start"}}>
                 <AlertCircle size={14} color={T.warning||"#f59e0b"} style={{marginTop:2,flexShrink:0}}/>
                 <span style={{fontSize:12,color:T.text,lineHeight:1.5}}>
-                  Nenhum fornecedor tem tabela <b>aprovada</b> para <b>{camp?.nome}</b>. Crie e aprove negociações em <b>Negociações</b> antes de cotar.
+                  Nenhum fornecedor tem tabela de preço preenchida para <b>{camp?.nome}</b>. Preencha em <b>Tabelas de Preço</b> antes de cotar.
                 </span>
               </div>
             ) : (

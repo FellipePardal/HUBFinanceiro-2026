@@ -74,6 +74,7 @@ export const unidadeLabel = key =>
 // Persistida em app_state.forn_tabelas_preco como array.
 //
 //   itemIds:  quais itens do catálogo do campeonato o fornecedor faz
+//   cidadeIds: cidades onde o fornecedor atende (null = todas as do campeonato)
 //   valores[itemId][cidadeId] = number  (o padrão B1/B2 já vem no nome do item)
 export function criarTabelaFornecedor({ fornecedorId, campeonatoId }) {
   const now = new Date().toISOString();
@@ -82,6 +83,7 @@ export function criarTabelaFornecedor({ fornecedorId, campeonatoId }) {
     fornecedorId,
     campeonatoId,
     itemIds: [],
+    cidadeIds: null,
     valores: {},
     vigencia: "",
     observacoes: "",

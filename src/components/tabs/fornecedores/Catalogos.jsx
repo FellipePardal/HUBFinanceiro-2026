@@ -203,7 +203,7 @@ function CampeonatoModal({ campeonato, cidades, campeonatos, itensMaster, onSave
     if (campeonatos.some(c=>c.id===id&&c.id!==campeonato?.id)) return alert("Já existe um campeonato com esse nome e ano.");
     const cats = form.categorias.filter(c=>c.codigo.trim()).map(c=>({codigo:c.codigo.trim(),nome:c.nome.trim()||c.codigo.trim()}));
     if (!cats.length) return alert("Adicione ao menos uma categoria.");
-    onSave({id,nome,ano,ativo:!!form.ativo,cidadeIds:form.cidadeIds,categorias:cats,itens:form.itens||[]});
+    onSave({id,nome,ano,ativo:!!form.ativo,origemHub:!!campeonato?.origemHub,cidadeIds:form.cidadeIds,categorias:cats,itens:form.itens||[]});
   };
 
   // Group master items by category
@@ -219,15 +219,15 @@ function CampeonatoModal({ campeonato, cidades, campeonatos, itensMaster, onSave
       <div style={{...modal(T),maxWidth:720,maxHeight:"92vh",overflowY:"auto"}}>
         <h3 style={mTitle(T)}>{campeonato?"Editar Campeonato":"Novo Campeonato"}</h3>
 
-        {/* Nome / Ano / Ativo */}
+        {/* Nome / Ano / Ativo — nome/ano vêm do campeonato do HUB quando sincronizado */}
         <div style={{display:"grid",gridTemplateColumns:"3fr 1fr 1fr",gap:12,marginBottom:18}}>
           <div>
-            <label style={lbl}>Nome</label>
-            <input value={form.nome} onChange={e=>set("nome",e.target.value)} style={IS} placeholder="Ex: Brasileirão Série A 2026"/>
+            <label style={lbl}>Nome {campeonato?.origemHub&&<span style={{fontWeight:400,textTransform:"none"}}>(do HUB)</span>}</label>
+            <input value={form.nome} onChange={e=>set("nome",e.target.value)} style={{...IS,opacity:campeonato?.origemHub?0.6:1}} placeholder="Ex: Brasileirão Série A 2026" disabled={!!campeonato?.origemHub}/>
           </div>
           <div>
             <label style={lbl}>Ano</label>
-            <input type="number" value={form.ano} onChange={e=>set("ano",e.target.value)} style={IS}/>
+            <input type="number" value={form.ano} onChange={e=>set("ano",e.target.value)} style={{...IS,opacity:campeonato?.origemHub?0.6:1}} disabled={!!campeonato?.origemHub}/>
           </div>
           <div>
             <label style={lbl}>Ativo</label>
@@ -568,9 +568,8 @@ export default function Catalogos({
           title={campSelecionado?"Campeonato selecionado":"Campeonatos"}
           subtitle={campSelecionado
             ?"Detalhes da temporada filtrada no header"
-            :"Temporadas ativas, cidades-sede, categorias e itens de serviço"}
+            :"Puxados dos campeonatos do HUB — configure cidades-sede, categorias e itens"}
           count={campeonatosVisiveis.length}
-          right={<Button T={T} variant="primary" size="sm" icon={Plus} onClick={()=>setShowNovoCamp(true)}>Novo</Button>}
         >
           <div style={{padding:"12px 16px 16px",display:"flex",flexDirection:"column",gap:10}}>
             {campeonatosVisiveis.map(c=>{
@@ -617,7 +616,9 @@ export default function Catalogos({
                           {c.ativo?<X size={13}/>:<Check size={13}/>}
                         </button>
                         <button onClick={e=>{e.stopPropagation();setCampEdit(c);}} style={btnIcon(T)}><Pencil size={13}/></button>
-                        <button onClick={e=>{e.stopPropagation();removeCamp(c.id);}} style={{...btnIcon(T),color:T.danger||"#ef4444"}}><Trash2 size={13}/></button>
+                        {!c.origemHub&&(
+                          <button onClick={e=>{e.stopPropagation();removeCamp(c.id);}} style={{...btnIcon(T),color:T.danger||"#ef4444"}}><Trash2 size={13}/></button>
+                        )}
                         {exp
                           ? <ChevronDown size={14} color={T.textSm} style={{marginLeft:2}}/>
                           : <ChevronRight size={14} color={T.textSm} style={{marginLeft:2}}/>}

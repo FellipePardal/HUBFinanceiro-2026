@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { RADIUS, FONT } from "../constants";
+import { RADIUS, FONT, CAMPEONATOS } from "../constants";
+import { REGISTRY_KEY } from "../data/customCampeonato";
 import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "../lib/supabase";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
@@ -44,7 +45,7 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
   useEffect(() => {
     async function load() {
       try {
-        const [f, c, j, ci, ca, im, tb, jf] = await Promise.all([
+        const [f, c, j, ci, ca, im, tb, jf, reg] = await Promise.all([
           getState('fornecedores'),
           getState('cotacoes'),
           getState('jogos'),
@@ -53,12 +54,39 @@ export default function HubFornecedores({ onBack, T, darkMode, setDarkMode, filt
           getState('forn_itens_master'),
           getState('forn_tabelas_preco'),
           getState('forn_jogos'),
+          getState(REGISTRY_KEY),
         ]);
         if (f)  setFornecedoresRaw(f);
         if (c)  setCotacoesRaw(c);
         if (j)  setJogosRaw(j);
         if (ci) setCidadesRaw(ci);     else setSupabaseState('forn_cidades', CIDADES_INIT);
-        if (ca) setCampeonatosRaw(ca); else setSupabaseState('forn_campeonatos', CAMPEONATOS_FORN_INIT);
+
+        // Catálogos de campeonato são puxados dos campeonatos do HUB (fixos +
+        // customizados): garante uma entrada por campeonato e mantém o nome em
+        // sincronia. Cidades/categorias/itens continuam configurados aqui.
+        let camps = ca || CAMPEONATOS_FORN_INIT;
+        let campsMudou = !ca;
+        // migração: id legado do Paulistão F criado manualmente antes do sync
+        if (camps.some(x => x.id === 'paulistao-f-2026') && !camps.some(x => x.id === 'paulistao-feminino-2026')) {
+          camps = camps.map(x => x.id === 'paulistao-f-2026' ? { ...x, id: 'paulistao-feminino-2026' } : x);
+          campsMudou = true;
+        }
+        const hubCamps = [
+          ...CAMPEONATOS.map(x => ({ id: x.id, nome: x.edicao ? `${x.nome} ${x.edicao}` : x.nome, ano: parseInt(x.edicao, 10) || new Date().getFullYear() })),
+          ...(reg || []).map(x => ({ id: x.id, nome: x.nome, ano: x.ano || new Date().getFullYear() })),
+        ];
+        hubCamps.forEach(hc => {
+          const ex = camps.find(x => x.id === hc.id);
+          if (!ex) {
+            camps = [...camps, { id: hc.id, nome: hc.nome, ano: hc.ano, ativo: true, origemHub: true, cidadeIds: [], categorias: [{codigo:"B1",nome:"B1"},{codigo:"B2",nome:"B2"}], itens: [] }];
+            campsMudou = true;
+          } else if (ex.nome !== hc.nome || !ex.origemHub) {
+            camps = camps.map(x => x.id === hc.id ? { ...x, nome: hc.nome, origemHub: true } : x);
+            campsMudou = true;
+          }
+        });
+        setCampeonatosRaw(camps);
+        if (campsMudou) setSupabaseState('forn_campeonatos', camps);
         const OLD_IDS = new Set(["eq-b1","eq-b2","eq-b3","coord-prod","dir-tv"]);
         const REQUIRED_IDS = ["supervisor2"];
         const needsMigration = !im || im.some(x => OLD_IDS.has(x.id)) || REQUIRED_IDS.some(id => !im.find(x => x.id === id));

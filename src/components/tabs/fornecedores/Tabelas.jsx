@@ -51,10 +51,26 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
   const feitos = useMemo(() => new Set(tab.itemIds || []), [tab.itemIds]);
   const itensAtivos = itensDoCatalogo.filter(it => feitos.has(it.id));
 
+  // Cidades onde o fornecedor atende — null = todas as do campeonato. Cidades
+  // desmarcadas ficam fora da matriz e da conta de preenchimento (o fornecedor
+  // não faz jogos lá; não é tabela incompleta).
+  const cidadesAtendidas = useMemo(() => {
+    if (tab.cidadeIds == null) return cidadesDoCamp;
+    const s = new Set(tab.cidadeIds);
+    return cidadesDoCamp.filter(c => s.has(c.id));
+  }, [tab.cidadeIds, cidadesDoCamp]);
+
   const toggleItem = id => {
     const s = new Set(tab.itemIds || []);
     s.has(id) ? s.delete(id) : s.add(id);
     setTab(t => ({ ...t, itemIds: Array.from(s) }));
+    setDirty(true);
+  };
+
+  const toggleCidade = id => {
+    const atual = tab.cidadeIds == null ? cidadesDoCamp.map(c => c.id) : tab.cidadeIds;
+    const next = atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id];
+    setTab(t => ({ ...t, cidadeIds: next }));
     setDirty(true);
   };
 
@@ -71,8 +87,10 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
     setDirty(false);
   };
 
-  const preenchidas = contarCelulasPreenchidas(tab);
-  const totalCelulas = itensAtivos.length * cidadesDoCamp.length;
+  // Conta só o que importa: itens que o fornecedor faz × cidades que atende
+  const preenchidas = itensAtivos.reduce((s, it) =>
+    s + cidadesAtendidas.filter(c => getValorTabela(tab, it.id, c.id) != null).length, 0);
+  const totalCelulas = itensAtivos.length * cidadesAtendidas.length;
   const pct = totalCelulas ? Math.round((preenchidas / totalCelulas) * 100) : 0;
 
   const cellSty = hasVal => ({
@@ -105,7 +123,7 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
           )}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: T.textMd }}>
-          {itensAtivos.length}/{itensDoCatalogo.length} serviços · {cidadesDoCamp.length} cidade{cidadesDoCamp.length !== 1 ? "s" : ""} ·{" "}
+          {itensAtivos.length}/{itensDoCatalogo.length} serviços · {cidadesAtendidas.length}/{cidadesDoCamp.length} cidade{cidadesAtendidas.length !== 1 ? "s" : ""} atendida{cidadesAtendidas.length !== 1 ? "s" : ""} ·{" "}
           <span style={{ fontWeight: 700, color: pct === 100 && totalCelulas > 0 ? (T.brand || "#10b981") : T.text }}>
             {preenchidas}/{totalCelulas} valores ({pct}%)
           </span>
@@ -176,7 +194,34 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
           )}
         </div>
 
-        {/* Matriz item × cidade */}
+        {/* Cidades atendidas pelo fornecedor */}
+        {cidadesDoCamp.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMd, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>
+              Cidades atendidas — desmarque onde o fornecedor não faz jogos
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {cidadesDoCamp.map(c => {
+                const on = cidadesAtendidas.some(x => x.id === c.id);
+                return (
+                  <button key={c.id} onClick={() => toggleCidade(c.id)} style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "5px 11px", borderRadius: RADIUS.pill, cursor: "pointer",
+                    border: `1px solid ${on ? "#3b82f6" : T.border}`,
+                    background: on ? "rgba(59,130,246,0.12)" : "transparent",
+                    color: on ? "#3b82f6" : T.textMd,
+                    fontSize: 12, fontWeight: 600, transition: "all .1s",
+                  }}>
+                    {on ? <Check size={11}/> : <MapPin size={11}/>}
+                    {c.nome}/{c.uf}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Matriz item × cidade atendida */}
         {!itensAtivos.length ? (
           <div style={{ padding: "24px", textAlign: "center", color: T.textSm, fontSize: 12, border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
             Marque acima os serviços que o fornecedor faz para preencher os valores.
@@ -185,13 +230,17 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
           <div style={{ padding: "24px", textAlign: "center", color: T.textSm, fontSize: 12, border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
             Este campeonato não tem cidades-sede. Edite em Catálogos → Campeonatos.
           </div>
+        ) : !cidadesAtendidas.length ? (
+          <div style={{ padding: "24px", textAlign: "center", color: T.textSm, fontSize: 12, border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
+            Nenhuma cidade atendida marcada. Marque acima as cidades onde o fornecedor faz jogos.
+          </div>
         ) : (
           <div style={{ overflowX: "auto", padding: "0 0 8px" }}>
             <table style={{ borderCollapse: "separate", borderSpacing: "3px 2px", fontSize: 12 }}>
               <thead>
                 <tr>
                   <th style={{ ...stickyLeft, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: T.textMd, textAlign: "left", whiteSpace: "nowrap" }}>Serviço</th>
-                  {cidadesDoCamp.map(c => (
+                  {cidadesAtendidas.map(c => (
                     <th key={c.id} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: T.text, textAlign: "center", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}` }}>
                       {c.nome}/{c.uf}
                     </th>
@@ -205,7 +254,7 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
                   const { label, color, Icon } = CAT_META[catKey];
                   return [
                     <tr key={`grp-${catKey}`}>
-                      <td colSpan={1 + cidadesDoCamp.length} style={{
+                      <td colSpan={1 + cidadesAtendidas.length} style={{
                         padding: "5px 12px", fontSize: 10, fontWeight: 800,
                         color, letterSpacing: "0.05em", textTransform: "uppercase",
                         background: `${color}10`,
@@ -221,7 +270,7 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
                           <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{item.nome}</span>
                           <small style={{ fontSize: 9, color: T.textSm, fontWeight: 400, marginLeft: 4 }}>{unidadeLabel(item.unidade)}</small>
                         </td>
-                        {cidadesDoCamp.map(cid => {
+                        {cidadesAtendidas.map(cid => {
                           const val = getValorTabela(tab, item.id, cid.id);
                           const hasVal = val !== null && val !== undefined;
                           return (

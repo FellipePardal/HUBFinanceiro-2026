@@ -1397,48 +1397,13 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
         </div>
 
         {jogosRodada.map(jogo => {
-          // Base: serviços com provisionado > 0
+          // Regra (2026-08-05): linha SÓ com valor provisionado > 0. O Portal
+          // continua preenchendo o FORNECEDOR dessas linhas (sync do
+          // fornecedoresJogo), mas serviço escalado sem provisionado não gera
+          // linha aqui — exceto se já existir NF registrada (fromNF abaixo,
+          // garantia de que nenhuma nota some da tela).
           const baseServicos = extrairServicos(jogo, subsExcluir);
-          const baseKeys = new Set(baseServicos.map(s => s.subKey));
-          // Extras: serviços onde o Portal tem fornecedor (mesmo sem provisionado).
-          // Valor de referência fica 0 — preenche depois quando a NF chegar.
-          const portalExtras = [];
-          // Mantém todas as linhas UM com provisionado > 0 (a categoria pode ter mudado entre orcamento e execução)
-          let baseFinal = baseServicos;
-          // Marca se já há alguma linha de UM no base — para não duplicar via Portal extras
-          const baseTemUM = baseServicos.some(s => /^um_b/.test(s.subKey));
-          if (portal) {
-            const opCat = CATS.find(c => c.key === 'operacoes') || CATS[0];
-            // SNG: separa em Host (bucket sng) + Premiere (bucket sng_extra)
-            const sngP = getOperacionaisPorSubKey(jogo.id, 'sng_premiere', portal);
-            if (sngP.length) {
-              baseFinal = baseServicos.filter(s => s.subKey !== 'sng_extra');
-              portalExtras.push({ subKey: 'sng_premiere', subLabel: 'SNG Premiere', catLabel: opCat.label, catColor: opCat.color, valorRef: jogo.provisionado?.sng_extra || 0, fromPortal: true });
-            }
-            // sng_host = sng: se não há linha sng no base, cria via portal se tiver provider externo
-            if (!baseKeys.has('sng')) {
-              const sngOpers = getOperacionaisPorSubKey(jogo.id, 'sng', portal, jogo.categoria);
-              if (sngOpers.length) portalExtras.push({ subKey: 'sng', subLabel: 'SNG', catLabel: opCat.label, catColor: opCat.color, valorRef: 0, fromPortal: true });
-            }
-            CATS.forEach(cat => {
-              cat.subs.forEach(sub => {
-                if (sub.key === 'sng') return;
-                if (baseKeys.has(sub.key)) return;
-                if (subsExcluir.has(sub.key)) return;
-                // Se base já tem alguma linha UM (provisionado), não duplica via Portal
-                if (/^um_b/.test(sub.key) && baseTemUM) return;
-                const opers = getOperacionaisPorSubKey(jogo.id, sub.key, portal, jogo.categoria);
-                if (opers.length > 0) {
-                  portalExtras.push({
-                    subKey: sub.key, subLabel: sub.label,
-                    catLabel: cat.label, catColor: cat.color,
-                    valorRef: 0, fromPortal: true,
-                  });
-                }
-              });
-            });
-          }
-          const servicosRaw = [...baseFinal, ...portalExtras];
+          const servicosRaw = [...baseServicos];
           const _jid = jogo.id;
           const nfsDoJogo = notas.filter(n =>
             n.servicosKeys?.some(k => k.startsWith(`${_jid}_`))
@@ -1448,8 +1413,12 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
             || (n.tipo === "prevista" && (n.jogoId === _jid || String(n.jogoId) === String(_jid)) && (!n.servicosKeys || n.servicosKeys.length === 0))
           );
           const servicosComNF = new Set(nfsDoJogo.flatMap(n => n.servicosKeys || []));
-          // sng_host é alias de sng — NFs com sng_host key aparecem na linha sng
-          servicosComNF.forEach(k => { if (k.endsWith('_sng_host')) servicosComNF.add(k.replace('_sng_host', '_sng')); });
+          // Aliases: sng_host → sng e sng_premiere → sng_extra (mesmo bucket
+          // financeiro; NFs registradas na era dos extras do Portal usam esses nomes)
+          servicosComNF.forEach(k => {
+            if (k.endsWith('_sng_host')) servicosComNF.add(k.replace('_sng_host', '_sng'));
+            if (k.endsWith('_sng_premiere')) servicosComNF.add(k.replace('_sng_premiere', '_sng_extra'));
+          });
 
           // Garante linha para qualquer servicoKey de NF existente que não esteja em servicosRaw
           // (ex: sng_host registrado quando Portal estava ativo, mas agora Portal não carregou)
@@ -1460,10 +1429,17 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
               if (!k.startsWith(`${jogo.id}_`) || rawKeys.has(k)) return;
               const subKey = k.slice(String(jogo.id).length + 1);
               if (subKey === 'sng_host' && rawKeys.has(`${jogo.id}_sng`)) return;
+              if (subKey === 'sng_premiere' && rawKeys.has(`${jogo.id}_sng_extra`)) return;
               let subLabel = subKey, catLabel = '', catColor = '';
               CATS.forEach(cat => cat.subs.forEach(sub => {
                 if (sub.key === subKey) { subLabel = sub.label; catLabel = cat.label; catColor = cat.color; }
               }));
+              // Chaves que não existem em CATS (vinham dos extras do Portal)
+              if (subLabel === subKey) {
+                const opCat = CATS.find(c => c.key === 'operacoes');
+                if (subKey === 'sng_premiere') { subLabel = 'SNG Premiere'; catLabel = opCat?.label || ''; catColor = opCat?.color || ''; }
+                if (subKey === 'sng_host')     { subLabel = 'SNG Host';     catLabel = opCat?.label || ''; catColor = opCat?.color || ''; }
+              }
               servicosRaw.push({ subKey, subLabel, catLabel, catColor, valorRef: 0, fromNF: true });
               rawKeys.add(k);
             });
@@ -1524,7 +1500,8 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     {servicos.map(s => {
                       const key = `${jogo.id}_${s.subKey}`;
                       const isMulti = SUBS_MULTI_NF.has(s.subKey);
-                      const aliasKey = s.subKey === 'sng' ? `${jogo.id}_sng_host` : null;
+                      const aliasSub = s.subKey === 'sng' ? 'sng_host' : s.subKey === 'sng_extra' ? 'sng_premiere' : null;
+                      const aliasKey = aliasSub ? `${jogo.id}_${aliasSub}` : null;
                       const notasDestaLinha = nfsDoJogo.filter(n =>
                         n.servicosKeys?.includes(key) ||
                         (aliasKey && n.servicosKeys?.includes(aliasKey)) ||
@@ -1534,7 +1511,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                       const valorUnit = notasDestaLinha.reduce((sum, n) => {
                         const detKey = (n.servicosDetalhe && n.servicosDetalhe[key] != null) ? key : (aliasKey && n.servicosDetalhe?.[aliasKey] != null ? aliasKey : null);
                         if (detKey) return sum + n.servicosDetalhe[detKey];
-                        const svKey = n.servicosValores?.[s.subKey] != null ? s.subKey : (aliasKey ? 'sng_host' : null);
+                        const svKey = n.servicosValores?.[s.subKey] != null ? s.subKey : (aliasSub && n.servicosValores?.[aliasSub] != null ? aliasSub : null);
                         if (svKey && n.servicosValores?.[svKey] != null) return sum + n.servicosValores[svKey];
                         return sum;
                       }, 0);

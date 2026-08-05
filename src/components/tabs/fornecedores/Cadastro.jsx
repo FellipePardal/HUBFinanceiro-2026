@@ -490,7 +490,6 @@ function TabelaPrecosFornecedor({ fornecedor, onUpdate, T }) {
 function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave, onDelete, onEditModal, T }) {
   const [f, setF]         = useState(fornecedor);
   const [dirty, setDirty] = useState(false);
-  const [newCat, setNewCat] = useState("");
 
   useEffect(() => {
     setF(fornecedor);
@@ -501,19 +500,22 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
   const save   = () => { onSave(f); setDirty(false); };
 
   // ── helpers for values matrix ────────────────────────────────────────────
-  const getVal = (forn, itemId, cidadeId, cat) =>
-    forn.tabelaValores?.[itemId]?.[cidadeId]?.[cat] ?? null;
+  // Um preço por serviço × cidade. O padrão (B1/B2...) já vem embutido no
+  // próprio serviço (UM B1, UM B2...), então não existe terceira dimensão.
+  const getVal = (forn, itemId, cidadeId) => {
+    const v = forn.tabelaValores?.[itemId]?.[cidadeId];
+    // formato legado: { B1: x, B2: y } — usa o primeiro valor preenchido
+    if (v && typeof v === "object") return Object.values(v).find(x => x != null) ?? null;
+    return v ?? null;
+  };
 
-  const updateVal = (itemId, cidadeId, cat, raw) => {
+  const updateVal = (itemId, cidadeId, raw) => {
     const v = raw === "" ? null : parseFloat(raw);
     setF(prev => {
       const tv      = { ...(prev.tabelaValores || {}) };
       const byItem  = { ...(tv[itemId]  || {}) };
-      const byCity  = { ...(byItem[cidadeId] || {}) };
-      if (v === null || isNaN(v)) delete byCity[cat];
-      else byCity[cat] = v;
-      if (!Object.keys(byCity).length) delete byItem[cidadeId];
-      else byItem[cidadeId] = byCity;
+      if (v === null || isNaN(v)) delete byItem[cidadeId];
+      else byItem[cidadeId] = v;
       if (!Object.keys(byItem).length) delete tv[itemId];
       else tv[itemId] = byItem;
       return { ...prev, tabelaValores: tv };
@@ -530,11 +532,6 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
     () => (f.cidadesAtuacao || []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
     [cidades, f.cidadesAtuacao]
   );
-  const categorias = f.categorias || [
-    { codigo: "B1", nome: "B1" },
-    { codigo: "B2", nome: "B2" },
-    { codigo: "B3", nome: "B3" },
-  ];
 
   const itensPorCat = useMemo(() => {
     const map = { periferico: [], equipe: [] };
@@ -552,16 +549,6 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
       ? (f.cidadesAtuacao || []).filter(x => x !== id)
       : [...(f.cidadesAtuacao || []), id];
     update({ cidadesAtuacao: next });
-  };
-
-  const addCategoria = () => {
-    const code = newCat.trim().toUpperCase();
-    if (!code || categorias.some(c => c.codigo === code)) return;
-    update({ categorias: [...categorias, { codigo: code, nome: code }] });
-    setNewCat("");
-  };
-  const removeCategoria = code => {
-    update({ categorias: categorias.filter(c => c.codigo !== code) });
   };
 
   const isPrestador = f.tipo === "Prestador";
@@ -596,38 +583,6 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
   });
 
   const stickyLeft = { position: "sticky", left: 0, background: T.surface || T.card, zIndex: 1 };
-
-  const catMgr = (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginLeft: "auto" }} onClick={e => e.stopPropagation()}>
-      {categorias.map(c => (
-        <span key={c.codigo} style={{
-          display: "inline-flex", alignItems: "center", gap: 3,
-          fontSize: 10, fontWeight: 700, padding: "2px 7px",
-          borderRadius: RADIUS.pill, background: "rgba(16,185,129,0.12)", color: "#10b981",
-          border: "1px solid rgba(16,185,129,0.25)",
-        }}>
-          {c.codigo}
-          <button onClick={() => removeCategoria(c.codigo)} style={{ background: "none", border: "none", cursor: "pointer", color: "#10b981", padding: 0, lineHeight: 1, fontSize: 11 }}>×</button>
-        </span>
-      ))}
-      <input
-        value={newCat}
-        onChange={e => setNewCat(e.target.value)}
-        onKeyDown={e => e.key === "Enter" && addCategoria()}
-        placeholder="B4"
-        style={{
-          width: 40, fontSize: 11, padding: "2px 5px", borderRadius: RADIUS.sm,
-          border: `1px solid ${T.border}`, background: T.surface || T.card, color: T.text,
-          fontFamily: "inherit", outline: "none",
-        }}
-      />
-      <button onClick={addCategoria} style={{
-        fontSize: 11, padding: "2px 7px", borderRadius: RADIUS.sm, cursor: "pointer",
-        background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)",
-        color: "#10b981", fontWeight: 700,
-      }}>+</button>
-    </div>
-  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -737,8 +692,8 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
           </div>
         </SecaoDetalhe>
 
-        {/* Section 4: Valores por Serviço */}
-        <SecaoDetalhe title="Valores por Serviço" color="#10b981" icon={DollarSign} defaultOpen extra={catMgr} T={T}>
+        {/* Section 4: Valores por Serviço — um preço por serviço × cidade */}
+        <SecaoDetalhe title="Valores por Serviço" color="#10b981" icon={DollarSign} defaultOpen T={T}>
           {(!servicosAtivos.length || !cidadesAtivas.length) ? (
             <div style={{ padding: "20px 20px 24px", textAlign: "center", color: T.textSm, fontSize: 12 }}>
               Selecione serviços e cidades para ver a matriz
@@ -750,20 +705,10 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
                   <tr>
                     <th style={{ ...stickyLeft, padding: "6px 12px", fontSize: 11, fontWeight: 700, color: T.textMd, textAlign: "left", whiteSpace: "nowrap" }}>Serviço</th>
                     {cidadesAtivas.map(c => (
-                      <th key={c.id} colSpan={categorias.length} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: T.text, textAlign: "center", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}` }}>
+                      <th key={c.id} style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: T.text, textAlign: "center", whiteSpace: "nowrap", borderBottom: `1px solid ${T.border}` }}>
                         {c.nome}/{c.uf}
                       </th>
                     ))}
-                  </tr>
-                  <tr>
-                    <th style={{ ...stickyLeft, padding: "4px 12px" }} />
-                    {cidadesAtivas.flatMap(c =>
-                      categorias.map(cat => (
-                        <th key={`${c.id}-${cat.codigo}`} style={{ padding: "3px 5px", fontSize: 10, fontWeight: 800, color: "#10b981", textAlign: "center", whiteSpace: "nowrap" }}>
-                          {cat.codigo}
-                        </th>
-                      ))
-                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -773,7 +718,7 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
                     const { label, color, Icon } = CAT_META[catKey];
                     return [
                       <tr key={`grp-${catKey}`}>
-                        <td colSpan={1 + cidadesAtivas.length * categorias.length} style={{
+                        <td colSpan={1 + cidadesAtivas.length} style={{
                           padding: "5px 12px", fontSize: 10, fontWeight: 800,
                           color, letterSpacing: "0.05em", textTransform: "uppercase",
                           background: `${color}10`,
@@ -793,23 +738,21 @@ function FornecedorDetalhe({ fornecedor, itensMaster = [], cidades = [], onSave,
                               </small>
                             )}
                           </td>
-                          {cidadesAtivas.flatMap(cid =>
-                            categorias.map(cat => {
-                              const val      = getVal(f, item.id, cid.id, cat.codigo);
-                              const hasValue = val !== null && val !== undefined;
-                              return (
-                                <td key={`${item.id}-${cid.id}-${cat.codigo}`} style={{ padding: "2px 2px" }}>
-                                  <input
-                                    type="number"
-                                    value={hasValue ? val : ""}
-                                    onChange={e => updateVal(item.id, cid.id, cat.codigo, e.target.value)}
-                                    style={cellSty(hasValue)}
-                                    placeholder="—"
-                                  />
-                                </td>
-                              );
-                            })
-                          )}
+                          {cidadesAtivas.map(cid => {
+                            const val      = getVal(f, item.id, cid.id);
+                            const hasValue = val !== null && val !== undefined;
+                            return (
+                              <td key={`${item.id}-${cid.id}`} style={{ padding: "2px 2px" }}>
+                                <input
+                                  type="number"
+                                  value={hasValue ? val : ""}
+                                  onChange={e => updateVal(item.id, cid.id, e.target.value)}
+                                  style={cellSty(hasValue)}
+                                  placeholder="—"
+                                />
+                              </td>
+                            );
+                          })}
                         </tr>
                       )),
                     ];

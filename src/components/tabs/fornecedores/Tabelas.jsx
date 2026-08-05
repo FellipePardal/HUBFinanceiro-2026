@@ -9,7 +9,7 @@ import {
 } from "../../../data/catalogos";
 import {
   Trophy, Building2, Camera, Users, Check, Plus, Trash2, Save,
-  AlertCircle, CalendarRange, MapPin, Package,
+  AlertCircle, CalendarRange, MapPin, Package, Pencil,
 } from "lucide-react";
 
 const CAT_META = {
@@ -29,8 +29,14 @@ const CAT_META = {
 function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave, onRemove, T }) {
   const [tab, setTab]     = useState(tabelaInicial);
   const [dirty, setDirty] = useState(false);
+  // Seleção de serviços abre em edição só em tabela nova (nada marcado ainda)
+  const [editandoServicos, setEditandoServicos] = useState(() => !(tabelaInicial.itemIds || []).length);
 
-  useEffect(() => { setTab(tabelaInicial); setDirty(false); }, [tabelaInicial?.id]);
+  useEffect(() => {
+    setTab(tabelaInicial);
+    setDirty(false);
+    setEditandoServicos(!(tabelaInicial.itemIds || []).length);
+  }, [tabelaInicial?.id]);
 
   const cidadesDoCamp = useMemo(() =>
     (camp?.cidadeIds || []).map(id => cidades.find(c => c.id === id)).filter(Boolean),
@@ -149,10 +155,21 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
           </div>
         </div>
 
-        {/* Itens do catálogo que o fornecedor faz */}
+        {/* Itens do catálogo que o fornecedor faz.
+            Depois de confirmada a seleção, só os marcados ficam visíveis;
+            "Alterar" reabre a lista completa do catálogo. */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: T.textMd, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 8 }}>
-            Serviços que este fornecedor faz — catálogo do {camp?.nome}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: T.textMd, letterSpacing: "0.04em", textTransform: "uppercase", flex: 1 }}>
+              Serviços que este fornecedor faz — catálogo do {camp?.nome}
+            </span>
+            {itensDoCatalogo.length > 0 && (
+              editandoServicos ? (
+                <Button T={T} variant="primary" size="sm" icon={Check} onClick={() => setEditandoServicos(false)} disabled={!itensAtivos.length}>Concluir</Button>
+              ) : (
+                <Button T={T} variant="secondary" size="sm" icon={Pencil} onClick={() => setEditandoServicos(true)}>Alterar</Button>
+              )
+            )}
           </div>
           {!itensDoCatalogo.length ? (
             <p style={{ margin: 0, fontSize: 12, color: T.textSm, padding: "12px 14px", border: `1px dashed ${T.border}`, borderRadius: RADIUS.md }}>
@@ -161,7 +178,8 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {Object.entries(itensPorCat).map(([catKey, items]) => {
-                if (!items.length) return null;
+                const visiveis = editandoServicos ? items : items.filter(it => feitos.has(it.id));
+                if (!visiveis.length) return null;
                 const { label, color, Icon } = CAT_META[catKey];
                 return (
                   <div key={catKey}>
@@ -169,12 +187,13 @@ function TabelaEditor({ tabela: tabelaInicial, fornecedor, camp, cidades, onSave
                       <Icon size={11}/>{label}
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                      {items.map(it => {
+                      {visiveis.map(it => {
                         const on = feitos.has(it.id);
                         return (
-                          <button key={it.id} onClick={() => toggleItem(it.id)} style={{
+                          <button key={it.id} onClick={() => editandoServicos && toggleItem(it.id)} style={{
                             display: "inline-flex", alignItems: "center", gap: 5,
-                            padding: "5px 11px", borderRadius: RADIUS.pill, cursor: "pointer",
+                            padding: "5px 11px", borderRadius: RADIUS.pill,
+                            cursor: editandoServicos ? "pointer" : "default",
                             border: `1px solid ${on ? color : T.border}`,
                             background: on ? `${color}14` : "transparent",
                             color: on ? color : T.textMd,

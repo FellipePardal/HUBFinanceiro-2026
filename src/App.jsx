@@ -145,7 +145,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
-  useAgendaPortal({ tabela: 'brasileirao_jogos', rodadaCol: 'eu', jogos, setJogos, pronto: !loading });
+  useAgendaPortal({ tabela: 'brasileirao_jogos', tabelaPeriferico: 'perifericos_brasileirao', rodadaCol: 'eu', jogos, setJogos, pronto: !loading });
 
   // Rateio de notas mensais "Seg. Espacial" entre jogos do mês
   // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo

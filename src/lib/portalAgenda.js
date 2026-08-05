@@ -68,7 +68,7 @@ export function aplicarAgendaPortal(jogos, rows, { rodadaCol = 'eu', extras = []
       continue;
     }
     next = next.map(j => (j.id === alvo.id ? { ...j, ...campos } : j));
-    adocoes.push({ portalRowId: row.id, hubJogoId: alvo.id });
+    adocoes.push({ portalRowId: row.id, hubJogoId: alvo.id, jogo: { mandante: row.mandante, visitante: row.visitante, data: row.data } });
     changed = true;
   }
 
@@ -88,8 +88,10 @@ export async function lerAgendaPortal(tabela) {
 
 // Grava o hub_jogo_id na linha do Portal recém-adotada. Filtro por
 // hub_jogo_id=is.null evita corrida (duas abas adotando ao mesmo tempo:
-// só a primeira escreve).
-export async function gravarLinkAdocao(tabela, portalRowId, hubJogoId) {
+// só a primeira escreve). Se a tabela de periféricos irmã for informada,
+// linka também a linha da MESMA partida lá (o Portal replica o jogo novo
+// nas duas tabelas; match por mandante+visitante+data, só se ainda sem link).
+export async function gravarLinkAdocao(tabela, portalRowId, hubJogoId, tabelaPeriferico, jogo) {
   try {
     await supabase
       .from(tabela)
@@ -98,5 +100,17 @@ export async function gravarLinkAdocao(tabela, portalRowId, hubJogoId) {
       .is('hub_jogo_id', null);
   } catch (err) {
     console.error('[portalAgenda] Falha ao gravar hub_jogo_id na adoção:', err);
+  }
+  if (!tabelaPeriferico || !jogo?.mandante || !jogo?.visitante) return;
+  try {
+    await supabase
+      .from(tabelaPeriferico)
+      .update({ hub_jogo_id: String(hubJogoId) })
+      .eq('mandante', jogo.mandante)
+      .eq('visitante', jogo.visitante)
+      .eq('data', jogo.data || '')
+      .is('hub_jogo_id', null);
+  } catch (err) {
+    console.error('[portalAgenda] Falha ao linkar periférico na adoção:', err);
   }
 }

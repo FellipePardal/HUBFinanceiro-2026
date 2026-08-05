@@ -6,7 +6,7 @@ import { aplicarAgendaPortal, lerAgendaPortal, gravarLinkAdocao } from '../lib/p
 // 2026-08): sincroniza ao montar e a cada mudança na tabela do Portal via
 // realtime. Só toca campos descritivos; financeiro fica intacto (ver
 // lib/portalAgenda.js). Se o Portal estiver fora do ar, não faz nada.
-export function useAgendaPortal({ tabela, rodadaCol = 'eu', extras = [], jogos, setJogos, pronto, enabled = true }) {
+export function useAgendaPortal({ tabela, tabelaPeriferico, rodadaCol = 'eu', extras = [], jogos, setJogos, pronto, enabled = true }) {
   // O sync usa sempre o snapshot mais recente sem re-rodar o efeito a cada
   // mudança de jogos (senão cada eco de realtime do próprio setJogos re-dispararia).
   const jogosRef = useRef(jogos);
@@ -25,7 +25,7 @@ export function useAgendaPortal({ tabela, rodadaCol = 'eu', extras = [], jogos, 
       // transformação lá dentro mantém a consistência mesmo com outra aba editando.
       setJogos(js => aplicarAgendaPortal(js, rows, { rodadaCol, extras }).next);
       for (const a of adocoes) {
-        await gravarLinkAdocao(tabela, a.portalRowId, a.hubJogoId);
+        await gravarLinkAdocao(tabela, a.portalRowId, a.hubJogoId, tabelaPeriferico, a.jogo);
       }
     }
 

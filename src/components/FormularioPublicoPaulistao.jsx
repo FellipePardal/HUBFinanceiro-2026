@@ -31,14 +31,16 @@ const SERVICOS_JOGO = [
   { catLabel:"Operações", catColor:"#D97706", subKey:"sng",        subLabel:"SNG" },
 ];
 
-// ── Serviços mensais (IDs espelham PAULISTAO_SERVICOS_INIT) ───────────────────
+// ── Serviços mensais (IDs espelham o orçamento ATUAL do Paulistão no banco —
+//    itens recriados ganham id novo; se divergir de novo, a religação por nome
+//    no load do Paulistao.jsx (religarMensaisOrfas) recupera a NF) ─────────────
 const SERVICOS_MENSAIS = [
-  { id:1, nome:"Coordenador de Sinal Internacional", secao:"Pessoal",     color:"#2563EB" },
-  { id:2, nome:"Editor de Vídeos",                   secao:"Pessoal",     color:"#2563EB" },
-  { id:3, nome:"Editor de Vídeos 2",                 secao:"Pessoal",     color:"#2563EB" },
-  { id:4, nome:"Suporte Operacional Vmix",           secao:"Pessoal",     color:"#2563EB" },
-  { id:6, nome:"Estatísticas",                       secao:"Transmissão", color:"#7C3AED" },
-  { id:7, nome:"Ingest/Edição (WSC)",                secao:"Transmissão", color:"#7C3AED" },
+  { id:1,             nome:"Coordenador de Sinal Internacional", secao:"Pessoal",                 color:"#2563EB" },
+  { id:2,             nome:"Editor de Vídeos",                   secao:"Pessoal",                 color:"#2563EB" },
+  { id:1777401124620, nome:"Editor de Vídeos 2",                 secao:"Pessoal",                 color:"#2563EB" },
+  { id:1777401138162, nome:"Suporte Operacional Vmix",           secao:"Pessoal",                 color:"#2563EB" },
+  { id:7,             nome:"Estatísticas",                       secao:"Serviços Complementares", color:"#D97706" },
+  { id:1777401168030, nome:"Ingest/Edição (WSC)",                secao:"Serviços Complementares", color:"#D97706" },
 ];
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];

@@ -38,6 +38,40 @@ const SERVICOS_LM_PAULISTAO = [
   { key:"distribuicao", orcadoKey:"distribuicao", label:"Distribuição",         valorPadrao:1000 },
 ];
 
+// ── Religação de notas mensais órfãs ─────────────────────────────────────────
+// O formulário público envia servicoId de uma lista espelhada; quando um item
+// do orçamento é excluído e recriado, o id muda e a NF fica órfã (some do
+// serviço no dashboard e cai em "Outros Mensais"). Recupera pelo nome: match
+// exato normalizado ou, se único candidato, por contenção (ex: "Suporte
+// Operacional Vmix" ⊂ "Desenvolvimento/Suporte operacional VMIX"). Nome
+// ambíguo permanece órfão — melhor "Outros Mensais" que creditar item errado.
+const normNomeServico = s => String(s || "")
+  .normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .toLowerCase().replace(/\s+/g, " ").trim();
+
+export function religarMensaisOrfas(notasMensais, servicos) {
+  const itens = (servicos || []).flatMap(sec => sec.itens || []);
+  const idsValidos = new Set(itens.map(i => i.id));
+  let mudou = false;
+  const lista = (notasMensais || []).map(n => {
+    if (!n.servicoId || idsValidos.has(n.servicoId)) return n;
+    const alvo = normNomeServico(n.servicoNome || n.categoria);
+    if (!alvo) return n;
+    let item = itens.find(i => normNomeServico(i.nome) === alvo);
+    if (!item) {
+      const candidatos = itens.filter(i => {
+        const nome = normNomeServico(i.nome);
+        return nome.includes(alvo) || alvo.includes(nome);
+      });
+      if (candidatos.length === 1) item = candidatos[0];
+    }
+    if (!item) return n;
+    mudou = true;
+    return { ...n, servicoId: item.id, servicoNome: (item.nome || "").trim() };
+  });
+  return { lista, mudou };
+}
+
 // Chaves de persistência namespaced no Supabase (mesma tabela app_state)
 const K = {
   jogos:            "paulistao_jogos",
@@ -111,10 +145,12 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
       } else { setJogosRaw(PAULISTAO_JOGOS_INIT); setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT); }
       // Serviços fixos: migra seed antigo (sem "Festa de Encerramento" e sem orçado)
       // para o orçamento aprovado v4 (R$ 238k). Não mexe se o operador já customizou.
+      let servicosEfetivos;
       if (s != null) {
         const temFesta  = Array.isArray(s) && s.some(sec => Array.isArray(sec.itens) && sec.itens.some(i => /festa de encerramento/i.test(i.nome||"")));
         const totalOrc  = Array.isArray(s) ? s.reduce((t,sec)=>t+(sec.itens||[]).reduce((u,i)=>u+(i.orcado||0),0),0) : 0;
         if (!temFesta && totalOrc === 0) {
+          servicosEfetivos = PAULISTAO_SERVICOS_INIT;
           setServicosRaw(PAULISTAO_SERVICOS_INIT);
           setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT);
         } else {
@@ -130,16 +166,24 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
                 return {...rest, ...TIPO_MAP[it.id]};
               })
             });
+            servicosEfetivos = migrado;
             setServicosRaw(migrado);
             setSupabaseState(K.servicos, migrado);
           } else {
+            servicosEfetivos = s;
             setServicosRaw(s);
           }
         }
-      } else { setServicosRaw(PAULISTAO_SERVICOS_INIT); setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT); }
+      } else { servicosEfetivos = PAULISTAO_SERVICOS_INIT; setServicosRaw(PAULISTAO_SERVICOS_INIT); setSupabaseState(K.servicos, PAULISTAO_SERVICOS_INIT); }
       seedIfMissing(n,   K.notas,             [],                  setNotasRaw);
       seedIfMissing(f,   K.fornecedores,      FORNECEDORES_INIT,   setFornecedoresRaw);
-      seedIfMissing(nm,  K.notas_mensais,     [],                  setNotasMensaisRaw);
+      // Notas mensais: religa órfãs pelo nome antes de expor (migração idempotente —
+      // depois da primeira gravação os ids ficam válidos e nada mais é escrito).
+      if (nm != null) {
+        const { lista: nmFinal, mudou } = religarMensaisOrfas(nm, servicosEfetivos);
+        setNotasMensaisRaw(nmFinal);
+        if (mudou) setSupabaseState(K.notas_mensais, nmFinal);
+      } else { setNotasMensaisRaw([]); setSupabaseState(K.notas_mensais, []); }
       seedIfMissing(ev,  K.envios,            [],                  setEnviosRaw);
       seedIfMissing(lm,  K.livemode,          [],                  setLivemodeRaw);
       seedIfMissing(nlm, K.notas_livemode,    [],                  setNotasLivemodeRaw);

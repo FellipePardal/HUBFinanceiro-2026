@@ -233,7 +233,8 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
-  useAgendaPortal({ tabela: 'paulistao_feminino_jogos', tabelaPeriferico: 'perifericos_paulistao', rodadaCol: 'rod', extras: [['dia', 'dia'], ['estadio', 'estadio']], jogos, setJogos, pronto: !loading });
+  // Só admin roda o sync/adoção (ver comentário no App.jsx — RLS do Portal)
+  useAgendaPortal({ tabela: 'paulistao_feminino_jogos', tabelaPeriferico: 'perifericos_paulistao', rodadaCol: 'rod', extras: [['dia', 'dia'], ['estadio', 'estadio']], jogos, setJogos, pronto: !loading, enabled: role === 'admin' });
 
   // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo,
   // não tem jogo pra receber o rateio -- o valor ia sendo descartado do realizado

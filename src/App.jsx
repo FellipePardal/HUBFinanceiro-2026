@@ -94,16 +94,20 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         if (nm != null) {
           const DESTINO_CLIPPING = {
             "luan domiciano": { servicoId: 5, categoria: "Editor de Imagens 2" },
-            "gabriel sayao":  { servicoId: 5, categoria: "Editor de Imagens 2" },
+            "gabriel sayao":  { servicoId: 4, categoria: "Editor de Imagens 1" },
             "nosso nos":      { servicoId: 4, categoria: "Editor de Imagens 1" },
             "capital humano": { servicoId: 4, categoria: "Editor de Imagens 1" },
           };
           const normForn = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
           let reclassificou = false;
           const nmFinal = nm.map(nota => {
-            if (nota.servicoId !== 9) return nota;
-            const destino = DESTINO_CLIPPING[normForn(nota.fornecedor)];
-            if (!destino) return nota;
+            const forn = normForn(nota.fornecedor);
+            // Gabriel Sayão chegou a ir pro Editor 2 numa versão anterior desta
+            // regra — o segundo teste desfaz isso se a gravação já tiver ocorrido.
+            const aplicavel = nota.servicoId === 9 || (forn === "gabriel sayao" && nota.servicoId === 5);
+            if (!aplicavel) return nota;
+            const destino = DESTINO_CLIPPING[forn];
+            if (!destino || destino.servicoId === nota.servicoId) return nota;
             reclassificou = true;
             return { ...nota, servicoId: destino.servicoId, categoria: destino.categoria };
           });

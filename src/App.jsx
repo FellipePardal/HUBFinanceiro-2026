@@ -87,7 +87,29 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         } else { setServicosRaw(SERVICOS_INIT); setSupabaseState('servicos', SERVICOS_INIT); }
         seedIfMissing(n,   'notas',             [],                  setNotasRaw);
         seedIfMissing(f,   'fornecedores',      FORNECEDORES_INIT,   setFornecedoresRaw);
-        seedIfMissing(nm,  'notas_mensais',     [],                  setNotasMensaisRaw);
+        // Reclassificação (pedido de 07/08/2026): NFs mensais desses fornecedores
+        // que entram como "Ferramenta de Clipping" (servicoId 9, mapeamento fixo
+        // do formulário público) pertencem às linhas de Editor de Imagens.
+        // Regra permanente e idempotente — pega também notas futuras do form.
+        if (nm != null) {
+          const DESTINO_CLIPPING = {
+            "luan domiciano": { servicoId: 5, categoria: "Editor de Imagens 2" },
+            "gabriel sayao":  { servicoId: 5, categoria: "Editor de Imagens 2" },
+            "nosso nos":      { servicoId: 4, categoria: "Editor de Imagens 1" },
+            "capital humano": { servicoId: 4, categoria: "Editor de Imagens 1" },
+          };
+          const normForn = x => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+          let reclassificou = false;
+          const nmFinal = nm.map(nota => {
+            if (nota.servicoId !== 9) return nota;
+            const destino = DESTINO_CLIPPING[normForn(nota.fornecedor)];
+            if (!destino) return nota;
+            reclassificou = true;
+            return { ...nota, servicoId: destino.servicoId, categoria: destino.categoria };
+          });
+          setNotasMensaisRaw(nmFinal);
+          if (reclassificou) setSupabaseState('notas_mensais', nmFinal);
+        } else { setNotasMensaisRaw([]); setSupabaseState('notas_mensais', []); }
         seedIfMissing(ev,  'envios',            [],                  setEnviosRaw);
         seedIfMissing(lm,  'livemode',          [],                  setLivemodeRaw);
         seedIfMissing(nlm, 'notas_livemode',    [],                  setNotasLivemodeRaw);

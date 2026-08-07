@@ -630,7 +630,9 @@ return { secao: s.secao, orc, prov, gasto, saldo };
 const orcTotal   = rows.reduce((s, r) => s + r.orc, 0);
 const provTotal  = rows.reduce((s, r) => s + r.prov, 0);
 const gastoTotal = rows.reduce((s, r) => s + r.gasto, 0);
-const saldoTotal = saldoUsaGasto ? orcTotal - gastoTotal : orcTotal - provTotal;
+// Total = soma das linhas — "Outros Mensais" entra pelo gasto (não tem provisão),
+// senão a linha Total diverge da soma da coluna Saldo e do resumo da Visão Geral.
+const saldoTotal = rows.reduce((s, r) => s + r.saldo, 0);
 return { rows, orcTotal, provTotal, gastoTotal, saldoTotal };
 }, [sectionsView]);
 
@@ -642,7 +644,16 @@ const gastoAtivo        = Math.max(0, gastoTotal - (computed.gastoEncerradosTota
 const orcTotEff   = orcTotOvr   !== "" ? parseBR(orcTotOvr)   : orcTotal;
 const provTotEff  = provTotOvr  !== "" ? parseBR(provTotOvr)  : provTotal;
 const gastoTotEff = gastoTotOvr !== "" ? parseBR(gastoTotOvr) : gastoTotal;
-const saldoTotEff = saldoUsaGasto ? orcTotEff - gastoTotEff : orcTotEff - provTotEff;
+
+// Realizado efetivo — base ÚNICA da caixa de saldo, da tabela e da Visão Geral:
+// Paulistão F usa gasto (saldoUsaGasto); demais usam prov, com "Outros Mensais"
+// entrando pelo gasto (NFs sem serviço não têm provisão). O override manual de
+// total realizado (provTotOvr) vale pras duas telas.
+const realizadoEff = saldoUsaGasto
+  ? gastoTotEff
+  : (provTotOvr !== "" ? parseBR(provTotOvr)
+      : rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0));
+const saldoTotEff = orcTotEff - realizadoEff;
 const nfRecV = saldoUsaGasto ? provTotEff : gastoAtivo;
 const nfPend = saldoUsaGasto
   ? Math.max(0, gastoTotEff - provTotEff)
@@ -650,11 +661,8 @@ const nfPend = saldoUsaGasto
 const nfBase = saldoUsaGasto ? gastoTotEff : provAtivoBase;
 const pctRec = nfBase > 0 ? nfRecV / nfBase * 100 : 0;
 
-// Realizado da Visão Geral: Paulistão F usa gasto (saldoUsaGasto); demais usam prov (Outros Mensais usa gasto).
-const realizadoVG = saldoUsaGasto
-  ? gastoTotEff
-  : rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
-const saldoVG = orcTotEff - realizadoVG;
+const realizadoVG = realizadoEff;
+const saldoVG = saldoTotEff;
 
 useEffect(() => {
   if (onDadosCalculados) {
@@ -919,7 +927,7 @@ return (
       <div style={{marginBottom:0}}>
         <label style={{color:T.textSm,fontSize:11,display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Saldo até {MESES_FIX[mesAtual]} (Orçado − {saldoUsaGasto?"Gasto":"Realizado"}) <span style={{background:"#052e16",color:"#4ade80",fontSize:9,padding:"1px 5px",borderRadius:2,marginLeft:4}}>AUTO</span></label>
         <input readOnly value={fmtNum(saldoTotEff)} style={{...IS_RO, color: saldoTotEff >= 0 ? "#a3e635" : "#ef4444"}}/>
-        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotEff)} (orç.) − {fmtR(provTotEff)} (real.) = {saldoTotEff >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotEff))}</p>
+        <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>{fmtR(orcTotEff)} (orç.) − {fmtR(realizadoEff)} (real.) = {saldoTotEff >= 0 ? "▲" : "▼"} {fmtR(Math.abs(saldoTotEff))}</p>
       </div>
     </div>
   </div>

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import CatalogoItensModal from "./CatalogoItensModal";
 import { unidadeLabel } from "./CatalogoItensModal";
+import { supabase } from "../../../lib/supabase";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const CAT_META = {
@@ -686,6 +687,17 @@ export default function Cadastro({ fornecedores, setFornecedores, itensMaster = 
   const selectedForn = selectedId ? fornecedores.find(f => f.id === selectedId) || null : null;
 
   const saveFornecedor = f => {
+    // Renome de apelido PROPAGA para as escalas do Portal de Controle (o
+    // vínculo lá é por nome): a RPC renomear_fornecedor troca o nome em todas
+    // as colunas de fornecedor das tabelas do Portal + links externos.
+    const anterior = fornecedores.find(x => x.id === f.id);
+    if (anterior && anterior.apelido && f.apelido && anterior.apelido.trim() !== f.apelido.trim()) {
+      supabase.rpc('renomear_fornecedor', { antigo: anterior.apelido.trim(), novo: f.apelido.trim() })
+        .then(({ data, error }) => {
+          if (error) console.error('Falha ao propagar renome para o Portal:', error.message);
+          else console.log(`Renome propagado ao Portal: ${data} célula(s) atualizadas`);
+        });
+    }
     setFornecedores(fs => {
       const idx = fs.findIndex(x => x.id === f.id);
       return idx >= 0 ? fs.map(x => x.id === f.id ? f : x) : [...fs, f];

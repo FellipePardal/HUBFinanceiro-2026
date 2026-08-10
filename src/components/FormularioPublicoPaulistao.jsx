@@ -575,7 +575,7 @@ export default function FormularioPublicoPaulistao() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    Promise.all([getState('paulistao_jogos'), getState('paulistao_fornecedores')]).then(([j, f]) => {
+    Promise.all([getState('paulistao_jogos'), getState('fornecedores')]).then(([j, f]) => {
       if (j) setJogos(j);
       if (f) setFornecedores(f);
       setLoading(false);

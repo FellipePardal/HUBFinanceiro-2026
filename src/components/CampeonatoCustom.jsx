@@ -42,7 +42,8 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     jogos:            `${campId}_jogos`,
     servicos:         `${campId}_servicos`,
     notas:            `${campId}_notas`,
-    fornecedores:     `${campId}_fornecedores`,
+    // Base ÚNICA de fornecedores (2026-08-10) — ver comentário em Paulistao.jsx
+    fornecedores:     "fornecedores",
     notas_mensais:    `${campId}_notas_mensais`,
     envios:           `${campId}_envios`,
     livemode:         `${campId}_livemode`,

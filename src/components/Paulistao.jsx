@@ -77,7 +77,10 @@ const K = {
   jogos:            "paulistao_jogos",
   servicos:         "paulistao_servicos",
   notas:            "paulistao_notas",
-  fornecedores:     "paulistao_fornecedores",
+  // Base ÚNICA de fornecedores (2026-08-10): a chave global 'fornecedores' é
+  // compartilhada por todos os campeonatos e com o Portal de Controle. A cópia
+  // congelada 'paulistao_fornecedores' ficou órfã no banco (nunca era escrita).
+  fornecedores:     "fornecedores",
   notas_mensais:    "paulistao_notas_mensais",
   envios:           "paulistao_envios",
   livemode:         "paulistao_livemode",

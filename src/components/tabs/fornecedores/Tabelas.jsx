@@ -332,6 +332,9 @@ export default function Tabelas({
   });
   const [fornSelId, setFornSelId] = useState(null);
   const [novoFornId, setNovoFornId] = useState("");
+  // Com 50+ fornecedores por campeonato, a lista precisa de busca e filtro
+  const [buscaForn, setBuscaForn] = useState("");
+  const [filtroItem, setFiltroItem] = useState("");
 
   const camp = campeonatos.find(c => c.id === campId) ?? null;
 
@@ -349,6 +352,21 @@ export default function Tabelas({
       .sort((a, b) => (a._forn.apelido || "").localeCompare(b._forn.apelido || "")),
     [tabelas, campId, fornById]
   );
+
+  // Busca por nome/função + filtro por item do catálogo
+  const normBusca = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const tabelasVisiveis = useMemo(() => {
+    let lista = tabelasDoCamp;
+    if (buscaForn.trim()) {
+      const q = normBusca(buscaForn);
+      lista = lista.filter(t =>
+        normBusca(t._forn.apelido).includes(q) ||
+        normBusca(t._forn.funcao).includes(q) ||
+        normBusca(t._forn.razaoSocial).includes(q));
+    }
+    if (filtroItem) lista = lista.filter(t => (t.itemIds || []).includes(filtroItem));
+    return lista;
+  }, [tabelasDoCamp, buscaForn, filtroItem]);
 
   // Fornecedores sem tabela neste campeonato (para o select de adicionar)
   const fornsDisponiveis = useMemo(() => {
@@ -438,12 +456,31 @@ export default function Tabelas({
 
       {/* ── Coluna 2: fornecedores com tabela ─────────────────────────────── */}
       <div style={{ borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Fornecedores</span>
+          <span className="num" style={{ fontSize: 11, color: T.textSm }}>
+            {tabelasVisiveis.length}{tabelasVisiveis.length !== tabelasDoCamp.length ? ` de ${tabelasDoCamp.length}` : ""}
+          </span>
+        </div>
+
+        {/* Busca + filtro por serviço */}
+        <div style={{ padding: "8px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          <input
+            value={buscaForn}
+            onChange={e => setBuscaForn(e.target.value)}
+            placeholder="🔍 Buscar fornecedor..."
+            style={{ ...IS, fontSize: 12 }}
+          />
+          <select value={filtroItem} onChange={e => setFiltroItem(e.target.value)} style={{ ...IS, fontSize: 12 }}>
+            <option value="">Todos os serviços</option>
+            {(camp?.itens || []).filter(i => i.ativo !== false).map(i => (
+              <option key={i.id} value={i.id}>{i.nome}</option>
+            ))}
+          </select>
         </div>
 
         {/* Adicionar fornecedor */}
-        <div style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", gap: 6 }}>
+        <div style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", gap: 6, flexShrink: 0 }}>
           <select value={novoFornId} onChange={e => setNovoFornId(e.target.value)} style={{ ...IS, flex: 1, minWidth: 0, fontSize: 12 }}>
             <option value="">— Adicionar... —</option>
             {fornsDisponiveis.map(f => <option key={f.id} value={f.id}>{f.apelido}</option>)}
@@ -452,11 +489,11 @@ export default function Tabelas({
         </div>
 
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {!tabelasDoCamp.length ? (
+          {!tabelasVisiveis.length ? (
             <div style={{ padding: "24px 16px", textAlign: "center", color: T.textSm, fontSize: 12 }}>
-              Nenhum fornecedor neste campeonato ainda. Adicione acima.
+              {tabelasDoCamp.length ? "Nada com esse filtro." : "Nenhum fornecedor neste campeonato ainda. Adicione acima."}
             </div>
-          ) : tabelasDoCamp.map(t => {
+          ) : tabelasVisiveis.map(t => {
             const isSel = String(t.fornecedorId) === String(fornSelId);
             const nItens = (t.itemIds || []).length;
             const nVals = contarCelulasPreenchidas(t);
@@ -474,7 +511,12 @@ export default function Tabelas({
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <Building2 size={12} color={isSel ? (T.brand || "#10b981") : T.textSm}/>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: isSel ? (T.brand || "#10b981") : T.text }}>{t._forn.apelido}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isSel ? (T.brand || "#10b981") : T.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t._forn.apelido}</span>
+                  {/* verde = tem valores; âmbar = tabela criada mas sem preço ainda */}
+                  <span title={nVals > 0 ? `${nVals} valores preenchidos` : "Sem valores ainda"} style={{
+                    width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                    background: nVals > 0 ? (T.brand || "#10b981") : (T.warning || "#D97706"),
+                  }}/>
                 </div>
                 <div style={{ fontSize: 11, color: T.textSm }}>
                   {nItens} serviço{nItens !== 1 ? "s" : ""} · {nVals} valor{nVals !== 1 ? "es" : ""}

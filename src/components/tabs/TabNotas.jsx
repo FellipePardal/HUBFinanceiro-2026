@@ -48,7 +48,24 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
   );
 }
 
-function PreviewModal({ nota, onClose, T }) {
+// Ver + anexar/substituir arquivo. O botão de upload fica SEMPRE disponível:
+// quando o arquivo se perde no banco (a nota continua marcada como "tem
+// arquivo"), sem ele não haveria caminho na tela pra anexar a segunda via —
+// a nota ficava num beco sem saída, só exibindo "arquivo não encontrado".
+function AcoesArquivo({ nota, canEdit, onVer, onEnviar, T }) {
+  return (
+    <>
+      {nota.hasFile && <Button T={T} variant="secondary" size="sm" icon={Eye} title="Ver arquivo" onClick={() => onVer(nota)}/>}
+      {canEdit && (
+        <Button T={T} variant="secondary" size="sm" icon={Upload}
+          title={nota.hasFile ? "Substituir arquivo" : "Anexar arquivo"}
+          onClick={() => onEnviar(nota)}/>
+      )}
+    </>
+  );
+}
+
+function PreviewModal({ nota, onClose, onArquivoAusente, T }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -56,7 +73,13 @@ function PreviewModal({ nota, onClose, T }) {
     if (!nota) return;
     setLoading(true);
     setSrc(null);
-    getNFFile(nota.id).then(data => { setSrc(data); setLoading(false); }).catch(() => setLoading(false));
+    getNFFile(nota.id).then(data => {
+      setSrc(data);
+      setLoading(false);
+      // O arquivo sumiu do banco mas a nota ainda promete que existe: corrige a
+      // marcação na hora, para o resto do sistema parar de prometer o que não tem.
+      if (!data && nota.hasFile) onArquivoAusente?.(nota);
+    }).catch(() => setLoading(false));
   }, [nota?.id]);
 
   if (!nota) return null;
@@ -1191,10 +1214,22 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     try {
       const dataUrl = await fileToDataUrl(file);
       await saveNFFile(nota.id, dataUrl);
+      // Confirma que o arquivo está mesmo no banco antes de marcar a nota como
+      // anexada — sem isso uma gravação que falhou em silêncio deixa a nota
+      // prometendo um arquivo inexistente (caso das NFs perdidas em 07-08/2026).
+      const gravado = await getNFFile(nota.id);
+      if (!gravado) throw new Error("arquivo não persistiu no banco");
       setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: true} : n));
-    } catch (e) { console.error("Upload falhou:", e); }
+    } catch (e) {
+      console.error("Upload falhou:", e);
+      alert("Não foi possível anexar o arquivo. Tente de novo — a nota segue marcada como sem arquivo.");
+    }
     setUploadTarget(null);
   };
+
+  // Corrige a marcação quando o arquivo prometido não existe mais no banco.
+  const marcarSemArquivo = (nota) =>
+    setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: false} : n));
 
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
@@ -1567,9 +1602,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                       <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{n.codigo}</code>
                                       <span style={{color:T.textMd}}>{n.fornecedor}</span>
                                       {envioMap[n.id] && <Pill label={envioLabel(envioMap[n.id])} color={purple}/>}
-                                      {n.hasFile
-                                        ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                                        : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                                      <AcoesArquivo nota={n} canEdit={canEdit} T={T} onVer={setPreview} onEnviar={x => {setUploadTarget(x); uploadRef.current?.click();}}/>
                                       {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                                     </span>
                                   ))}
@@ -1579,9 +1612,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                                   <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4}}>{nota.codigo}</code>
                                   <span style={{color:T.textMd}}>{nota.fornecedor}</span>
                                   {envioMap[nota.id] && <Pill label={envioLabel(envioMap[nota.id])} color={purple}/>}
-                                  {nota.hasFile
-                                    ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(nota)}/>
-                                    : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(nota); uploadRef.current?.click();}}/>}
+                                  <AcoesArquivo nota={nota} canEdit={canEdit} T={T} onVer={setPreview} onEnviar={x => {setUploadTarget(x); uploadRef.current?.click();}}/>
                                   {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(nota.id)}/>}
                                 </span>
                               )}
@@ -1607,9 +1638,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                         {n.numeroNF && <span style={{color:T.textSm,fontSize:11}}>NF {n.numeroNF}</span>}
                         {n.dataEmissao && <span style={{color:T.textSm,fontSize:11}}>Emissão {n.dataEmissao}</span>}
                         <span style={{marginLeft:"auto",display:"flex",gap:4}}>
-                          {n.hasFile
-                            ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                            : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                          <AcoesArquivo nota={n} canEdit={canEdit} T={T} onVer={setPreview} onEnviar={x => {setUploadTarget(x); uploadRef.current?.click();}}/>
                           {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                         </span>
                       </div>
@@ -1715,9 +1744,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                     </td>
                     <td style={TS.td}>
                       <div style={{display:"flex",gap:4}}>
-                        {n.hasFile
-                          ? <Button T={T} variant="secondary" size="sm" icon={Eye} onClick={()=>setPreview(n)}/>
-                          : canEdit && <Button T={T} variant="secondary" size="sm" icon={Upload} onClick={()=>{setUploadTarget(n); uploadRef.current?.click();}}/>}
+                        <AcoesArquivo nota={n} canEdit={canEdit} T={T} onVer={setPreview} onEnviar={x => {setUploadTarget(x); uploadRef.current?.click();}}/>
                         {canEdit && <Button T={T} variant="danger" size="sm" icon={Trash2} onClick={()=>deleteNota(n.id)}/>}
                       </div>
                     </td>
@@ -1784,7 +1811,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T} portal={portal} subsExcluir={subsExcluir}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
       {showLivemode && <ReembolsoLogisticaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowLivemode(false)} T={T}/>}
-      {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} T={T}/>}
+      {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} onArquivoAusente={marcarSemArquivo} T={T}/>}
       <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}
         onChange={e => {if (e.target.files[0] && uploadTarget) handleUploadLater(e.target.files[0], uploadTarget); e.target.value="";}}/>
     </>

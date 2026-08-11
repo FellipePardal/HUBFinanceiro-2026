@@ -9,7 +9,7 @@ import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../.
 import { countNotasFiscais, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
 import { ReembolsoLogisticaModal } from "../modals/ReembolsoLogisticaModal";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
-import { Plus, Eye, Trash2, Upload, Copy as CopyIcon, FileText } from "lucide-react";
+import { Plus, Eye, Trash2, Upload, Paperclip, Copy as CopyIcon, FileText } from "lucide-react";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Solicitada":"#3b82f6","Recebida":"#8b5cf6","Conferida":"#22c55e"};
@@ -48,24 +48,21 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
   );
 }
 
-// Ver + anexar/substituir arquivo. O botão de upload fica SEMPRE disponível:
-// quando o arquivo se perde no banco (a nota continua marcada como "tem
-// arquivo"), sem ele não haveria caminho na tela pra anexar a segunda via —
-// a nota ficava num beco sem saída, só exibindo "arquivo não encontrado".
+// Uma ação por linha, sem ambiguidade: nota com arquivo mostra "ver", nota sem
+// arquivo mostra o clipe de "anexar". Substituir o arquivo de uma nota que já
+// tem um vive dentro do visualizador — é lá que dá pra conferir o que está
+// trocando. Quando o arquivo some do banco, abrir a nota corrige a marcação e
+// o clipe aparece aqui, então nenhuma NF fica sem caminho para receber o PDF.
 function AcoesArquivo({ nota, canEdit, onVer, onEnviar, T }) {
-  return (
-    <>
-      {nota.hasFile && <Button T={T} variant="secondary" size="sm" icon={Eye} title="Ver arquivo" onClick={() => onVer(nota)}/>}
-      {canEdit && (
-        <Button T={T} variant="secondary" size="sm" icon={Upload}
-          title={nota.hasFile ? "Substituir arquivo" : "Anexar arquivo"}
-          onClick={() => onEnviar(nota)}/>
-      )}
-    </>
-  );
+  if (nota.hasFile) {
+    return <Button T={T} variant="secondary" size="sm" icon={Eye} title="Ver arquivo" onClick={() => onVer(nota)}/>;
+  }
+  return canEdit
+    ? <Button T={T} variant="secondary" size="sm" icon={Paperclip} title="Anexar arquivo" onClick={() => onEnviar(nota)}/>
+    : null;
 }
 
-function PreviewModal({ nota, onClose, onArquivoAusente, T }) {
+function PreviewModal({ nota, onClose, onArquivoAusente, onSubstituir, T }) {
   const [src, setSrc] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +93,13 @@ function PreviewModal({ nota, onClose, onArquivoAusente, T }) {
           <span style={{color:"#94a3b8",fontSize:12}}>{nota.jogoLabel} · Rd {nota.rodada}</span>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <a href={src} download={nota.codigo} style={{...btnStyle,background:"#3b82f6",padding:"6px 14px",fontSize:12,textDecoration:"none"}}>Download</a>
+          {src && <a href={src} download={nota.codigo} style={{...btnStyle,background:"#3b82f6",padding:"6px 14px",fontSize:12,textDecoration:"none"}}>Download</a>}
+          {onSubstituir && (
+            <button onClick={() => { onSubstituir(nota); onClose(); }}
+              style={{...btnStyle,background:"transparent",border:"1px solid #64748b",color:"#cbd5e1",padding:"6px 14px",fontSize:12}}>
+              Substituir arquivo
+            </button>
+          )}
           <button onClick={onClose} style={{...btnStyle,background:"#475569",padding:"6px 14px",fontSize:12}}>Fechar</button>
         </div>
       </div>
@@ -1825,7 +1828,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
       {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T} portal={portal} subsExcluir={subsExcluir}/>}
       {showAvulsa && <NFAvulsaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowAvulsa(false)} T={T}/>}
       {showLivemode && <ReembolsoLogisticaModal jogos={jogos} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowLivemode(false)} T={T}/>}
-      {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} onArquivoAusente={marcarSemArquivo} T={T}/>}
+      {preview && <PreviewModal nota={preview} onClose={() => setPreview(null)} onArquivoAusente={marcarSemArquivo} onSubstituir={canEdit ? (n => {setUploadTarget(n); uploadRef.current?.click();}) : null} T={T}/>}
       <input ref={uploadRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}
         onChange={e => {if (e.target.files[0] && uploadTarget) handleUploadLater(e.target.files[0], uploadTarget); e.target.value="";}}/>
     </>

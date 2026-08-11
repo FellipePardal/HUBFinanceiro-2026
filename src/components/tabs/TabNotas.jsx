@@ -823,7 +823,12 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
         // Volta pra fila sem clientRef (senão o dedupe de reenvio do formulário
         // engoliria a recuperação) e sem os campos de decisão.
         const { clientRef: _cr, ...limpo } = item;
-        const devolvida = { ...limpo, decisao: undefined, decidoEm: undefined };
+        // O arquivo pode ter sido apagado quando a nota foi excluída (deleteNota
+        // apaga o PDF e joga a nota no histórico). Recuperar não ressuscita o
+        // arquivo — então a submissão volta honestamente marcada como SEM
+        // arquivo, senão a nota renasce prometendo um PDF que não existe mais.
+        const arquivoVivo = item.hasFile ? !!(await getNFFile(item.id).catch(() => null)) : false;
+        const devolvida = { ...limpo, hasFile: arquivoVivo, decisao: undefined, decidoEm: undefined };
         const naFila = (await getState(submissionsKey)) || [];
         if (!naFila.some(s => s.id === item.id)) {
           await appendState(submissionsKey, devolvida);
@@ -843,7 +848,11 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
 
   const excluirDefinitivo = async (id) => {
     if (!window.confirm("Excluir definitivamente do histórico?")) return;
-    deleteNFFile(id);
+    // A entrada do histórico compartilha o id com a nota que a originou. Se essa
+    // nota está viva (foi recuperada e reaprovada), apagar o arquivo aqui tiraria
+    // o PDF de uma NF em uso — só apaga quando ninguém mais aponta pra ele.
+    const emUso = (notas || []).some(n => n.id === id);
+    if (!emUso) deleteNFFile(id);
     setHistorico(h => h.filter(x => x.id !== id)); // otimista
     try {
       await enqueue(() => removeFromStateList(historicoKey, id));

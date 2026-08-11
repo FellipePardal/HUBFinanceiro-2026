@@ -408,7 +408,8 @@ export default function Tabelas({
       border: `1px solid ${T.border}`,
       borderRadius: RADIUS.lg,
       overflow: "hidden",
-      minHeight: "72vh",
+      // Altura FIXA na janela: rolagem interna por coluna, página não cresce
+      height: "calc(100vh - 240px)", minHeight: 460,
       background: T.surface || T.card,
     }}>
 

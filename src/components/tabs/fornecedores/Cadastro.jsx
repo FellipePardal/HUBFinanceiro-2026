@@ -719,7 +719,9 @@ export default function Cadastro({ fornecedores, setFornecedores, itensMaster = 
     <div style={{
       display: "grid", gridTemplateColumns: "300px 1fr",
       border: `1px solid ${T.border}`, borderRadius: RADIUS.lg,
-      overflow: "hidden", minHeight: "78vh",
+      // Altura FIXA na janela: a rolagem acontece DENTRO dos painéis (lista à
+      // esquerda, detalhe à direita) — a página em si não cresce mais.
+      overflow: "hidden", height: "calc(100vh - 240px)", minHeight: 460,
       background: T.surface || T.card,
     }}>
 

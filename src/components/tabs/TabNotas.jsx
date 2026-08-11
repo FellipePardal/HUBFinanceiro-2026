@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, appendState, removeFromStateList } from "../../lib/supabase";
+import { fileToDataUrl, saveNFFile, getNFFile, nfFileExiste, deleteNFFile, getState, setState as setSupabaseState, appendState, removeFromStateList } from "../../lib/supabase";
 import { pushHistorico } from "../../lib/historico";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
@@ -823,12 +823,17 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
         // Volta pra fila sem clientRef (senão o dedupe de reenvio do formulário
         // engoliria a recuperação) e sem os campos de decisão.
         const { clientRef: _cr, ...limpo } = item;
-        // O arquivo pode ter sido apagado quando a nota foi excluída (deleteNota
-        // apaga o PDF e joga a nota no histórico). Recuperar não ressuscita o
-        // arquivo — então a submissão volta honestamente marcada como SEM
-        // arquivo, senão a nota renasce prometendo um PDF que não existe mais.
-        const arquivoVivo = item.hasFile ? !!(await getNFFile(item.id).catch(() => null)) : false;
-        const devolvida = { ...limpo, hasFile: arquivoVivo, decisao: undefined, decidoEm: undefined };
+        // Rejeitar preserva o arquivo, então recuperar traz o PDF de volta
+        // normalmente. Já excluir a NOTA apaga o PDF (deleteNota) e manda a nota
+        // pro histórico — recuperar essa não ressuscita arquivo nenhum. Por isso
+        // conferimos: só rebaixa hasFile quando dá pra afirmar que sumiu (null =
+        // consulta falhou, mantém como estava pra não esconder arquivo bom).
+        const existe = item.hasFile ? await nfFileExiste(item.id) : false;
+        const devolvida = {
+          ...limpo,
+          hasFile: existe === null ? item.hasFile : existe,
+          decisao: undefined, decidoEm: undefined,
+        };
         const naFila = (await getState(submissionsKey)) || [];
         if (!naFila.some(s => s.id === item.id)) {
           await appendState(submissionsKey, devolvida);

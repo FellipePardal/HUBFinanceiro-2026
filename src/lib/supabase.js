@@ -226,6 +226,25 @@ export async function getNFFile(notaId) {
   return getState(`nf_file_${notaId}`);
 }
 
+// Existe arquivo para esta nota? Consulta só a chave — as linhas nf_file_ chegam
+// a 1 MB e baixar o conteúdo inteiro só pra checar existência é desperdício (e
+// dá timeout justamente quando o banco está lento).
+// Devolve true/false quando dá pra afirmar e `null` quando a consulta falhou —
+// nesse caso quem chama NÃO deve rebaixar hasFile, senão um erro transitório
+// esconde um arquivo que está lá.
+export async function nfFileExiste(notaId) {
+  try {
+    const { data, error } = await comTimeout(
+      supabase.from('app_state').select('key').eq('key', `nf_file_${notaId}`).maybeSingle(),
+      `checar arquivo da NF ${notaId}`
+    );
+    if (error) return null;
+    return !!data;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteNFFile(notaId) {
   await supabase.from('app_state').delete().eq('key', `nf_file_${notaId}`);
 }

@@ -4,7 +4,7 @@ import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./ui";
 import {
-  LayoutDashboard, FileText, Users, ClipboardList,
+  LayoutDashboard, FileText, ClipboardList,
   ArrowLeft, Eye, EyeOff, Sun, Moon, LogOut,
   Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
@@ -471,7 +471,6 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const TABS = setor==="orcamento" ? TABS_ORC : setor==="notas" ? TABS_NF : setor==="logistica" ? TABS_LOG : TABS_REL;
 
   const handleSetorChange = s => {
-    if (s === "fornecedores") { onOpenHub && onOpenHub("paulistao-feminino-2026"); return; }
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
@@ -495,7 +494,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
     { k:"orcamento",    l:"Orçamento",            icon:LayoutDashboard },
     { k:"notas",        l:"Notas Fiscais",        icon:FileText },
     { k:"logistica",    l:"Logística",            icon:Truck },
-    { k:"fornecedores", l:"Hub de Fornecedores →", icon:Users },
+    // Hub de Fornecedores saiu daqui (13/08/2026): módulo transversal, vive só na Home.
     { k:"relatorio",    l:"Relatório",            icon:ClipboardList },
   ];
   const SETORES = role === 'admin' ? SETORES_ALL : [

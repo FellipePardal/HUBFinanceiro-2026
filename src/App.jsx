@@ -5,7 +5,7 @@ import { ALL_JOGOS, SERVICOS_INIT } from "./data";
 import { KPI, Pill, CustomTooltip } from "./components/shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./components/ui";
 import {
-  LayoutDashboard, FileText, Users, ClipboardList,
+  LayoutDashboard, FileText, ClipboardList,
   ArrowLeft, Eye, EyeOff, Sun, Moon, Lock, LogOut,
   Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
@@ -412,8 +412,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "logistica" ? TABS_LOG : TABS_REL;
 
   const handleSetorChange = s => {
-    // Fornecedores agora é um módulo do HUB — abre filtrado no campeonato atual
-    if (s === "fornecedores") { onOpenHub && onOpenHub("brasileirao-2026"); return; }
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
@@ -437,7 +435,8 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
     {k:"orcamento",    l:"Orçamento",            icon:LayoutDashboard},
     {k:"notas",        l:"Notas Fiscais",        icon:FileText},
     {k:"logistica",    l:"Logística",            icon:Truck},
-    {k:"fornecedores", l:"Hub de Fornecedores →", icon:Users},
+    // Hub de Fornecedores saiu daqui (13/08/2026): é módulo transversal a todos
+    // os campeonatos e vive só na Home.
     {k:"relatorio",    l:"Relatório",            icon:ClipboardList},
   ];
   const SETORES = role === 'admin' ? SETORES_ALL : [

@@ -4,7 +4,7 @@ import { fmt, subTotal, catTotal } from "../utils";
 import { Pill } from "./shared";
 import { Card, SectionHeader, Stat, Badge, Progress, IconButton } from "./ui";
 import {
-  LayoutDashboard, FileText, Users, ClipboardList,
+  LayoutDashboard, FileText, ClipboardList,
   ArrowLeft, Eye, EyeOff, Sun, Moon,
   Wallet, TrendingUp, Activity, PiggyBank, Truck, Target,
 } from "lucide-react";
@@ -374,7 +374,6 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const TABS = setor==="orcamento" ? TABS_ORC : setor==="notas" ? TABS_NF : setor==="logistica" ? TABS_LOG : TABS_REL;
 
   const handleSetorChange = s => {
-    if (s === "fornecedores") { onOpenHub && onOpenHub(campId); return; }
     setSetor(s);
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
@@ -398,7 +397,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     { k:"orcamento",    l:"Orçamento",            icon:LayoutDashboard },
     { k:"notas",        l:"Notas Fiscais",        icon:FileText },
     { k:"logistica",    l:"Logística",            icon:Truck },
-    { k:"fornecedores", l:"Hub de Fornecedores →", icon:Users },
+    // Hub de Fornecedores saiu daqui (13/08/2026): módulo transversal, vive só na Home.
     { k:"relatorio",    l:"Relatório",            icon:ClipboardList },
   ];
   const setorAtual = SETORES.find(s => s.k === setor);

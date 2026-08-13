@@ -168,44 +168,51 @@ export default function TabGraficos({ divulgados = [], T }) {
     };
   }, [porRodada, jogos]);
 
-  // ── Convergência Provisionado → Realizado ──────────────────────────────────
-  // O acompanhamento às entidades usa o provisionado porque as NFs demoram a
-  // chegar. Aqui medimos, nas rodadas MADURAS (todas menos as N mais recentes,
-  // onde as NFs já tiveram tempo de entrar), quanto do provisionado de fato
-  // virou nota — e usamos esse fator para projetar o realizado das rodadas
-  // recentes. O fator é calibrado no campeonato inteiro (respeitando só o
-  // filtro de categoria); o período filtrado é onde ele é aplicado.
-  const convergencia = useMemo(() => {
-    const base = divulgados.filter(j => filtroCat === "Todas" || j.categoria === filtroCat);
-    const rodadas = Array.from(new Set(base.map(j => j.rodada))).sort((a, b) => a - b);
-    const maduras = new Set(rodadas.slice(0, Math.max(0, rodadas.length - maturidade)));
-    let provM = 0, realM = 0;
-    base.forEach(j => {
-      if (!maduras.has(j.rodada)) return;
-      provM += subTotal(j.provisionado);
-      realM += subTotal(j.realizado);
+  // ── Fechamento Provisionado → Realizado ─────────────────────────────────────
+  // Rotina do time: quando TODAS as NFs de um jogo chegaram, o jogo é "fechado"
+  // igualando provisionado e realizado — o provisionado vira o custo final e o
+  // saving reportado às entidades já sai fiel. Logo a aproximação que importa
+  // não é um fator estatístico (nos fechados a razão é 100% por construção) e
+  // sim o STATUS: quanto do provisionado já está consolidado por NF, quanto
+  // chegou parcial, quanto ainda aguarda nota — e quais jogos maduros (fora da
+  // janela recente de chegada de NFs) seguem abertos e precisam de ação:
+  // cobrar o fornecedor ou fechar o jogo.
+  const classifica = j => {
+    const p = subTotal(j.provisionado), r = subTotal(j.realizado);
+    return { p, r, fechado: r > 0 && Math.abs(p - r) < 1 };
+  };
+
+  const fechamento = useMemo(() => {
+    const recentes = new Set(rodadasTodas.slice(-maturidade));
+    let consolidado = 0, parcialReal = 0, aReceber = 0, nFech = 0, nParc = 0, nAg = 0;
+    const abertosMaduros = [];
+    jogos.forEach(j => {
+      const { p, r, fechado } = classifica(j);
+      if (fechado) { consolidado += r; nFech++; return; }
+      if (r > 0) { parcialReal += r; nParc++; } else nAg++;
+      aReceber += Math.max(0, p - r);
+      if (!recentes.has(j.rodada)) abertosMaduros.push({
+        id: j.id, rodada: j.rodada, jogo: `${j.mandante} x ${j.visitante}`,
+        prov: p, real: r, pendente: Math.max(0, p - r),
+      });
     });
-    if (provM <= 0) return { pronto: false, nMaduras: maduras.size };
-    const fator = realM / provM;
-    return { pronto: true, fator, provM, realM, nMaduras: maduras.size, primeiraImatura: rodadas.slice(-maturidade)[0] };
-  }, [divulgados, filtroCat, maturidade]);
+    abertosMaduros.sort((a, b) => b.pendente - a.pendente);
+    const pendenteMaduro = abertosMaduros.reduce((s, x) => s + x.pendente, 0);
+    return { consolidado, parcialReal, aReceber, nFech, nParc, nAg, abertosMaduros, pendenteMaduro,
+             primeiraRecente: rodadasTodas.slice(-maturidade)[0] };
+  }, [jogos, rodadasTodas, maturidade]);
 
-  const convergenciaRodada = useMemo(() => porRodada.map(r => ({
-    ...r,
-    projReal: convergencia.pronto ? r.prov * convergencia.fator : null,
-    cobertura: r.prov > 0 ? r.real / r.prov * 100 : 0,
-  })), [porRodada, convergencia]);
-
-  const ajustado = useMemo(() => {
-    if (!convergencia.pronto) return null;
-    const realProjetado = tot.prov * convergencia.fator;
-    const savingAjustado = tot.orc - realProjetado;
-    return {
-      realProjetado, savingAjustado,
-      desvio: (convergencia.fator - 1) * 100,          // <0: NFs chegam abaixo do provisionado
-      diferenca: savingAjustado - tot.saving,           // quanto o saving reportado muda com a calibração
-    };
-  }, [convergencia, tot]);
+  const fechamentoRodada = useMemo(() => {
+    const map = {};
+    jogos.forEach(j => {
+      const r = j.rodada;
+      if (!map[r]) map[r] = { rodada: r, name: `R${r}`, Consolidado: 0, "NF parcial": 0, "Aguardando NF": 0 };
+      const { p, r: real, fechado } = classifica(j);
+      if (fechado) map[r].Consolidado += real;
+      else { map[r]["NF parcial"] += real; map[r]["Aguardando NF"] += Math.max(0, p - real); }
+    });
+    return Object.values(map).sort((a, b) => a.rodada - b.rodada);
+  }, [jogos]);
 
   const indices = useMemo(() => {
     if (!porRodada.length) return null;
@@ -402,11 +409,11 @@ export default function TabGraficos({ divulgados = [], T }) {
         </Card>
       </div>
 
-      {/* ── Linha 4: convergência Provisionado → Realizado ── */}
+      {/* ── Linha 4: fechamento Provisionado → Realizado ── */}
       <Card T={T}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-          <PanelTitle T={T} title="Convergência Provisionado → Realizado"
-            subtitle="Quanto do provisionado vira NF de fato — fator medido nas rodadas maduras e aplicado ao período"/>
+          <PanelTitle T={T} title="Fechamento Provisionado → Realizado"
+            subtitle="Jogo fechado = todas as NFs chegaram e provisionado vira o custo final; aqui vive o que ainda está em aberto"/>
           <div style={{display:"flex",alignItems:"center",gap:6,padding:"16px 20px 0"}}>
             <span style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Janela de NFs</span>
             {[3,5,8].map(n => (
@@ -414,66 +421,64 @@ export default function TabGraficos({ divulgados = [], T }) {
             ))}
           </div>
         </div>
-        {!convergencia.pronto ? (
-          <div style={{padding:"12px 20px 24px",color:T.textSm,fontSize:12}}>
-            Ainda não há rodadas maduras suficientes (com a janela de {maturidade} rodadas) para calibrar a convergência — diminua a janela ou aguarde mais NFs.
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,padding:"12px 20px 4px"}}>
+          {[
+            { label:"Consolidado (jogos fechados)", valor:fmtRs(fechamento.consolidado),
+              sub:`${fechamento.nFech} jogos · ${tot.prov>0?(fechamento.consolidado/tot.prov*100).toFixed(0):0}% do provisionado`, cor:GREEN },
+            { label:"NF parcial (jogos abertos)", valor:fmtRs(fechamento.parcialReal),
+              sub:`${fechamento.nParc} jogos com nota parcial`, cor:"#2563EB" },
+            { label:"A receber (estimado)", valor:fmtRs(fechamento.aReceber),
+              sub:`${fechamento.nAg} jogos ainda sem NF`, cor:"#D97706" },
+            { label:"Maduros em aberto", valor:`${fechamento.abertosMaduros.length} ${fechamento.abertosMaduros.length===1?"jogo":"jogos"}`,
+              sub: fechamento.abertosMaduros.length ? `${fmtRs(fechamento.pendenteMaduro)} pendentes fora da janela — cobrar ou fechar` : "tudo fechado fora da janela ✓",
+              cor: fechamento.abertosMaduros.length ? RED : GREEN },
+          ].map(k => (
+            <div key={k.label} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px"}}>
+              <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 4px"}}>{k.label}</p>
+              <p className="num" style={{fontSize:17,fontWeight:700,color:k.cor,margin:0}}>{k.valor}</p>
+              <p style={{fontSize:10,color:T.textSm,margin:"3px 0 0"}}>{k.sub}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(380px,2fr) minmax(260px,1fr)",gap:16,padding:"8px 16px 16px"}}>
+          <div>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={fechamentoRodada}>
+                <CartesianGrid {...gridProps}/>
+                <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={false}/>
+                <YAxis tickFormatter={fmtK} tick={axisTick} axisLine={axisLine} tickLine={false} width={54}/>
+                <Tooltip content={<TipBox T={T}/>}/>
+                <Legend wrapperStyle={{fontSize:12}}/>
+                {fechamento.primeiraRecente != null && fechamentoRodada.some(r => r.rodada === fechamento.primeiraRecente) && (
+                  <ReferenceArea x1={`R${fechamento.primeiraRecente}`} x2={fechamentoRodada[fechamentoRodada.length-1].name}
+                    fill={T.textSm} fillOpacity={0.07}
+                    label={{value:"NFs ainda chegando",position:"insideTopRight",fill:T.textSm,fontSize:10}}/>
+                )}
+                <Bar dataKey="Consolidado" stackId="f" fill={GREEN} barSize={18} stroke={T.surface||T.card} strokeWidth={1}/>
+                <Bar dataKey="NF parcial" stackId="f" fill="#2563EB" barSize={18} stroke={T.surface||T.card} strokeWidth={1}/>
+                <Bar dataKey="Aguardando NF" stackId="f" fill="#D97706" barSize={18} radius={[4,4,0,0]} stroke={T.surface||T.card} strokeWidth={1}/>
+              </BarChart>
+            </ResponsiveContainer>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0",paddingLeft:8}}>Cada barra soma o provisionado da rodada — verde já é custo final confirmado por NF.</p>
           </div>
-        ) : (
-          <>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,padding:"12px 20px 4px"}}>
-              {[
-                { label:"Fator de convergência", valor:`${(convergencia.fator*100).toFixed(1)}%`,
-                  sub:`calibrado em ${convergencia.nMaduras} rodadas maduras`, cor:T.text },
-                { label:"Desvio da provisão", valor:`${ajustado.desvio>=0?"+":""}${ajustado.desvio.toFixed(1)}%`,
-                  sub: ajustado.desvio < 0 ? "NFs chegam abaixo do provisionado" : "NFs chegam acima do provisionado",
-                  cor: Math.abs(ajustado.desvio) <= 3 ? GREEN : "#D97706" },
-                { label:"Realizado projetado", valor:fmtRs(ajustado.realProjetado),
-                  sub:"provisionado do período × fator", cor:"#D97706" },
-                { label:"Saving ajustado", valor:`${ajustado.savingAjustado>=0?"▲":"▼"} ${fmtRs(Math.abs(ajustado.savingAjustado))}`,
-                  sub:`${ajustado.diferenca>=0?"+":""}${fmtRs(ajustado.diferenca)} vs. saving reportado (${fmtRs(tot.saving)})`,
-                  cor: ajustado.savingAjustado>=0 ? GREEN : RED },
-              ].map(k => (
-                <div key={k.label} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px"}}>
-                  <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 4px"}}>{k.label}</p>
-                  <p className="num" style={{fontSize:17,fontWeight:700,color:k.cor,margin:0}}>{k.valor}</p>
-                  <p style={{fontSize:10,color:T.textSm,margin:"3px 0 0"}}>{k.sub}</p>
+          <div>
+            <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"6px 0 10px"}}>Ação: jogos maduros em aberto</p>
+            {fechamento.abertosMaduros.length === 0 ? (
+              <p style={{fontSize:12,color:GREEN,fontWeight:600}}>✓ Nenhum — todo jogo fora da janela de {maturidade} rodadas está fechado.</p>
+            ) : fechamento.abertosMaduros.slice(0,6).map(x => (
+              <div key={x.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:T.bg,border:`1px solid ${T.border}`,marginBottom:6}}>
+                <div style={{minWidth:0}}>
+                  <p style={{fontSize:12,fontWeight:600,color:T.text,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>R{x.rodada} · {x.jogo}</p>
+                  <p className="num" style={{fontSize:10,color:T.textSm,margin:"2px 0 0"}}>NF: {fmtRs(x.real)} de {fmtRs(x.prov)}</p>
                 </div>
-              ))}
-            </div>
-            <div style={{padding:"8px 16px 16px"}}>
-              <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={convergenciaRodada}>
-                  <CartesianGrid {...gridProps}/>
-                  <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={false}/>
-                  <YAxis tickFormatter={fmtK} tick={axisTick} axisLine={axisLine} tickLine={false} width={54}/>
-                  <Tooltip content={({active,payload,label}) => {
-                    if (!active || !payload?.length) return null;
-                    const row = payload[0].payload;
-                    return (
-                      <div style={{background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
-                        <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:T.text}}>{label}</p>
-                        <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Provisionado: <b style={{color:T.text}}>{fmt(row.prov)}</b></p>
-                        <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Realizado NF: <b style={{color:T.text}}>{fmt(row.real)}</b> ({row.cobertura.toFixed(0)}%)</p>
-                        {row.projReal != null && <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Projetado (calibrado): <b style={{color:T.text}}>{fmt(row.projReal)}</b></p>}
-                      </div>
-                    );
-                  }}/>
-                  <Legend wrapperStyle={{fontSize:12}}/>
-                  {convergencia.primeiraImatura != null && convergenciaRodada.some(r => r.rodada === convergencia.primeiraImatura) && (
-                    <ReferenceArea x1={`R${convergencia.primeiraImatura}`} x2={convergenciaRodada[convergenciaRodada.length-1].name}
-                      fill={T.textSm} fillOpacity={0.07}
-                      label={{value:"NFs ainda chegando",position:"insideTopRight",fill:T.textSm,fontSize:10}}/>
-                  )}
-                  <Bar dataKey="prov" name="Provisionado" fill={brand} barSize={12} radius={[4,4,0,0]}/>
-                  <Bar dataKey="real" name="Realizado NF" fill="#2563EB" barSize={12} radius={[4,4,0,0]}/>
-                  <Line type="monotone" dataKey="projReal" name="Projetado (calibrado)" stroke="#D97706" strokeWidth={2}
-                    dot={{r:3,fill:"#D97706",stroke:T.surface||T.card,strokeWidth:2}}
-                    activeDot={{r:4,stroke:T.surface||T.card,strokeWidth:2}}/>
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )}
+                <span className="num" style={{fontSize:12,fontWeight:700,color:x.real===0?RED:"#D97706",flexShrink:0}}>{fmtRs(x.pendente)}</span>
+              </div>
+            ))}
+            {fechamento.abertosMaduros.length > 6 && (
+              <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0"}}>+ {fechamento.abertosMaduros.length - 6} jogos — veja a Rastreabilidade para a lista completa.</p>
+            )}
+          </div>
+        </div>
       </Card>
 
       {/* ── Linha 5: top jogos ── */}

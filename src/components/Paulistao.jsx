@@ -23,6 +23,7 @@ const TabRastreabilidade = lazy(() => import("./tabs/TabRastreabilidade"));
 import { NovoJogoPaulistaoModal } from "./modals/NovoJogoPaulistaoModal";
 import LivemodeLogo from "./LivemodeLogo";
 import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "../lib/supabase";
+import { lerApresentacoesDoLocalStorage } from "../lib/apresentacoesCalc";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "../lib/notasFiscais";
 import { FORNECEDORES_INIT } from "../data/fornecedores";
 import { COTACAO_INIT } from "../data/negociacoes";
@@ -89,6 +90,7 @@ const K = {
   fornecedores_jogo:"paulistao_fornecedores_jogo",
   logistica:        "paulistao_logistica",
   eventos_log:      "paulistao_eventos_log",
+  apresentacoes:    "paulistao_apresentacoes",
 };
 
 export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admin', onSignOut }) {
@@ -104,6 +106,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const [logistica, setLogisticaRaw]               = useState([]);
   const [eventosLog, setEventosLogRaw]             = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
+  const [apres, setApresRaw]                       = useState({});
   const [loading, setLoading]                      = useState(true);
   const [loadError, setLoadError]                  = useState(null);
   // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
@@ -116,10 +119,11 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   useEffect(() => {
     async function load() {
       try {
-      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg] = await Promise.all([
+      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg, ap] = await Promise.all([
         getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
+        getState(K.apresentacoes),
       ]);
       // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
       // Nunca sobrescreve dados — getState com falha transitória não pode zerar
@@ -194,6 +198,9 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
       seedIfMissing(fj,  K.fornecedores_jogo, {},                  setFornecedoresJogoRaw);
       seedIfMissing(lg,  K.logistica,         [],                  setLogisticaRaw);
       seedIfMissing(elg, K.eventos_log,       [],                  setEventosLogRaw);
+      // Migração one-time da aba Apresentações: importa overrides do localStorage
+      // (prefixo "pau") quando a linha ainda não existe no banco.
+      seedIfMissing(ap,  K.apresentacoes,     lerApresentacoesDoLocalStorage('pau'), setApresRaw);
       setLoading(false);
       setLoadError(null);
       } catch (err) {
@@ -212,6 +219,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
           [K.envios]: setEnviosRaw, [K.livemode]: setLivemodeRaw, [K.notas_livemode]: setNotasLivemodeRaw,
           [K.cotacoes]: setCotacoesRaw, [K.fornecedores_jogo]: setFornecedoresJogoRaw,
           [K.logistica]: setLogisticaRaw, [K.eventos_log]: setEventosLogRaw,
+          [K.apresentacoes]: setApresRaw,
         };
         const fn = m[payload.new.key];
         if (fn && !isPersistPending(persistRefs, payload.new.key)) fn(payload.new.value);
@@ -233,6 +241,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const setEventosLog     = createPersistedSetter(K.eventos_log,     setEventosLogRaw,     persistRefs);
   const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
+  const setApres            = createPersistedSetter(K.apresentacoes,     setApresRaw,            persistRefs, { empty: {}, debounceMs: 600 });
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
@@ -697,7 +706,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} fornecedores={fornecedores} T={T} useOrcadoLivemode={true} servicosLm={SERVICOS_LM_PAULISTAO} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} historicoKey="paulistao_nf_historico" T={T}/>}
-        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="pau" orcGlobal={orcGlobalVariaveis} mesInicio={4} saldoUsaGasto={true}/>}
+        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} apres={apres} setApres={setApres} orcGlobal={orcGlobalVariaveis} mesInicio={4} saldoUsaGasto={true} nomeCampeonato="Paulistão Feminino 2026"/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios} dedupeNotasPorNF={true} role={role} agruparReembolsoComLivemode/>}
         {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true}/>}
         </Suspense>

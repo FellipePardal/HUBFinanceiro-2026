@@ -25,6 +25,7 @@ const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "./lib/supabase";
+import { lerApresentacoesDoLocalStorage } from "./lib/apresentacoesCalc";
 import { buildRealizadoPorJogo, buildInfraRealizadoPorJogo, marcarLogisticaReembolsada } from "./lib/notasFiscais";
 import { FORNECEDORES_INIT } from "./data/fornecedores";
 import { COTACAO_INIT } from "./data/negociacoes";
@@ -47,6 +48,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [logistica, setLogisticaRaw]     = useState([]);
   const [eventosLog, setEventosLogRaw]   = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
+  const [apres, setApresRaw]             = useState({});
   const [loading, setLoading]            = useState(true);
   const [loadError, setLoadError]        = useState(null);
   // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
@@ -59,7 +61,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   useEffect(() => {
     async function load() {
       try {
-        const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log')]);
+        const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg, ap] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log'), getState('apresentacoes')]);
         // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
         // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
         // dados existentes — assim um getState com falha transitória/null não zera
@@ -122,6 +124,9 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         seedIfMissing(fj,  'fornecedores_jogo', {},                  setFornecedoresJogoRaw);
         seedIfMissing(lg,  'logistica',         [],                  setLogisticaRaw);
         seedIfMissing(elg, 'eventos_log',       [],                  setEventosLogRaw);
+        // Migração one-time da aba Apresentações: importa os overrides que
+        // viviam no localStorage (prefixo "bra") quando a linha ainda não existe.
+        seedIfMissing(ap,  'apresentacoes',     lerApresentacoesDoLocalStorage('bra'), setApresRaw);
         setLoading(false);
         setLoadError(null);
       } catch (err) {
@@ -149,6 +154,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         if (key === 'fornecedores_jogo') setFornecedoresJogoRaw(payload.new.value);
         if (key === 'logistica')     setLogisticaRaw(payload.new.value);
         if (key === 'eventos_log')   setEventosLogRaw(payload.new.value);
+        if (key === 'apresentacoes') setApresRaw(payload.new.value);
       })
       .subscribe();
 
@@ -168,6 +174,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const setEventosLog        = createPersistedSetter('eventos_log',       setEventosLogRaw,        persistRefs);
   const setLogistica         = createPersistedSetter('logistica',         setLogisticaRaw,         persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo  = createPersistedSetter('fornecedores_jogo', setFornecedoresJogoRaw,  persistRefs, { empty: {}, debounceMs: 500 });
+  const setApres             = createPersistedSetter('apresentacoes',     setApresRaw,             persistRefs, { empty: {}, debounceMs: 600 });
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
@@ -724,7 +731,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}
-        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} storagePrefix="bra" orcGlobal={10130480} mesInicio={0}/>}
+        {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} apres={apres} setApres={setApres} orcGlobal={10130480} mesInicio={0} nomeCampeonato="Brasileirão 2026"/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={[...notasLivemode, ...notasLiveU]} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role} dedupeNotasPorNF={true} agruparReembolsoComLivemode/>}
         {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true}/>}
         </Suspense>

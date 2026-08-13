@@ -9,7 +9,6 @@ export default defineConfig({
         manualChunks: {
           'vendor':  ['react', 'react-dom'],
           'charts':  ['recharts'],
-          'pptx':    ['pptxgenjs'],
           'supabase': ['@supabase/supabase-js'],
         },
       },

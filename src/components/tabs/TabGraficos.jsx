@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  CartesianGrid, ComposedChart, Line, Area, Legend, ReferenceLine, LabelList,
+  CartesianGrid, ComposedChart, Line, Area, Legend, ReferenceLine, ReferenceArea, LabelList,
 } from "recharts";
 import { fmt, fmtK, fmtRs, subTotal, catTotal } from "../../utils";
 import { CATS } from "../../constants";
@@ -107,6 +107,7 @@ function StatTile({ label, value, sub, subColor, color, spark, sparkColor, T }) 
 export default function TabGraficos({ divulgados = [], T }) {
   const [periodo, setPeriodo] = useState("todas");   // todas | u5 | u10
   const [filtroCat, setFiltroCat] = useState("Todas");
+  const [maturidade, setMaturidade] = useState(5);   // rodadas recentes ignoradas na calibração (NFs ainda chegando)
 
   const categorias = useMemo(() =>
     Array.from(new Set(divulgados.map(j => j.categoria).filter(Boolean))).sort(),
@@ -166,6 +167,45 @@ export default function TabGraficos({ divulgados = [], T }) {
       orcMedio: jogos.length ? orc / jogos.length : 0,
     };
   }, [porRodada, jogos]);
+
+  // ── Convergência Provisionado → Realizado ──────────────────────────────────
+  // O acompanhamento às entidades usa o provisionado porque as NFs demoram a
+  // chegar. Aqui medimos, nas rodadas MADURAS (todas menos as N mais recentes,
+  // onde as NFs já tiveram tempo de entrar), quanto do provisionado de fato
+  // virou nota — e usamos esse fator para projetar o realizado das rodadas
+  // recentes. O fator é calibrado no campeonato inteiro (respeitando só o
+  // filtro de categoria); o período filtrado é onde ele é aplicado.
+  const convergencia = useMemo(() => {
+    const base = divulgados.filter(j => filtroCat === "Todas" || j.categoria === filtroCat);
+    const rodadas = Array.from(new Set(base.map(j => j.rodada))).sort((a, b) => a - b);
+    const maduras = new Set(rodadas.slice(0, Math.max(0, rodadas.length - maturidade)));
+    let provM = 0, realM = 0;
+    base.forEach(j => {
+      if (!maduras.has(j.rodada)) return;
+      provM += subTotal(j.provisionado);
+      realM += subTotal(j.realizado);
+    });
+    if (provM <= 0) return { pronto: false, nMaduras: maduras.size };
+    const fator = realM / provM;
+    return { pronto: true, fator, provM, realM, nMaduras: maduras.size, primeiraImatura: rodadas.slice(-maturidade)[0] };
+  }, [divulgados, filtroCat, maturidade]);
+
+  const convergenciaRodada = useMemo(() => porRodada.map(r => ({
+    ...r,
+    projReal: convergencia.pronto ? r.prov * convergencia.fator : null,
+    cobertura: r.prov > 0 ? r.real / r.prov * 100 : 0,
+  })), [porRodada, convergencia]);
+
+  const ajustado = useMemo(() => {
+    if (!convergencia.pronto) return null;
+    const realProjetado = tot.prov * convergencia.fator;
+    const savingAjustado = tot.orc - realProjetado;
+    return {
+      realProjetado, savingAjustado,
+      desvio: (convergencia.fator - 1) * 100,          // <0: NFs chegam abaixo do provisionado
+      diferenca: savingAjustado - tot.saving,           // quanto o saving reportado muda com a calibração
+    };
+  }, [convergencia, tot]);
 
   const indices = useMemo(() => {
     if (!porRodada.length) return null;
@@ -362,7 +402,81 @@ export default function TabGraficos({ divulgados = [], T }) {
         </Card>
       </div>
 
-      {/* ── Linha 4: top jogos ── */}
+      {/* ── Linha 4: convergência Provisionado → Realizado ── */}
+      <Card T={T}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <PanelTitle T={T} title="Convergência Provisionado → Realizado"
+            subtitle="Quanto do provisionado vira NF de fato — fator medido nas rodadas maduras e aplicado ao período"/>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"16px 20px 0"}}>
+            <span style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Janela de NFs</span>
+            {[3,5,8].map(n => (
+              <Chip key={n} T={T} ativo={maturidade===n} onClick={()=>setMaturidade(n)}>{n} rodadas</Chip>
+            ))}
+          </div>
+        </div>
+        {!convergencia.pronto ? (
+          <div style={{padding:"12px 20px 24px",color:T.textSm,fontSize:12}}>
+            Ainda não há rodadas maduras suficientes (com a janela de {maturidade} rodadas) para calibrar a convergência — diminua a janela ou aguarde mais NFs.
+          </div>
+        ) : (
+          <>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,padding:"12px 20px 4px"}}>
+              {[
+                { label:"Fator de convergência", valor:`${(convergencia.fator*100).toFixed(1)}%`,
+                  sub:`calibrado em ${convergencia.nMaduras} rodadas maduras`, cor:T.text },
+                { label:"Desvio da provisão", valor:`${ajustado.desvio>=0?"+":""}${ajustado.desvio.toFixed(1)}%`,
+                  sub: ajustado.desvio < 0 ? "NFs chegam abaixo do provisionado" : "NFs chegam acima do provisionado",
+                  cor: Math.abs(ajustado.desvio) <= 3 ? GREEN : "#D97706" },
+                { label:"Realizado projetado", valor:fmtRs(ajustado.realProjetado),
+                  sub:"provisionado do período × fator", cor:"#D97706" },
+                { label:"Saving ajustado", valor:`${ajustado.savingAjustado>=0?"▲":"▼"} ${fmtRs(Math.abs(ajustado.savingAjustado))}`,
+                  sub:`${ajustado.diferenca>=0?"+":""}${fmtRs(ajustado.diferenca)} vs. saving reportado (${fmtRs(tot.saving)})`,
+                  cor: ajustado.savingAjustado>=0 ? GREEN : RED },
+              ].map(k => (
+                <div key={k.label} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px"}}>
+                  <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"0 0 4px"}}>{k.label}</p>
+                  <p className="num" style={{fontSize:17,fontWeight:700,color:k.cor,margin:0}}>{k.valor}</p>
+                  <p style={{fontSize:10,color:T.textSm,margin:"3px 0 0"}}>{k.sub}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"8px 16px 16px"}}>
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart data={convergenciaRodada}>
+                  <CartesianGrid {...gridProps}/>
+                  <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={false}/>
+                  <YAxis tickFormatter={fmtK} tick={axisTick} axisLine={axisLine} tickLine={false} width={54}/>
+                  <Tooltip content={({active,payload,label}) => {
+                    if (!active || !payload?.length) return null;
+                    const row = payload[0].payload;
+                    return (
+                      <div style={{background:T.surface||T.card,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
+                        <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:T.text}}>{label}</p>
+                        <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Provisionado: <b style={{color:T.text}}>{fmt(row.prov)}</b></p>
+                        <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Realizado NF: <b style={{color:T.text}}>{fmt(row.real)}</b> ({row.cobertura.toFixed(0)}%)</p>
+                        {row.projReal != null && <p className="num" style={{margin:0,fontSize:12,color:T.textMd}}>Projetado (calibrado): <b style={{color:T.text}}>{fmt(row.projReal)}</b></p>}
+                      </div>
+                    );
+                  }}/>
+                  <Legend wrapperStyle={{fontSize:12}}/>
+                  {convergencia.primeiraImatura != null && convergenciaRodada.some(r => r.rodada === convergencia.primeiraImatura) && (
+                    <ReferenceArea x1={`R${convergencia.primeiraImatura}`} x2={convergenciaRodada[convergenciaRodada.length-1].name}
+                      fill={T.textSm} fillOpacity={0.07}
+                      label={{value:"NFs ainda chegando",position:"insideTopRight",fill:T.textSm,fontSize:10}}/>
+                  )}
+                  <Bar dataKey="prov" name="Provisionado" fill={brand} barSize={12} radius={[4,4,0,0]}/>
+                  <Bar dataKey="real" name="Realizado NF" fill="#2563EB" barSize={12} radius={[4,4,0,0]}/>
+                  <Line type="monotone" dataKey="projReal" name="Projetado (calibrado)" stroke="#D97706" strokeWidth={2}
+                    dot={{r:3,fill:"#D97706",stroke:T.surface||T.card,strokeWidth:2}}
+                    activeDot={{r:4,stroke:T.surface||T.card,strokeWidth:2}}/>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* ── Linha 5: top jogos ── */}
       <Card T={T}>
         <PanelTitle T={T} title="Top 10 Jogos Mais Caros" subtitle="Provisionado no período filtrado — passe o mouse para comparar com o orçado"/>
         <div style={{padding:"8px 16px 16px"}}>

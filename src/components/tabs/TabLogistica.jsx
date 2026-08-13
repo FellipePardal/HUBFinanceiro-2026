@@ -209,6 +209,38 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
       : l));
   };
 
+  // ─── Arquivo das NFs de reembolso (mesma chave nf_file_<id> das Notas Fiscais) ──
+  const uploadNFRef = useRef(null);
+  const [uploadNFTarget, setUploadNFTarget] = useState(null);
+  const verArquivoNF = async (nota) => {
+    const url = await getNFFile(nota.id);
+    if (!url) {
+      // O arquivo sumiu do banco mas a nota ainda promete que existe: corrige a
+      // marcação na hora e o clipe de anexar aparece no lugar do olho.
+      if (nota.hasFile) setNotas(ns => (Array.isArray(ns)?ns:[]).map(n => n.id === nota.id ? { ...n, hasFile: false } : n));
+      alert("Arquivo não encontrado — anexe pelo clipe.");
+      return;
+    }
+    const w = window.open(); w.document.write(`<iframe src="${url}" style="border:none;width:100%;height:100vh"></iframe>`);
+  };
+  const anexarArquivoNF = async (file, nota) => {
+    if (!file || !nota) return;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await saveNFFile(nota.id, dataUrl);
+      // Confirma que o arquivo está mesmo no banco antes de marcar a nota como
+      // anexada — sem isso uma gravação que falhou em silêncio deixa a nota
+      // prometendo um arquivo inexistente (caso das NFs perdidas em 07-08/2026).
+      const gravado = await getNFFile(nota.id);
+      if (!gravado) throw new Error("arquivo não persistiu no banco");
+      setNotas(ns => (Array.isArray(ns)?ns:[]).map(n => n.id === nota.id ? { ...n, hasFile: true } : n));
+    } catch (e) {
+      console.error("Upload falhou:", e);
+      alert("Não foi possível anexar o arquivo. Tente de novo — a nota segue marcada como sem arquivo.");
+    }
+    setUploadNFTarget(null);
+  };
+
   // ─── Gráficos ────────────────────────────────────────────────────────────
   const porCategoria = CATEGORIAS_LOG.map(c => ({
     name: c.label,
@@ -615,6 +647,9 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
                       {n.rodadasLabel && <Pill label={n.rodadasLabel} color={teal}/>}
                       {n.dataEmissao && <span style={{color:T.textSm,fontSize:11}}>Emissão {n.dataEmissao}</span>}
                       <span className="num" style={{marginLeft:"auto",color:purple,fontWeight:700,fontSize:14}}>{fmt(n.valorNF)}</span>
+                      {n.hasFile
+                        ? <Button T={T} variant="secondary" size="sm" icon={Eye} title="Ver arquivo" onClick={() => verArquivoNF(n)}/>
+                        : <Button T={T} variant="secondary" size="sm" icon={Paperclip} title="Anexar arquivo" onClick={() => { setUploadNFTarget(n); uploadNFRef.current?.click(); }}/>}
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:6,paddingLeft:4}}>
                       {porJogo.map(({jogoId, jogo, valor}) => (
@@ -633,6 +668,8 @@ export default function TabLogistica({ logistica, setLogistica, jogos, fornecedo
       )}
 
       {showReembolso && <ReembolsoLogisticaModal jogos={jogos} fornecedores={fornecedoresList} onSave={registrarReembolso} onClose={()=>setShowReembolso(false)} T={T}/>}
+      <input ref={uploadNFRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:"none"}}
+        onChange={e => { if (e.target.files[0] && uploadNFTarget) anexarArquivoNF(e.target.files[0], uploadNFTarget); e.target.value = ""; }}/>
     </div>
   );
 }

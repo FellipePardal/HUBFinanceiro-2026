@@ -29,18 +29,18 @@ class ErrorBoundary extends Component {
 }
 
 // ─── PEÇAS COMPARTILHADAS DAS VIEWS ──────────────────────────────────────────
-function DonutNF({ rec, pend, pct, T }) {
+function DonutNF({ rec, pend, pct, T, size = 110 }) {
   const vazio = rec + pend <= 0;
   const data = vazio ? [{ name: "—", value: 1 }] : [{ name: "Recebidas", value: rec }, { name: "Pendentes", value: pend }];
   return (
-    <div style={{position:"relative",width:110,height:110}}>
-      <PieChart width={110} height={110}>
-        <Pie data={data} dataKey="value" cx="50%" cy="50%" innerRadius={34} outerRadius={52}
+    <div style={{position:"relative",width:size,height:size}}>
+      <PieChart width={size} height={size}>
+        <Pie data={data} dataKey="value" cx="50%" cy="50%" innerRadius={size*0.31} outerRadius={size*0.47}
           startAngle={90} endAngle={-270} stroke="none" isAnimationActive={false}>
           {vazio ? <Cell fill={T.border}/> : [<Cell key="rec" fill="#22c55e"/>, <Cell key="pend" fill="#d97706"/>]}
         </Pie>
       </PieChart>
-      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:15,fontWeight:700,color:T.text}}>{Math.round(pct)}%</div>
+      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:size>=100?15:12,fontWeight:700,color:T.text}}>{Math.round(pct)}%</div>
     </div>
   );
 }
@@ -87,54 +87,61 @@ function SlideVariaveis({ d, T }) {
         <KPI label={`Realizado até R${d.rodadaAtual}`} value={fmtR(d.totReal)} sub="Base: provisionado (Savings)" color="#22c55e" T={T}/>
         <KPI label="Saving Acumulado" value={(d.saving>=0?"▲ ":"▼ ")+fmtR(Math.abs(d.saving))} sub={`${Math.abs(d.savPct).toFixed(1)}% vs. orçado`} color={d.saving>=0?"#22c55e":"#ef4444"} T={T}/>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"minmax(340px,3fr) minmax(320px,2fr)",gap:16,marginBottom:20}}>
-        <Card T={T}>
-          <div style={{padding:"16px 20px"}}>
+      {/* Altura presa na janela: com 20+ rodadas a tabela rolava a página toda;
+          agora ela rola por dentro, com cabeçalho e Total fixos, e tudo cabe
+          numa tela só (mesmo padrão do Hub de Fornecedores). */}
+      <div style={{display:"grid",gridTemplateColumns:"minmax(340px,3fr) minmax(320px,2fr)",gap:16,marginBottom:12,height:"calc(100vh - 350px)",minHeight:380}}>
+        <Card T={T} style={{display:"flex",flexDirection:"column",minHeight:0}}>
+          <div style={{padding:"16px 20px",flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
             <h4 style={{margin:"0 0 12px",color:T.text,fontSize:13,fontWeight:700}}>Orçado vs Realizado por Rodada</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false}/>
-                <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:11}}/>
-                <YAxis tick={{fill:T.textMd,fontSize:11}} tickFormatter={v=>`R$${(v/1000).toFixed(0)}k`}/>
-                <Tooltip formatter={v=>fmtBRL(v)} contentStyle={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8}} labelStyle={{color:T.text}}/>
-                <Legend wrapperStyle={{fontSize:12}}/>
-                <Bar dataKey="Orçado" fill="#94a3b8" radius={[3,3,0,0]}/>
-                <Bar dataKey="Realizado" fill="#22c55e" radius={[3,3,0,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{flex:1,minHeight:0}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="name" tick={{fill:T.textMd,fontSize:11}}/>
+                  <YAxis tick={{fill:T.textMd,fontSize:11}} tickFormatter={v=>`R$${(v/1000).toFixed(0)}k`}/>
+                  <Tooltip formatter={v=>fmtBRL(v)} contentStyle={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8}} labelStyle={{color:T.text}}/>
+                  <Legend wrapperStyle={{fontSize:12}}/>
+                  <Bar dataKey="Orçado" fill="#94a3b8" radius={[3,3,0,0]}/>
+                  <Bar dataKey="Realizado" fill="#22c55e" radius={[3,3,0,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </Card>
-        <Card T={T}>
-          <div style={{padding:"16px 20px"}}>
-            <h4 style={{margin:"0 0 12px",color:T.text,fontSize:13,fontWeight:700}}>Status NFs</h4>
-            <div style={{display:"flex",gap:24,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
-              <DonutNF rec={d.nfRecV} pend={d.nfPend} pct={d.pctRec} T={T}/>
-              <LegendaNF nfRecV={d.nfRecV} nfPend={d.nfPend} T={T}/>
+        <Card T={T} style={{display:"flex",flexDirection:"column",minHeight:0}}>
+          <div style={{padding:"16px 20px",flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:10,flexWrap:"wrap"}}>
+              <h4 style={{margin:0,color:T.text,fontSize:13,fontWeight:700}}>Status NFs</h4>
+              <div style={{display:"flex",gap:14,alignItems:"center"}}>
+                <DonutNF rec={d.nfRecV} pend={d.nfPend} pct={d.pctRec} T={T} size={72}/>
+                <LegendaNF nfRecV={d.nfRecV} nfPend={d.nfPend} T={T}/>
+              </div>
             </div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr style={{background:T.bg}}>
-                  {["Rodada","Orçado","Realizado","Saving"].map((h,i)=><th key={h} style={thSty(T,i>0)}>{h}</th>)}
+            <div style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"separate",borderSpacing:0}}>
+                <thead><tr>
+                  {["Rodada","Orçado","Realizado","Saving"].map((h,i)=><th key={h} style={{...thSty(T,i>0),position:"sticky",top:0,background:T.surface||T.card,zIndex:1}}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {d.rows.map(r => {
                     const sav = r.orcado - r.realizado;
                     return (
-                      <tr key={r.label} style={{borderBottom:`1px solid ${T.border}`}}>
-                        <td style={{...tdSty(false),fontWeight:700,color:"#22c55e"}}>{r.label}</td>
-                        <td style={{...tdSty(true),color:T.textMd}} className="num">{fmtR(r.orcado)}</td>
-                        <td style={{...tdSty(true),color:T.text}} className="num">{fmtR(r.realizado)}</td>
-                        <td style={{...tdSty(true),fontWeight:700,color:sav>=0?"#a3e635":"#ef4444"}} className="num">{sav>=0?"▲ ":"▼ "}{fmtR(Math.abs(sav))}</td>
+                      <tr key={r.label}>
+                        <td style={{...tdSty(false),fontWeight:700,color:"#22c55e",borderBottom:`1px solid ${T.border}`}}>{r.label}</td>
+                        <td style={{...tdSty(true),color:T.textMd,borderBottom:`1px solid ${T.border}`}} className="num">{fmtR(r.orcado)}</td>
+                        <td style={{...tdSty(true),color:T.text,borderBottom:`1px solid ${T.border}`}} className="num">{fmtR(r.realizado)}</td>
+                        <td style={{...tdSty(true),fontWeight:700,color:sav>=0?"#a3e635":"#ef4444",borderBottom:`1px solid ${T.border}`}} className="num">{sav>=0?"▲ ":"▼ "}{fmtR(Math.abs(sav))}</td>
                       </tr>
                     );
                   })}
                   {d.rows.length === 0 && <tr><td colSpan={4} style={{padding:24,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhuma rodada disponível</td></tr>}
                 </tbody>
-                <tfoot><tr style={{background:T.bg}}>
-                  <td style={{...tdSty(false),fontWeight:700,color:T.textSm,textTransform:"uppercase",fontSize:11,letterSpacing:1}}>Total</td>
-                  <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(d.totOrc)}</td>
-                  <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(d.totReal)}</td>
-                  <td style={{...tdSty(true),fontWeight:700,color:d.saving>=0?"#a3e635":"#ef4444"}} className="num">{d.saving>=0?"▲ ":"▼ "}{fmtR(Math.abs(d.saving))}</td>
+                <tfoot><tr>
+                  <td style={{...tdSty(false),fontWeight:700,color:T.textSm,textTransform:"uppercase",fontSize:11,letterSpacing:1,position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`2px solid ${T.border}`}}>Total</td>
+                  <td style={{...tdSty(true),fontWeight:700,color:T.text,position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`2px solid ${T.border}`}} className="num">{fmtR(d.totOrc)}</td>
+                  <td style={{...tdSty(true),fontWeight:700,color:T.text,position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`2px solid ${T.border}`}} className="num">{fmtR(d.totReal)}</td>
+                  <td style={{...tdSty(true),fontWeight:700,color:d.saving>=0?"#a3e635":"#ef4444",position:"sticky",bottom:0,background:T.surface||T.card,borderTop:`2px solid ${T.border}`}} className="num">{d.saving>=0?"▲ ":"▼ "}{fmtR(Math.abs(d.saving))}</td>
                 </tr></tfoot>
               </table>
             </div>

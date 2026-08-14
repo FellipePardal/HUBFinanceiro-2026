@@ -58,12 +58,18 @@ export function NovoJogoPaulistaoModal({ jogo, onSave, onClose, T, fases = FASES
   const handleSave = () => {
     if (!form.mandante || !form.visitante) return;
     const defs = getPaulistaoDefaults();
+    // Espalha o jogo original ANTES do form: editar não pode descartar campos
+    // que o formulário não conhece (seed_version, codigo_orcamento, fechado,
+    // dia/estadio do Portal…) — perder seed_version disparava a migração de
+    // seed no load e apagava o provisionado de TODOS os jogos (13/08).
     onSave({
+      ...(jogo || {}),
       ...form,
       id:           jogo?.id || Date.now(),
-      categoria:    "PAU",
+      categoria:    jogo?.categoria || "PAU",
       grupo:        mostraGrupo ? form.grupo : "-",
       rodada:       parseInt(form.rodada) || 1,
+      seed_version: jogo?.seed_version ?? 3,
       orcado:       jogo?.orcado       || { ...defs },
       provisionado: jogo?.provisionado || { ...defs },
       realizado:    jogo?.realizado    || { ...allSubKeysPaulistao() },

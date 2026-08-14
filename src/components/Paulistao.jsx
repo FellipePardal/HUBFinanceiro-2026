@@ -143,9 +143,23 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         const todosPlaceholder = Array.isArray(j) && j.length > 0 && j.every(x => x && x.mandante === "A definir");
         const semCodigoOrc     = Array.isArray(j) && j.length > 0 && !j.some(x => x && x.codigo_orcamento);
         const seedDesatualizado= Array.isArray(j) && j.length > 0 && !j.every(x => x && x.seed_version === 3);
-        if (todosPlaceholder || semCodigoOrc || seedDesatualizado) {
+        // Trava de segurança: se QUALQUER jogo tem provisionado/realizado
+        // preenchido ou está fechado, há trabalho do operador — resetar pro
+        // seed apagaria tudo (aconteceu em 11/08 e 13/08: um jogo editado pelo
+        // modal perdia o seed_version e o load zerava o campeonato inteiro).
+        // Nesse caso só re-carimba o seed_version nos jogos em que ele falta.
+        const temDadosOperador = Array.isArray(j) && j.some(x => x && (
+          x.fechado ||
+          Object.values(x.provisionado || {}).some(v => v > 0) ||
+          Object.values(x.realizado    || {}).some(v => v > 0)
+        ));
+        if ((todosPlaceholder || semCodigoOrc || seedDesatualizado) && !temDadosOperador) {
           setJogosRaw(PAULISTAO_JOGOS_INIT);
           setSupabaseState(K.jogos, PAULISTAO_JOGOS_INIT);
+        } else if (seedDesatualizado) {
+          const carimbado = j.map(x => x && x.seed_version !== 3 ? { ...x, seed_version: 3 } : x);
+          setJogosRaw(carimbado);
+          setSupabaseState(K.jogos, carimbado);
         } else {
           setJogosRaw(j);
         }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, CATS, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { calcOrcadoJogo, blocosJogo } from "../../data/orcamentos";
+import { calcOrcadoJogo, blocosJogo, GRUPOS_PREMISSA } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { CalendarDays, Plus, Trash2, Copy, ChevronDown, ChevronUp, Eraser, Zap } from "lucide-react";
 
@@ -109,7 +109,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
         )}
 
         <div style={ts.wrap}>
-          <table style={{...ts.table, minWidth:980}}>
+          <table style={{...ts.table, minWidth:1060}}>
             <thead style={ts.thead}>
               <tr>
                 <th style={{...ts.th, ...ts.thLeft}}>{pontosCorridos ? "Rodada" : "Fase"}</th>
@@ -122,6 +122,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                 <th style={{...ts.th, ...ts.thRight}}>Logística</th>
                 <th style={{...ts.th, ...ts.thRight}}>Pessoal</th>
                 <th style={{...ts.th, ...ts.thRight}}>Operações</th>
+                <th style={{...ts.th, ...ts.thRight}}>Livemode</th>
                 <th style={{...ts.th, ...ts.thRight}}>Total</th>
                 <th style={ts.th}/>
               </tr>
@@ -180,6 +181,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                     <td className="num" style={ts.tdNum}>{fmt(blocos.logistica)}</td>
                     <td className="num" style={ts.tdNum}>{fmt(blocos.pessoal)}</td>
                     <td className="num" style={ts.tdNum}>{fmt(blocos.operacoes)}</td>
+                    <td className="num" style={{...ts.tdNum, color:"#7C3AED"}}>{fmt(blocos.livemode)}</td>
                     <td className="num" style={{...ts.tdNum, fontWeight:700}}>
                       {fmt(blocos.total)}
                       {nOverrides > 0 && (
@@ -209,7 +211,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                   </tr>,
                   aberto && (
                     <tr key={`${j.id}-det`} style={{background:T.surfaceAlt||T.bg}}>
-                      <td colSpan={pontosCorridos ? 11 : 12} style={{padding:"14px 20px", borderTop:`1px dashed ${T.border}`}}>
+                      <td colSpan={pontosCorridos ? 12 : 13} style={{padding:"14px 20px", borderTop:`1px dashed ${T.border}`}}>
                         <DetalheOverrides orc={orc} jogo={j} readOnly={readOnly} T={T}
                           onSetOverride={(k, v)=>setOverride(j.id, k, v)}
                           onLimpar={()=>limparOverrides(j.id)}/>
@@ -219,7 +221,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                 ];
               })}
               {jogos.length === 0 && (
-                <tr><td colSpan={12} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhum jogo estimado ainda.</td></tr>
+                <tr><td colSpan={13} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhum jogo estimado ainda.</td></tr>
               )}
             </tbody>
           </table>
@@ -276,7 +278,7 @@ function DetalheOverrides({ orc, jogo, readOnly, T, onSetOverride, onLimpar }) {
         )}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
-        {CATS.map(cat => (
+        {[{ key:CATS[0].key, label:CATS[0].label, color:CATS[0].color, subs:CATS[0].subs }, ...GRUPOS_PREMISSA].map(cat => (
           <div key={cat.key}>
             <p style={{margin:"0 0 8px",fontSize:10,fontWeight:700,color:cat.color,letterSpacing:"0.08em",textTransform:"uppercase"}}>{cat.label}</p>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>

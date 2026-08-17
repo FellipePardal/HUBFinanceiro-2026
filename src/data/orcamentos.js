@@ -27,7 +27,18 @@ export const ORC_STATUS = {
 
 // Eixos de subKeys: logística vem da faixa da praça; o resto vem da premissa do padrão.
 export const SUBS_LOGISTICA = CATS[0].subs;                        // outros_log, transporte, uber, hospedagem, diaria
-export const SUBS_PREMISSA  = [...CATS[1].subs, ...CATS[2].subs];  // pessoal + operações
+export const SUBS_PREMISSA  = [...CATS[1].subs, ...CATS[2].subs];  // pessoal + operações (inclui Livemode)
+
+// NF Livemode: linha dentro do jogo nos outros campeonatos (TabLivemode) —
+// no construtor vira um grupo próprio de premissa, separado de Operações.
+export const SUBS_LIVEMODE_KEYS = ["maquinas", "starlink", "downlink", "distribuicao", "liveu"];
+
+// Grupos usados nas telas de premissa/override e no resumo por categoria.
+export const GRUPOS_PREMISSA = [
+  { key:"pessoal",   label:"Pessoal",   color:CATS[1].color, subs:CATS[1].subs },
+  { key:"operacoes", label:"Operações", color:CATS[2].color, subs:CATS[2].subs.filter(s => !SUBS_LIVEMODE_KEYS.includes(s.key)) },
+  { key:"livemode",  label:"Livemode (NF por jogo)", color:"#7C3AED", subs:CATS[2].subs.filter(s => SUBS_LIVEMODE_KEYS.includes(s.key)) },
+];
 
 export const PADROES_SUGERIDOS = ["B1", "B2", "B3", "B3+"];
 
@@ -112,16 +123,17 @@ export const calcOrcadoJogo = (orc, jogo) => {
 export const totalJogo = (orc, jogo) =>
   Object.values(calcOrcadoJogo(orc, jogo)).reduce((s, v) => s + v, 0);
 
-// Quebra do orçado derivado de um jogo por categoria de CATS (p/ colunas da tabela).
+// Quebra do orçado derivado de um jogo (p/ colunas da tabela): logística,
+// pessoal, operações (sem Livemode) e Livemode separado — como nos outros
+// campeonatos, onde a NF Livemode é uma linha própria dentro do jogo.
 export const blocosJogo = (orc, jogo) => {
   const orcado = calcOrcadoJogo(orc, jogo);
-  const out = { total: 0 };
-  CATS.forEach(cat => {
-    const t = cat.subs.reduce((s, sub) => s + (orcado[sub.key] || 0), 0);
-    out[cat.key] = t;
-    out.total += t;
-  });
-  return out;
+  const soma = subs => subs.reduce((s, sub) => s + (orcado[sub.key] || 0), 0);
+  const logistica = soma(CATS[0].subs);
+  const pessoal   = soma(GRUPOS_PREMISSA[0].subs);
+  const operacoes = soma(GRUPOS_PREMISSA[1].subs);
+  const livemode  = soma(GRUPOS_PREMISSA[2].subs);
+  return { logistica, pessoal, operacoes, livemode, total: logistica + pessoal + operacoes + livemode };
 };
 
 export const totalFixos = (orc) =>
@@ -131,14 +143,18 @@ export const totalFixos = (orc) =>
 // Totais consolidados para o Resumo e para o espelho do registry.
 export const calcTotais = (orc) => {
   const jogos = orc?.jogos || [];
-  const porCategoria = CATS.map(cat => ({ key: cat.key, label: cat.label, color: cat.color, total: 0 }));
+  const grupos = [
+    { key:"logistica", label:CATS[0].label, color:CATS[0].color, subs:CATS[0].subs },
+    ...GRUPOS_PREMISSA,
+  ];
+  const porCategoria = grupos.map(g => ({ key: g.key, label: g.label, color: g.color, total: 0 }));
   const porFase = {}, porPadrao = {}, porFaixa = {};
   let totalJogos = 0;
   jogos.forEach(j => {
     const orcado = calcOrcadoJogo(orc, j);
     let tj = 0;
-    CATS.forEach((cat, i) => {
-      const t = cat.subs.reduce((s, sub) => s + (orcado[sub.key] || 0), 0);
+    grupos.forEach((g, i) => {
+      const t = g.subs.reduce((s, sub) => s + (orcado[sub.key] || 0), 0);
       porCategoria[i].total += t;
       tj += t;
     });

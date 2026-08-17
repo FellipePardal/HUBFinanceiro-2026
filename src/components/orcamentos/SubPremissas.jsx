@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { iSty, CATS, FONT } from "../../constants";
+import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { PADROES_SUGERIDOS } from "../../data/orcamentos";
+import { PADROES_SUGERIDOS, GRUPOS_PREMISSA } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { Layers, Plus, Trash2, Copy } from "lucide-react";
 
@@ -61,7 +61,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
   const totalPadrao = (p) =>
     Object.values(orc.premissas?.[p] || {}).reduce((s, v) => s + (Number(v) || 0), 0);
 
-  const gruposPremissa = [CATS[1], CATS[2]]; // pessoal + operações
+  const gruposPremissa = GRUPOS_PREMISSA; // Pessoal · Operações · Livemode (NF por jogo)
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>

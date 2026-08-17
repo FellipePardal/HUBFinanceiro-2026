@@ -3,7 +3,7 @@ import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
 import { PADROES_SUGERIDOS, GRUPOS_PREMISSA } from "../../data/orcamentos";
 import { fmt } from "../../utils";
-import { Layers, Plus, Trash2, Copy } from "lucide-react";
+import { Layers, Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
 
 // Premissas por padrão: o que compõe um jogo daquele padrão (pessoal +
 // operações). A logística NÃO entra aqui — vem da faixa da praça.
@@ -11,6 +11,9 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
   const IS = iSty(T);
   const ts = tableStyles(T);
   const [novoPadrao, setNovoPadrao] = useState("");
+  // Grupos da matriz recolhidos por padrão — a tabela é grande; abre o que precisa.
+  const [abertos, setAbertos] = useState({});
+  const toggleAberto = (key) => setAbertos(prev => ({ ...prev, [key]: !prev[key] }));
 
   const padroes = orc.padroes || [];
 
@@ -117,13 +120,49 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
         </div>
       </Card>
 
-      {/* ── Matriz de premissas ── */}
-      {padroes.length > 0 && gruposPremissa.map(cat => (
+      {/* ── Matriz de premissas (grupos recolhíveis) ── */}
+      {padroes.length > 0 && gruposPremissa.map(cat => {
+        const aberto = !!abertos[cat.key];
+        const resumoFechado = padroes
+          .map(p => `${p} ${fmt(cat.subs.reduce((s, sub) => s + (Number(orc.premissas?.[p]?.[sub.key]) || 0), 0))}`)
+          .join(" · ");
+        return (
         <Card T={T} key={cat.key}>
-          <SectionHeader T={T} title={cat.label}
-            subtitle={`Valores por jogo, para cada padrão — ${cat.subs.length} linhas`}
-            icon={Layers}/>
-          <div style={ts.wrap}>
+          <button onClick={()=>toggleAberto(cat.key)} style={{
+            width:"100%",
+            padding:"14px 20px",
+            border:"none",
+            borderBottom: aberto ? `1px solid ${T.border}` : "none",
+            background:"transparent",
+            cursor:"pointer",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"space-between",
+            gap:12,
+            textAlign:"left",
+            fontFamily:FONT.ui,
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+              <div style={{
+                width:32, height:32, borderRadius:8,
+                background:cat.color+"14", color:cat.color,
+                display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
+              }}>
+                <Layers size={16} strokeWidth={2.25}/>
+              </div>
+              <div style={{minWidth:0}}>
+                <h3 style={{margin:0,fontSize:13,fontWeight:600,color:T.text,letterSpacing:"-0.005em"}}>{cat.label}</h3>
+                <p style={{margin:"2px 0 0",fontSize:11,color:T.textSm,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                  {aberto ? `Valores por jogo, para cada padrão — ${cat.subs.length} linhas` : resumoFechado}
+                </p>
+              </div>
+            </div>
+            <span style={{display:"inline-flex",alignItems:"center",gap:6,color:T.textMd,fontSize:11,fontWeight:600,flexShrink:0}}>
+              {aberto ? "Ocultar" : "Mostrar"}
+              {aberto ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+            </span>
+          </button>
+          {aberto && <div style={ts.wrap}>
             <table style={ts.table}>
               <thead style={ts.thead}>
                 <tr>
@@ -169,9 +208,10 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                 </tr>
               </tbody>
             </table>
-          </div>
+          </div>}
         </Card>
-      ))}
+        );
+      })}
 
       {/* ── Total geral por padrão ── */}
       {padroes.length > 0 && (

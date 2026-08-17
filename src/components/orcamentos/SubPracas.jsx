@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, tableStyles } from "../ui";
-import { SUBS_LOGISTICA, logisticaDaPraca, AJUSTES_FAIXA_OPS } from "../../data/orcamentos";
+import { SUBS_LOGISTICA, logisticaDaPraca } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { MapPin, Route, Plus, Trash2 } from "lucide-react";
 
@@ -26,7 +26,7 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
     if (!key || faixas.some(f => f.key === key)) { window.alert(`Já existe uma faixa "${label}".`); return; }
     setOrc(prev => ({
       ...prev,
-      faixas: [...(prev.faixas || []), { key, label, logistica:{ transporte:0, uber:0, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } }],
+      faixas: [...(prev.faixas || []), { key, label, logistica:{ transporte:0, uber:0, hospedagem:0, diaria:0, outros_log:0 } }],
     }));
     setNovaFaixa("");
   };
@@ -45,17 +45,6 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
         if (f.key !== key) return f;
         const v = String(raw).replace(/[^0-9.,\-]/g, "").replace(",", ".");
         return { ...f, logistica: { ...f.logistica, [subKey]: v === "" ? 0 : (parseFloat(v) || 0) } };
-      }),
-    }));
-  };
-
-  const setAjusteFaixa = (key, campo, raw) => {
-    setOrc(prev => ({
-      ...prev,
-      faixas: (prev.faixas || []).map(f => {
-        if (f.key !== key) return f;
-        const v = String(raw).replace(/[^0-9.,\-]/g, "").replace(",", ".");
-        return { ...f, operacoes: { ...(f.operacoes || {}), [campo]: v === "" ? 0 : (parseFloat(v) || 0) } };
       }),
     }));
   };
@@ -179,48 +168,6 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
             </tbody>
           </table>
         </div>
-        {/* ── Acréscimos de operações por faixa ── */}
-        {faixas.length > 0 && (
-          <div style={{borderTop:`1px solid ${T.border}`}}>
-            <p style={{margin:0,padding:"12px 20px 4px",fontSize:11,color:T.textMd,fontWeight:600}}>
-              Acréscimos de Operações por faixa <span style={{color:T.textSm,fontWeight:500}}>
-                — R$ por jogo somados à premissa do padrão (só quando o serviço existe no jogo)</span>
-            </p>
-            <div style={ts.wrap}>
-              <table style={{...ts.table, minWidth:420}}>
-                <thead style={ts.thead}>
-                  <tr>
-                    <th style={{...ts.th, ...ts.thLeft, minWidth:140}}>Faixa</th>
-                    {AJUSTES_FAIXA_OPS.map(a => <th key={a.key} style={{...ts.th, ...ts.thRight, minWidth:110}}>{a.label} +R$</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {faixas.map(f => (
-                    <tr key={f.key} style={ts.tr}>
-                      <td style={{...ts.td, fontSize:12, fontWeight:600}}>{f.label}</td>
-                      {AJUSTES_FAIXA_OPS.map(a => (
-                        <td key={a.key} style={{...ts.tdNum, padding:"6px 10px"}}>
-                          <input
-                            value={f.operacoes?.[a.key] ?? ""}
-                            disabled={readOnly}
-                            onChange={e=>setAjusteFaixa(f.key, a.key, e.target.value)}
-                            placeholder="0"
-                            inputMode="decimal"
-                            style={{
-                              ...IS, maxWidth:100, textAlign:"right",
-                              fontFamily:FONT.num, fontSize:12, padding:"5px 8px",
-                              background: Number(f.operacoes?.[a.key]) ? "#D9770614" : (T.surface||T.bg),
-                              opacity: readOnly ? 0.7 : 1,
-                            }}/>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
         {!readOnly && (
           <div style={{padding:"12px 20px 18px",display:"flex",gap:8,alignItems:"center",borderTop:`1px solid ${T.border}`}}>
             <input value={novaFaixa} onChange={e=>setNovaFaixa(e.target.value)}

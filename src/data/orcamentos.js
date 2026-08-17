@@ -33,14 +33,27 @@ export const SUBS_PREMISSA  = [...CATS[1].subs, ...CATS[2].subs];  // pessoal + 
 // no construtor vira um grupo próprio de premissa, separado de Operações.
 export const SUBS_LIVEMODE_KEYS = ["maquinas", "starlink", "downlink", "distribuicao", "liveu"];
 
-// Serviços de operação cujo valor também muda com a praça/distância: cada
-// faixa define um acréscimo ABSOLUTO (R$/jogo) somado à premissa do padrão.
-// O acréscimo só se aplica quando a premissa do serviço é > 0 no jogo.
-export const AJUSTES_FAIXA_OPS = [
-  { key:"um",        label:"UM",        alvos:["um_b1","um_b2","um_b3"] },
-  { key:"geradores", label:"Geradores", alvos:["geradores"] },
-  { key:"sng",       label:"SNG",       alvos:["sng"] },
+// Serviços de operação cotados por PADRÃO × FAIXA (mesma lógica da cotação
+// enviada às produtoras: padrões + praças/distâncias → preço por combinação).
+// A matriz fica em orc.premissasFaixa[padrao][faixaKey] = { um, geradores, sng };
+// célula vazia herda o valor base da premissa do padrão.
+export const SERVICOS_PADRAO_FAIXA = [
+  { key:"um",        label:"UM" },
+  { key:"geradores", label:"Geradores" },
+  { key:"sng",       label:"SNG" },
 ];
+
+// Para qual subKey de UM o valor da matriz vai: se a premissa do padrão já tem
+// exatamente um um_* preenchido, usa ele; senão infere pelo nome do padrão.
+export const umKeyDoPadrao = (orc, padrao) => {
+  const prem = orc?.premissas?.[padrao] || {};
+  const comValor = ["um_b1", "um_b2", "um_b3"].filter(k => Number(prem[k]) > 0);
+  if (comValor.length === 1) return comValor[0];
+  const s = String(padrao || "").toLowerCase();
+  if (s.includes("b1")) return "um_b1";
+  if (s.includes("b2")) return "um_b2";
+  return "um_b3";
+};
 
 // Montagem de véspera: jogo que começa antes das 13h monta no dia anterior.
 // O custo extra (50% do gerador + 30% da UM, já com ajustes de faixa) vai
@@ -72,10 +85,10 @@ export const CATALOGO_SERVICOS_FIXOS = (() => {
 // Faixas de distância padrão — valores iniciais zerados exceto Uber (piso comum);
 // o operador ajusta na aba Praças & Logística.
 export const FAIXAS_PRESET = [
-  { key:"sp",        label:"SP",        logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
-  { key:"grande_sp", label:"Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
-  { key:"sp200",     label:"SP200",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
-  { key:"sp400",     label:"SP400",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
+  { key:"sp",        label:"SP",        logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"grande_sp", label:"Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp200",     label:"SP200",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp400",     label:"SP400",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
 ];
 
 export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, icon, descricao }) => {
@@ -101,7 +114,8 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
     },
     padroes: [],
     premissas: {},          // { [padrao]: { [subKey]: number } }
-    faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica }, operacoes: { ...f.operacoes } })),
+    premissasFaixa: {},     // { [padrao]: { [faixaKey]: { um, geradores, sng } } } — vazio herda a premissa
+    faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica } })),
     pracas: [],             // [{ id, cidade, faixaKey, logistica?:{5 subs} — própria vence a faixa }]
     jogos: [],              // [{ id, fase, rodada, mandante, visitante, pracaId, padrao, data, obs, overrides:{} }]
     servicosFixos: [],      // [{ secao, itens:[{ id, nome, orcado, obs }] }]
@@ -120,7 +134,7 @@ export const logisticaDaPraca = (orc, praca) => {
 };
 
 // Orçado derivado de um jogo: base zerada → premissa do padrão → logística da
-// praça (própria ou herdada da faixa) → acréscimos de operações da faixa →
+// praça (própria ou herdada da faixa) → matriz padrão × faixa (UM/Ger/SNG) →
 // montagem de véspera (jogo antes das 13h) → overrides da linha (vencem tudo).
 export const calcOrcadoJogo = (orc, jogo) => {
   const out = { ...allSubKeysPaulistao() };
@@ -130,14 +144,13 @@ export const calcOrcadoJogo = (orc, jogo) => {
   const faixa = (orc?.faixas || []).find(f => f.key === praca?.faixaKey);
   const logistica = praca?.logistica || faixa?.logistica;
   if (logistica) for (const [k, v] of Object.entries(logistica)) if (k in out) out[k] = Number(v) || 0;
-  // Acréscimos de operações por faixa (vale mesmo com logística própria —
-  // a faixa continua classificando a distância da praça)
-  const aj = faixa?.operacoes || {};
-  AJUSTES_FAIXA_OPS.forEach(({ key, alvos }) => {
-    const delta = Number(aj[key]) || 0;
-    if (!delta) return;
-    alvos.forEach(k => { if (out[k] > 0) out[k] += delta; });
-  });
+  // Matriz padrão × faixa (UM/Geradores/SNG): célula preenchida SUBSTITUI a
+  // premissa base do padrão para a faixa da praça do jogo (vale mesmo com
+  // logística própria — a faixa continua classificando a distância)
+  const pf = orc?.premissasFaixa?.[jogo?.padrao]?.[praca?.faixaKey] || {};
+  if (pf.um != null && pf.um !== "") out[umKeyDoPadrao(orc, jogo?.padrao)] = Number(pf.um) || 0;
+  if (pf.geradores != null && pf.geradores !== "") out.geradores = Number(pf.geradores) || 0;
+  if (pf.sng != null && pf.sng !== "") out.sng = Number(pf.sng) || 0;
   // Montagem de véspera: 50% do gerador + 30% da UM (já ajustados) na linha própria
   if (jogo?.antes13h) {
     const um = (out.um_b1 || 0) + (out.um_b2 || 0) + (out.um_b3 || 0);

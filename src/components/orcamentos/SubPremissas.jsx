@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { PADROES_SUGERIDOS, GRUPOS_PREMISSA } from "../../data/orcamentos";
+import { PADROES_SUGERIDOS, GRUPOS_PREMISSA, SERVICOS_PADRAO_FAIXA, umKeyDoPadrao } from "../../data/orcamentos";
 import { fmt } from "../../utils";
-import { Layers, Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Layers, Plus, Trash2, Copy, ChevronDown, ChevronUp, Route } from "lucide-react";
 
 // Premissas por padrão: o que compõe um jogo daquele padrão (pessoal +
 // operações). A logística NÃO entra aqui — vem da faixa da praça.
@@ -63,6 +63,26 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
 
   const totalPadrao = (p) =>
     Object.values(orc.premissas?.[p] || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+
+  // Matriz padrão × faixa: célula vazia herda a premissa base do padrão.
+  const setValorFaixaMatriz = (p, faixaKey, servKey, raw) => {
+    setOrc(prev => {
+      const doPadrao = { ...(prev.premissasFaixa?.[p] || {}) };
+      const daFaixa = { ...(doPadrao[faixaKey] || {}) };
+      const v = String(raw).replace(/[^0-9.,\-]/g, "").replace(",", ".");
+      if (v === "" || v === "-") delete daFaixa[servKey];
+      else daFaixa[servKey] = parseFloat(v) || 0;
+      if (Object.keys(daFaixa).length === 0) delete doPadrao[faixaKey];
+      else doPadrao[faixaKey] = daFaixa;
+      return { ...prev, premissasFaixa: { ...(prev.premissasFaixa || {}), [p]: doPadrao } };
+    });
+  };
+
+  const basePadraoServico = (p, servKey) => {
+    const prem = orc.premissas?.[p] || {};
+    if (servKey === "um") return Number(prem[umKeyDoPadrao(orc, p)]) || 0;
+    return Number(prem[servKey]) || 0;
+  };
 
   const gruposPremissa = GRUPOS_PREMISSA; // Pessoal · Operações · Livemode (NF por jogo)
 
@@ -212,6 +232,103 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
         </Card>
         );
       })}
+
+      {/* ── Matriz padrão × faixa: UM / Geradores / SNG (lógica da cotação) ── */}
+      {padroes.length > 0 && (() => {
+        const faixas = orc.faixas || [];
+        const aberto = !!abertos["padrao_faixa"];
+        return (
+          <Card T={T}>
+            <button onClick={()=>toggleAberto("padrao_faixa")} style={{
+              width:"100%",
+              padding:"14px 20px",
+              border:"none",
+              borderBottom: aberto ? `1px solid ${T.border}` : "none",
+              background:"transparent",
+              cursor:"pointer",
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"space-between",
+              gap:12,
+              textAlign:"left",
+              fontFamily:FONT.ui,
+            }}>
+              <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+                <div style={{
+                  width:32, height:32, borderRadius:8,
+                  background:"#D9770614", color:"#D97706",
+                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
+                }}>
+                  <Route size={16} strokeWidth={2.25}/>
+                </div>
+                <div style={{minWidth:0}}>
+                  <h3 style={{margin:0,fontSize:13,fontWeight:600,color:T.text,letterSpacing:"-0.005em"}}>Operações por Distância — UM · Geradores · SNG</h3>
+                  <p style={{margin:"2px 0 0",fontSize:11,color:T.textSm}}>
+                    Valor por padrão × faixa, como na cotação enviada às produtoras. Célula vazia herda a premissa base do padrão.
+                  </p>
+                </div>
+              </div>
+              <span style={{display:"inline-flex",alignItems:"center",gap:6,color:T.textMd,fontSize:11,fontWeight:600,flexShrink:0}}>
+                {aberto ? "Ocultar" : "Mostrar"}
+                {aberto ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+              </span>
+            </button>
+            {aberto && (faixas.length === 0 ? (
+              <p style={{margin:0,padding:"14px 20px",fontSize:12,color:T.warning||"#D97706"}}>
+                Crie as faixas de distância na aba Praças & Logística para preencher esta matriz.
+              </p>
+            ) : (
+              <div style={{padding:"6px 0 8px"}}>
+                {SERVICOS_PADRAO_FAIXA.map(serv => (
+                  <div key={serv.key}>
+                    <p style={{margin:0,padding:"10px 20px 2px",fontSize:11,color:T.textMd,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                      {serv.label}{serv.key === "um" ? " (vai para a linha UM do padrão)" : ""}
+                    </p>
+                    <div style={ts.wrap}>
+                      <table style={{...ts.table, minWidth:420}}>
+                        <thead style={ts.thead}>
+                          <tr>
+                            <th style={{...ts.th, ...ts.thLeft, minWidth:120}}>Padrão</th>
+                            {faixas.map(f => <th key={f.key} style={{...ts.th, ...ts.thRight, minWidth:110}}>{f.label}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {padroes.map(p => (
+                            <tr key={p} style={ts.tr}>
+                              <td style={{...ts.td, fontSize:12, fontWeight:600}}>{p}</td>
+                              {faixas.map(f => {
+                                const v = orc.premissasFaixa?.[p]?.[f.key]?.[serv.key];
+                                const temValor = v != null && v !== "";
+                                return (
+                                  <td key={f.key} style={{...ts.tdNum, padding:"6px 10px"}}>
+                                    <input
+                                      value={temValor ? v : ""}
+                                      disabled={readOnly}
+                                      onChange={e=>setValorFaixaMatriz(p, f.key, serv.key, e.target.value)}
+                                      placeholder={String(basePadraoServico(p, serv.key))}
+                                      inputMode="decimal"
+                                      style={{
+                                        ...IS, maxWidth:110, textAlign:"right",
+                                        fontFamily:FONT.num, fontSize:12, padding:"5px 8px",
+                                        background: temValor ? "#D9770614" : (T.surface||T.bg),
+                                        borderColor: temValor ? "#D9770688" : undefined,
+                                        opacity: readOnly ? 0.7 : 1,
+                                      }}/>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Card>
+        );
+      })()}
 
       {/* ── Total geral por padrão ── */}
       {padroes.length > 0 && (

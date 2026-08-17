@@ -991,6 +991,7 @@ import FormularioPublico from "./components/FormularioPublico";
 import FormularioPublicoPaulistao from "./components/FormularioPublicoPaulistao";
 import EnvioPublico from "./components/EnvioPublico";
 import HubFornecedores from "./components/HubFornecedores";
+import HubOrcamentos from "./components/HubOrcamentos";
 import Paulistao from "./components/Paulistao";
 import CampeonatoCustom from "./components/CampeonatoCustom";
 import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
@@ -1220,8 +1221,8 @@ export default function App() {
   // Fornecedor — só acessa formulário externo
   if (effectiveRole === 'fornecedor') return <>{<FornecedorPage T={T} onSignOut={roleOverride ? () => setRoleOverride(null) : signOut}/>}{roleWidget}</>;
 
-  // Visualizador não acessa hub-fornecedores
-  const paginaEfetiva = (effectiveRole === 'visualizador' && pagina === 'hub-fornecedores') ? 'home' : pagina;
+  // Visualizador não acessa os módulos transversais
+  const paginaEfetiva = (effectiveRole === 'visualizador' && (pagina === 'hub-fornecedores' || pagina === 'hub-orcamentos')) ? 'home' : pagina;
 
   // Bloqueio por entidade para visualizador (aceita múltiplas separadas por vírgula)
   const podeVerCamp = (campId) => {
@@ -1249,6 +1250,7 @@ export default function App() {
     return null;
   }
   if(paginaEfetiva==="hub-fornecedores") return <>{<HubFornecedores onBack={()=>setPagina("home")} filtroInicial={hubFiltro} T={T} darkMode={darkMode} setDarkMode={toggleDark}/>}{roleWidget}</>;
+  if(paginaEfetiva==="hub-orcamentos") return <>{<HubOrcamentos onBack={()=>setPagina("home")} onEnter={setPagina} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole} user={user} onCriarCampeonato={criarCampeonato} customCampeonatos={customCampeonatos}/>}{roleWidget}</>;
   if(paginaEfetiva==="admin-usuarios" && role==='admin') return <AdminUsuarios onBack={()=>setPagina("home")} T={T} darkMode={darkMode} setDarkMode={toggleDark} onSignOut={signOut} currentUser={user}/>;
   return (
     <>

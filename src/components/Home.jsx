@@ -8,7 +8,7 @@ import { Card, Stat, Button, Badge } from "./ui";
 import {
   Trophy, Calendar, Building2, Sun, Moon,
   ArrowRight, Lock, Activity, Handshake, Globe2,
-  Plus, Trash2, LogOut, Users,
+  Plus, Trash2, LogOut, Users, Calculator,
 } from "lucide-react";
 
 
@@ -533,6 +533,85 @@ export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, cus
 
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.brand, fontSize: 12, fontWeight: 500 }}>
               Abrir Hub <ArrowRight size={14} strokeWidth={2.25}/>
+            </div>
+          </button>
+
+          {/* Módulo Orçamentos — budget builder pré-campeonato */}
+          <button
+            onClick={() => onEnter("hub-orcamentos")}
+            className="lm-card-hover"
+            style={{
+              background: T.surface || T.card,
+              border: `1px solid ${T.border}`,
+              borderRadius: RADIUS.lg,
+              padding: 20,
+              cursor: "pointer",
+              textAlign: "left",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              boxShadow: T.shadow || "0 1px 3px rgba(0,0,0,0.06)",
+              fontFamily: FONT.ui,
+              color: T.text,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 9,
+                  background: "rgba(101,179,46,0.10)",
+                  color: T.brand || "#65B32E",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  <Calculator size={20} strokeWidth={2.25}/>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 500, color: T.text }}>Orçamentos</h4>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: T.textSm }}>Construção de orçamentos pré-campeonato até a aprovação</p>
+                </div>
+              </div>
+              <span style={{
+                background: "rgba(101,179,46,0.12)",
+                border: "1px solid rgba(101,179,46,0.35)",
+                color: T.brand || "#65B32E",
+                borderRadius: RADIUS.pill,
+                padding: "0 10px",
+                height: 22,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+              }}>Novo</span>
+            </div>
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+              paddingTop: 16,
+              borderTop: `1px solid ${T.border}`,
+            }}>
+              <div>
+                <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Escopo</p>
+                <p style={{ color: T.text, fontSize: 12, fontWeight: 500, margin: 0 }}>Pré-campeonato</p>
+              </div>
+              <div>
+                <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Sub-abas</p>
+                <p className="num" style={{ color: T.text, fontSize: 12, fontWeight: 500, margin: 0, fontFamily: FONT.num }}>5 módulos</p>
+              </div>
+              <div>
+                <p style={{ color: T.textSm, fontSize: 10, margin: "0 0 4px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Fluxo</p>
+                <p style={{ color: T.brand, fontSize: 12, fontWeight: 500, margin: 0 }}>Rascunho → Aprovado</p>
+              </div>
+            </div>
+
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.brand, fontSize: 12, fontWeight: 500 }}>
+              Abrir Orçamentos <ArrowRight size={14} strokeWidth={2.25}/>
             </div>
           </button>
         </div>}

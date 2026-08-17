@@ -11,7 +11,8 @@
 //   orc_${id}_eventos     → log append-only (appendState, com clientRef)
 
 import { CATS } from "../constants";
-import { allSubKeysPaulistao } from "./paulistao";
+import { allSubKeysPaulistao, PAULISTAO_SERVICOS_INIT } from "./paulistao";
+import { SERVICOS_INIT } from "../data";
 import { slugify } from "./customCampeonato";
 
 export const ORC_REGISTRY_KEY = "orc_registry";
@@ -29,6 +30,18 @@ export const SUBS_LOGISTICA = CATS[0].subs;                        // outros_log
 export const SUBS_PREMISSA  = [...CATS[1].subs, ...CATS[2].subs];  // pessoal + operações
 
 export const PADROES_SUGERIDOS = ["B1", "B2", "B3", "B3+"];
+
+// Catálogo-base de serviços fixos: união dos nomes já usados nos orçamentos do
+// Brasileirão e do Paulistão F, agrupados por seção. Só os NOMES servem de
+// base — os valores são sempre deste orçamento (nunca dos outros campeonatos).
+export const CATALOGO_SERVICOS_FIXOS = (() => {
+  const porSecao = new Map();
+  [...SERVICOS_INIT, ...PAULISTAO_SERVICOS_INIT].forEach(sec => {
+    if (!porSecao.has(sec.secao)) porSecao.set(sec.secao, new Set());
+    (sec.itens || []).forEach(it => porSecao.get(sec.secao).add(it.nome));
+  });
+  return Array.from(porSecao, ([secao, nomes]) => ({ secao, nomes: [...nomes] }));
+})();
 
 // Faixas de distância padrão — valores iniciais zerados exceto Uber (piso comum);
 // o operador ajusta na aba Praças & Logística.

@@ -8,12 +8,13 @@ import {
   orcKey, orcEventosKey, ORC_REGISTRY_KEY, ORC_STATUS,
   resumoRegistry, validarAprovacao, orcamentoParaCampeonato,
 } from "../../data/orcamentos";
-import { Settings, Layers, MapPin, CalendarDays, LineChart } from "lucide-react";
+import { Settings, Layers, MapPin, CalendarDays, Briefcase, LineChart } from "lucide-react";
 import { AprovarOrcamentoModal } from "../modals/AprovarOrcamentoModal";
 import SubConfiguracao from "./SubConfiguracao";
 import SubPremissas from "./SubPremissas";
 import SubPracas from "./SubPracas";
 import SubJogos from "./SubJogos";
+import SubServicos from "./SubServicos";
 import SubResumo from "./SubResumo";
 
 const SUBTABS = [
@@ -21,6 +22,7 @@ const SUBTABS = [
   { key:"premissas", label:"Padrões & Premissas", icon:Layers },
   { key:"pracas",    label:"Praças & Logística",  icon:MapPin },
   { key:"jogos",     label:"Jogos",               icon:CalendarDays },
+  { key:"servicos",  label:"Serviços Fixos",      icon:Briefcase },
   { key:"resumo",    label:"Resumo",              icon:LineChart },
 ];
 
@@ -212,6 +214,7 @@ export default function OrcamentoEditor({
       {sub === "premissas" && <SubPremissas {...commonProps}/>}
       {sub === "pracas"    && <SubPracas {...commonProps}/>}
       {sub === "jogos"     && <SubJogos {...commonProps}/>}
+      {sub === "servicos"  && <SubServicos {...commonProps}/>}
       {sub === "resumo"    && (
         <SubResumo
           {...commonProps}

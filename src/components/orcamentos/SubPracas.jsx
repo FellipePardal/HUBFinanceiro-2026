@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, tableStyles } from "../ui";
-import { SUBS_LOGISTICA } from "../../data/orcamentos";
+import { SUBS_LOGISTICA, logisticaDaPraca } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { MapPin, Route, Plus, Trash2 } from "lucide-react";
 
@@ -83,6 +83,35 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
     setOrc(prev => ({ ...prev, pracas: (prev.pracas || []).map(p => p.id === id ? { ...p, ...patch } : p) }));
   };
 
+  // Alterna o modo de logística da praça: "própria" começa copiando os valores
+  // da faixa atual (ponto de partida); voltar para "faixa" descarta a própria.
+  const setModoPraca = (id, modo) => {
+    setOrc(prev => ({
+      ...prev,
+      pracas: (prev.pracas || []).map(p => {
+        if (p.id !== id) return p;
+        if (modo === "propria") {
+          if (p.logistica) return p;
+          const faixa = (prev.faixas || []).find(f => f.key === p.faixaKey);
+          return { ...p, logistica: { transporte:0, uber:0, hospedagem:0, diaria:0, outros_log:0, ...(faixa?.logistica || {}) } };
+        }
+        if (p.logistica && !window.confirm(`Voltar a herdar da faixa? Os valores próprios de "${p.cidade}" serão descartados.`)) return p;
+        return { ...p, logistica: null };
+      }),
+    }));
+  };
+
+  const setValorPraca = (id, subKey, raw) => {
+    setOrc(prev => ({
+      ...prev,
+      pracas: (prev.pracas || []).map(p => {
+        if (p.id !== id || !p.logistica) return p;
+        const v = String(raw).replace(/[^0-9.,\-]/g, "").replace(",", ".");
+        return { ...p, logistica: { ...p.logistica, [subKey]: v === "" ? 0 : (parseFloat(v) || 0) } };
+      }),
+    }));
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {/* ── Faixas de distância ── */}
@@ -152,13 +181,14 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
       {/* ── Praças ── */}
       <Card T={T}>
         <SectionHeader T={T} icon={MapPin} title="Praças"
-          subtitle="Cidades onde os jogos acontecem — cada praça pertence a uma faixa de distância"/>
+          subtitle="Cada praça herda a logística da faixa OU define valores próprios (mesmos 5 campos)"/>
         <div style={ts.wrap}>
-          <table style={{...ts.table, minWidth:420}}>
+          <table style={{...ts.table, minWidth:560}}>
             <thead style={ts.thead}>
               <tr>
                 <th style={{...ts.th, ...ts.thLeft}}>Cidade</th>
                 <th style={{...ts.th, ...ts.thLeft}}>Faixa</th>
+                <th style={{...ts.th, ...ts.thLeft}}>Logística</th>
                 <th style={{...ts.th, ...ts.thRight}}>Logística / jogo</th>
                 <th style={{...ts.th, ...ts.thRight}}>Jogos</th>
                 {!readOnly && <th style={ts.th}/>}
@@ -167,8 +197,11 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
             <tbody>
               {pracas.map(p => {
                 const faixa = faixas.find(f => f.key === p.faixaKey);
+                const propria = !!p.logistica;
+                const { logistica } = logisticaDaPraca(orc, p);
+                const totalLog = logistica ? SUBS_LOGISTICA.reduce((s, sub) => s + (Number(logistica[sub.key]) || 0), 0) : null;
                 const jogosNaPraca = (orc.jogos || []).filter(j => j.pracaId === p.id).length;
-                return (
+                return [
                   <tr key={p.id} style={ts.tr}>
                     <td style={{...ts.td, padding:"6px 14px"}}>
                       <input value={p.cidade} disabled={readOnly} onChange={e=>patchPraca(p.id, {cidade:e.target.value})}
@@ -176,12 +209,25 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
                     </td>
                     <td style={{...ts.td, padding:"6px 14px"}}>
                       <select value={p.faixaKey} disabled={readOnly} onChange={e=>patchPraca(p.id, {faixaKey:e.target.value})}
-                        style={{...IS, maxWidth:160, fontSize:12, padding:"5px 8px", opacity:readOnly?0.7:1, borderColor: faixa ? undefined : (T.danger||"#DC2626")}}>
-                        {!faixa && <option value={p.faixaKey}>Faixa inválida</option>}
+                        style={{...IS, maxWidth:160, fontSize:12, padding:"5px 8px", opacity:readOnly?0.7:1,
+                                borderColor: (faixa || propria) ? undefined : (T.danger||"#DC2626")}}>
+                        {!faixa && <option value={p.faixaKey}>{propria ? "— (usa própria)" : "Faixa inválida"}</option>}
                         {faixas.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                       </select>
                     </td>
-                    <td className="num" style={ts.tdNum}>{faixa ? fmt(totalFaixa(faixa)) : "—"}</td>
+                    <td style={{...ts.td, padding:"6px 14px"}}>
+                      <select value={propria ? "propria" : "faixa"} disabled={readOnly}
+                        onChange={e=>setModoPraca(p.id, e.target.value)}
+                        style={{...IS, maxWidth:150, fontSize:12, padding:"5px 8px", opacity:readOnly?0.7:1,
+                                color: propria ? (T.warning||"#D97706") : T.text,
+                                borderColor: propria ? (T.warning||"#D97706")+"88" : undefined}}>
+                        <option value="faixa">Herda da faixa</option>
+                        <option value="propria">Própria</option>
+                      </select>
+                    </td>
+                    <td className="num" style={{...ts.tdNum, color: propria ? (T.warning||"#D97706") : T.text}}>
+                      {totalLog != null ? fmt(totalLog) : "—"}
+                    </td>
                     <td className="num" style={ts.tdNum}>{jogosNaPraca}</td>
                     {!readOnly && (
                       <td style={{...ts.td, padding:"6px 10px"}}>
@@ -191,11 +237,39 @@ export default function SubPracas({ orc, setOrc, readOnly, T }) {
                         </button>
                       </td>
                     )}
-                  </tr>
-                );
+                  </tr>,
+                  propria && (
+                    <tr key={`${p.id}-log`} style={{background:T.surfaceAlt||T.bg}}>
+                      <td colSpan={readOnly ? 5 : 6} style={{padding:"10px 20px", borderTop:`1px dashed ${T.border}`}}>
+                        <div style={{display:"flex",gap:14,alignItems:"flex-end",flexWrap:"wrap"}}>
+                          <span style={{fontSize:11,color:T.warning||"#D97706",fontWeight:700,paddingBottom:6}}>
+                            Logística própria de {p.cidade}:
+                          </span>
+                          {SUBS_LOGISTICA.map(sub => (
+                            <div key={sub.key}>
+                              <label style={{display:"block",fontSize:10,color:T.textSm,fontWeight:600,marginBottom:3,letterSpacing:"0.04em",textTransform:"uppercase"}}>{sub.label}</label>
+                              <input
+                                value={p.logistica?.[sub.key] ?? ""}
+                                disabled={readOnly}
+                                onChange={e=>setValorPraca(p.id, sub.key, e.target.value)}
+                                placeholder="0"
+                                inputMode="decimal"
+                                style={{
+                                  ...IS, maxWidth:100, textAlign:"right",
+                                  fontFamily:FONT.num, fontSize:12, padding:"5px 8px",
+                                  background: Number(p.logistica?.[sub.key]) ? (T.warning||"#D97706")+"14" : (T.surface||T.bg),
+                                  opacity: readOnly ? 0.7 : 1,
+                                }}/>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ),
+                ];
               })}
               {pracas.length === 0 && (
-                <tr><td colSpan={5} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhuma praça — adicione abaixo.</td></tr>
+                <tr><td colSpan={6} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhuma praça — adicione abaixo.</td></tr>
               )}
             </tbody>
           </table>

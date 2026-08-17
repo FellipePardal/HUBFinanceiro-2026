@@ -76,7 +76,7 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
     padroes: [],
     premissas: {},          // { [padrao]: { [subKey]: number } }
     faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica } })),
-    pracas: [],             // [{ id, cidade, faixaKey }]
+    pracas: [],             // [{ id, cidade, faixaKey, logistica?:{5 subs} — própria vence a faixa }]
     jogos: [],              // [{ id, fase, rodada, mandante, visitante, pracaId, padrao, data, obs, overrides:{} }]
     servicosFixos: [],      // [{ secao, itens:[{ id, nome, orcado, obs }] }]
   };
@@ -84,15 +84,24 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
 
 // ─── DERIVAÇÃO DO ORÇADO ──────────────────────────────────────────────────────
 
+// Logística efetiva de uma praça: modo "própria" (praca.logistica preenchida,
+// mesmos 5 subKeys) vence o modo "por faixa" (herda de faixas[faixaKey]).
+export const logisticaDaPraca = (orc, praca) => {
+  if (!praca) return { logistica: null, origem: null };
+  if (praca.logistica) return { logistica: praca.logistica, origem: "propria" };
+  const faixa = (orc?.faixas || []).find(f => f.key === praca.faixaKey);
+  return { logistica: faixa?.logistica || null, origem: faixa ? "faixa" : null };
+};
+
 // Orçado derivado de um jogo: base zerada → premissa do padrão → logística da
-// faixa da praça → overrides da linha (vencem tudo).
+// praça (própria ou herdada da faixa) → overrides da linha (vencem tudo).
 export const calcOrcadoJogo = (orc, jogo) => {
   const out = { ...allSubKeysPaulistao() };
   const prem = orc?.premissas?.[jogo?.padrao] || {};
   for (const [k, v] of Object.entries(prem)) if (k in out) out[k] = Number(v) || 0;
   const praca = (orc?.pracas || []).find(p => p.id === jogo?.pracaId);
-  const faixa = (orc?.faixas || []).find(f => f.key === praca?.faixaKey);
-  if (faixa) for (const [k, v] of Object.entries(faixa.logistica || {})) if (k in out) out[k] = Number(v) || 0;
+  const { logistica } = logisticaDaPraca(orc, praca);
+  if (logistica) for (const [k, v] of Object.entries(logistica)) if (k in out) out[k] = Number(v) || 0;
   for (const [k, v] of Object.entries(jogo?.overrides || {})) {
     if (v === null || v === undefined || v === "") continue;
     if (k in out) out[k] = Number(v) || 0;
@@ -137,7 +146,9 @@ export const calcTotais = (orc) => {
     porFase[j.fase || "—"] = (porFase[j.fase || "—"] || 0) + tj;
     porPadrao[j.padrao || "—"] = (porPadrao[j.padrao || "—"] || 0) + tj;
     const praca = (orc.pracas || []).find(p => p.id === j.pracaId);
-    const faixaLabel = (orc.faixas || []).find(f => f.key === praca?.faixaKey)?.label || "—";
+    const faixaLabel = praca?.logistica
+      ? `${praca.cidade} (própria)`
+      : ((orc.faixas || []).find(f => f.key === praca?.faixaKey)?.label || "—");
     porFaixa[faixaLabel] = (porFaixa[faixaLabel] || 0) + tj;
   });
   const fixos = totalFixos(orc);
@@ -182,7 +193,8 @@ export const validarAprovacao = (orc, idsExistentes = []) => {
     else if (!orc.premissas?.[j.padrao]) erros.push(`${rot}: o padrão "${j.padrao}" não tem premissas preenchidas.`);
     const praca = (orc.pracas || []).find(p => p.id === j.pracaId);
     if (!praca) erros.push(`${rot}: sem praça definida.`);
-    else if (!(orc.faixas || []).some(f => f.key === praca.faixaKey)) erros.push(`${rot}: a praça "${praca.cidade}" aponta para uma faixa inexistente.`);
+    else if (!praca.logistica && !(orc.faixas || []).some(f => f.key === praca.faixaKey))
+      erros.push(`${rot}: a praça "${praca.cidade}" não tem logística própria nem faixa válida.`);
   });
   return erros;
 };
@@ -222,7 +234,7 @@ export const orcamentoParaCampeonato = (orc) => {
       grupo: "-",
       rodada: parseInt(j.rodada) || (i + 1),
       categoria: j.padrao || "",
-      dist: faixa?.label || "",
+      dist: praca?.logistica ? (faixa?.label || "Própria") : (faixa?.label || ""),
       logistica_modo: "",
       equipe: "",
       cidade: praca?.cidade || "A definir",

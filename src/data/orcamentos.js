@@ -33,6 +33,21 @@ export const SUBS_PREMISSA  = [...CATS[1].subs, ...CATS[2].subs];  // pessoal + 
 // no construtor vira um grupo próprio de premissa, separado de Operações.
 export const SUBS_LIVEMODE_KEYS = ["maquinas", "starlink", "downlink", "distribuicao", "liveu"];
 
+// Serviços de operação cujo valor também muda com a praça/distância: cada
+// faixa define um acréscimo ABSOLUTO (R$/jogo) somado à premissa do padrão.
+// O acréscimo só se aplica quando a premissa do serviço é > 0 no jogo.
+export const AJUSTES_FAIXA_OPS = [
+  { key:"um",        label:"UM",        alvos:["um_b1","um_b2","um_b3"] },
+  { key:"geradores", label:"Geradores", alvos:["geradores"] },
+  { key:"sng",       label:"SNG",       alvos:["sng"] },
+];
+
+// Montagem de véspera: jogo que começa antes das 13h monta no dia anterior.
+// O custo extra (50% do gerador + 30% da UM, já com ajustes de faixa) vai
+// para a linha própria montagem_vespera — UM/Gerador ficam intactos.
+export const MONTAGEM_PCT_GERADOR = 0.5;
+export const MONTAGEM_PCT_UM      = 0.3;
+
 // Grupos usados nas telas de premissa/override e no resumo por categoria.
 export const GRUPOS_PREMISSA = [
   { key:"pessoal",   label:"Pessoal",   color:CATS[1].color, subs:CATS[1].subs },
@@ -57,10 +72,10 @@ export const CATALOGO_SERVICOS_FIXOS = (() => {
 // Faixas de distância padrão — valores iniciais zerados exceto Uber (piso comum);
 // o operador ajusta na aba Praças & Logística.
 export const FAIXAS_PRESET = [
-  { key:"sp",        label:"SP",        logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"grande_sp", label:"Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"sp200",     label:"SP200",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"sp400",     label:"SP400",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp",        label:"SP",        logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
+  { key:"grande_sp", label:"Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
+  { key:"sp200",     label:"SP200",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
+  { key:"sp400",     label:"SP400",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 }, operacoes:{ um:0, geradores:0, sng:0 } },
 ];
 
 export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, icon, descricao }) => {
@@ -86,7 +101,7 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
     },
     padroes: [],
     premissas: {},          // { [padrao]: { [subKey]: number } }
-    faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica } })),
+    faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica }, operacoes: { ...f.operacoes } })),
     pracas: [],             // [{ id, cidade, faixaKey, logistica?:{5 subs} — própria vence a faixa }]
     jogos: [],              // [{ id, fase, rodada, mandante, visitante, pracaId, padrao, data, obs, overrides:{} }]
     servicosFixos: [],      // [{ secao, itens:[{ id, nome, orcado, obs }] }]
@@ -105,14 +120,29 @@ export const logisticaDaPraca = (orc, praca) => {
 };
 
 // Orçado derivado de um jogo: base zerada → premissa do padrão → logística da
-// praça (própria ou herdada da faixa) → overrides da linha (vencem tudo).
+// praça (própria ou herdada da faixa) → acréscimos de operações da faixa →
+// montagem de véspera (jogo antes das 13h) → overrides da linha (vencem tudo).
 export const calcOrcadoJogo = (orc, jogo) => {
   const out = { ...allSubKeysPaulistao() };
   const prem = orc?.premissas?.[jogo?.padrao] || {};
   for (const [k, v] of Object.entries(prem)) if (k in out) out[k] = Number(v) || 0;
   const praca = (orc?.pracas || []).find(p => p.id === jogo?.pracaId);
-  const { logistica } = logisticaDaPraca(orc, praca);
+  const faixa = (orc?.faixas || []).find(f => f.key === praca?.faixaKey);
+  const logistica = praca?.logistica || faixa?.logistica;
   if (logistica) for (const [k, v] of Object.entries(logistica)) if (k in out) out[k] = Number(v) || 0;
+  // Acréscimos de operações por faixa (vale mesmo com logística própria —
+  // a faixa continua classificando a distância da praça)
+  const aj = faixa?.operacoes || {};
+  AJUSTES_FAIXA_OPS.forEach(({ key, alvos }) => {
+    const delta = Number(aj[key]) || 0;
+    if (!delta) return;
+    alvos.forEach(k => { if (out[k] > 0) out[k] += delta; });
+  });
+  // Montagem de véspera: 50% do gerador + 30% da UM (já ajustados) na linha própria
+  if (jogo?.antes13h) {
+    const um = (out.um_b1 || 0) + (out.um_b2 || 0) + (out.um_b3 || 0);
+    out.montagem_vespera += Math.round(MONTAGEM_PCT_GERADOR * (out.geradores || 0) + MONTAGEM_PCT_UM * um);
+  }
   for (const [k, v] of Object.entries(jogo?.overrides || {})) {
     if (v === null || v === undefined || v === "") continue;
     if (k in out) out[k] = Number(v) || 0;

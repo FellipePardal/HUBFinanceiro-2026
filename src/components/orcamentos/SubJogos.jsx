@@ -109,7 +109,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
         )}
 
         <div style={ts.wrap}>
-          <table style={{...ts.table, minWidth:1060}}>
+          <table style={{...ts.table, minWidth:1120}}>
             <thead style={ts.thead}>
               <tr>
                 <th style={{...ts.th, ...ts.thLeft}}>{pontosCorridos ? "Rodada" : "Fase"}</th>
@@ -119,6 +119,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                 <th style={{...ts.th, ...ts.thLeft}}>Praça</th>
                 <th style={{...ts.th, ...ts.thLeft}}>Padrão</th>
                 <th style={{...ts.th, ...ts.thLeft}}>Data</th>
+                <th style={{...ts.th, textAlign:"center"}} title="Jogo antes das 13h monta na véspera: +50% do gerador e +30% da UM na linha Montagem Véspera">{"< 13h"}</th>
                 <th style={{...ts.th, ...ts.thRight}}>Logística</th>
                 <th style={{...ts.th, ...ts.thRight}}>Pessoal</th>
                 <th style={{...ts.th, ...ts.thRight}}>Operações</th>
@@ -178,6 +179,12 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                       <input value={j.data} disabled={readOnly} placeholder="dd/mm"
                         onChange={e=>patchJogo(j.id, {data:e.target.value})} style={{...inpSty, maxWidth:90}}/>
                     </td>
+                    <td style={{...ts.td, textAlign:"center", padding:"6px 8px"}}>
+                      <input type="checkbox" checked={!!j.antes13h} disabled={readOnly}
+                        title="Jogo antes das 13h — montagem na véspera (+50% gerador, +30% UM em Montagem Véspera)"
+                        onChange={e=>patchJogo(j.id, {antes13h:e.target.checked})}
+                        style={{cursor:readOnly?"default":"pointer",accentColor:T.warning||"#D97706"}}/>
+                    </td>
                     <td className="num" style={ts.tdNum}>{fmt(blocos.logistica)}</td>
                     <td className="num" style={ts.tdNum}>{fmt(blocos.pessoal)}</td>
                     <td className="num" style={ts.tdNum}>{fmt(blocos.operacoes)}</td>
@@ -211,7 +218,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                   </tr>,
                   aberto && (
                     <tr key={`${j.id}-det`} style={{background:T.surfaceAlt||T.bg}}>
-                      <td colSpan={pontosCorridos ? 12 : 13} style={{padding:"14px 20px", borderTop:`1px dashed ${T.border}`}}>
+                      <td colSpan={pontosCorridos ? 13 : 14} style={{padding:"14px 20px", borderTop:`1px dashed ${T.border}`}}>
                         <DetalheOverrides orc={orc} jogo={j} readOnly={readOnly} T={T}
                           onSetOverride={(k, v)=>setOverride(j.id, k, v)}
                           onLimpar={()=>limparOverrides(j.id)}/>
@@ -221,7 +228,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                 ];
               })}
               {jogos.length === 0 && (
-                <tr><td colSpan={13} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhum jogo estimado ainda.</td></tr>
+                <tr><td colSpan={14} style={{...ts.td, color:T.textSm, fontSize:12}}>Nenhum jogo estimado ainda.</td></tr>
               )}
             </tbody>
           </table>

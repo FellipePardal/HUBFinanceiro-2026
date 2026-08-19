@@ -276,8 +276,11 @@ export default function TabGraficos({ divulgados = [], notas = [], dedupeNotasPo
         orc += o; prov += p; real += r;
         if (o > 0 || p > 0 || r > 0) nJogos++;
       });
-      return { key, info, orc, prov, real, nJogos,
-               saving: orc - prov,
+      // Saving acompanha a métrica escolhida: com "Realizado (NF)" compara
+      // orçado − realizado; nas demais, orçado − provisionado (padrão do painel)
+      const saving = servMetrica === "realizado" ? orc - real : orc - prov;
+      return { key, info, orc, prov, real, nJogos, saving,
+               savingBase: servMetrica === "realizado" ? "orçado − realizado" : "orçado − provisionado",
                medio: nJogos ? { orcado: orc, provisionado: prov, realizado: real }[servMetrica] / nJogos : 0 };
     };
     return { a: calc(servA), b: calc(servB) };
@@ -440,7 +443,7 @@ export default function TabGraficos({ divulgados = [], notas = [], dedupeNotasPo
                 { label:`${c.info?.label} · Provisionado`, valor:fmtRs(c.prov), cor:brand },
                 { label:`${c.info?.label} · Realizado NF`, valor:fmtRs(c.real), cor:"#2563EB" },
                 { label:`${c.info?.label} · Saving`,       valor:fmtRs(Math.abs(c.saving)), cor:c.saving>=0?GREEN:RED,
-                  sub:c.saving>=0?"dentro do orçado":"estouro" },
+                  sub:`${c.saving>=0?"dentro do orçado":"estouro"} · ${c.savingBase}` },
                 { label:`${c.info?.label} · Média/jogo`,   valor:fmtRs(c.medio), cor:c.info?.catColor||"#D97706",
                   sub:`${c.nJogos} jogos com o serviço` },
               ].map(k => (

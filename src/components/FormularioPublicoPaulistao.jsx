@@ -29,6 +29,9 @@ const SERVICOS_JOGO = [
   { catLabel:"Pessoal",   catColor:"#2563EB", subKey:"supervisor1",subLabel:"Supervisor 1" },
   { catLabel:"Operações", catColor:"#D97706", subKey:"geradores",  subLabel:"Geradores" },
   { catLabel:"Operações", catColor:"#D97706", subKey:"sng",        subLabel:"SNG" },
+  // Cai no bucket "Outros Logística" do realizado (mesmo destino da NF de
+  // reembolso consolidada — alias reembolso_log→outros_log em notasFiscais.js)
+  { catLabel:"Logística", catColor:"#16A34A", subKey:"outros_log", subLabel:"Logística" },
 ];
 
 // ── Serviços mensais (IDs espelham o orçamento ATUAL do Paulistão no banco —

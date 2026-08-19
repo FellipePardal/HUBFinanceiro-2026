@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { fmt, fmtK, fmtRs, subTotal, catTotal } from "../../utils";
 import { CATS } from "../../constants";
+import { getNotaFiscalScales } from "../../lib/notasFiscais";
 import { Card, PanelTitle } from "../ui";
 import { TrendingUp, TrendingDown, Target, Trophy, AlertTriangle, Search } from "lucide-react";
 
@@ -107,13 +108,16 @@ function StatTile({ label, value, sub, subColor, color, spark, sparkColor, T }) 
 // Todos os serviços (subKeys) com a categoria de origem — para a Consulta por Serviço
 const SUBS_ALL = CATS.flatMap(c => c.subs.map(s => ({ key: s.key, label: s.label, catLabel: c.label, catColor: c.color })));
 
-export default function TabGraficos({ divulgados = [], T }) {
+export default function TabGraficos({ divulgados = [], notas = [], dedupeNotasPorNF = false, T }) {
   const [periodo, setPeriodo] = useState("todas");   // todas | u5 | u10
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [maturidade, setMaturidade] = useState(5);   // rodadas recentes ignoradas na calibração (NFs ainda chegando)
+  const [consultaModo, setConsultaModo] = useState("servico"); // servico | fornecedor
   const [servA, setServA] = useState("coord_um");    // Consulta por Serviço
   const [servB, setServB] = useState("");            // comparação opcional
   const [servMetrica, setServMetrica] = useState("realizado"); // orcado | provisionado | realizado
+  const [fornA, setFornA] = useState("");            // Consulta por Fornecedor (chave lowercase)
+  const [fornB, setFornB] = useState("");
 
   const categorias = useMemo(() =>
     Array.from(new Set(divulgados.map(j => j.categoria).filter(Boolean))).sort(),
@@ -301,6 +305,50 @@ export default function TabGraficos({ divulgados = [], T }) {
       .slice(0, 10);
   }, [jogos, servMetrica]);
 
+  // ── Consulta por Fornecedor: gasto NF por fornecedor no slice filtrado ──────
+  // Mesma escala de NF do realizado (grupos de mesma NF dividem o valor).
+  const fornecedoresNF = useMemo(() => {
+    const scales = getNotaFiscalScales(notas, "valorNF", { dedupe: dedupeNotasPorNF });
+    const rodadaDoJogo = new Map(jogos.map(j => [j.id, j.rodada]));
+    const map = {};
+    const add = (n, jogoId, valor) => {
+      if (!rodadaDoJogo.has(jogoId)) return; // fora do slice filtrado
+      const nome = String(n.fornecedor || "").trim() || "(sem fornecedor)";
+      const k = nome.toLowerCase();
+      if (!map[k]) map[k] = { key: k, nome, total: 0, notasIds: new Set(), jogosIds: new Set(), porRodada: {} };
+      const v = (Number(valor) || 0) * (scales[n.id] ?? 1);
+      map[k].total += v;
+      map[k].notasIds.add(n.id);
+      map[k].jogosIds.add(jogoId);
+      const r = rodadaDoJogo.get(jogoId);
+      map[k].porRodada[r] = (map[k].porRodada[r] || 0) + v;
+    };
+    (notas || []).forEach(n => {
+      if (n.servicosDetalhe) {
+        Object.entries(n.servicosDetalhe).forEach(([key, valor]) => {
+          const jId = parseInt(key.split("_")[0]);
+          if (!Number.isNaN(jId)) add(n, jId, valor);
+        });
+      } else if (n.servicosValores && n.jogoId != null) {
+        Object.values(n.servicosValores).forEach(v => add(n, n.jogoId, v));
+      }
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [notas, jogos, dedupeNotasPorNF]);
+
+  const fornInfo = (k) => fornecedoresNF.find(f => f.key === k) || null;
+  const fornSelA = fornInfo(fornA) || fornecedoresNF[0] || null;
+  const fornSelB = fornB ? fornInfo(fornB) : null;
+
+  const fornecedorRodada = useMemo(() => {
+    const rodadas = Array.from(new Set(jogos.map(j => j.rodada))).sort((a, b) => a - b);
+    return rodadas.map(r => ({
+      rodada: r, name: `R${r}`,
+      a: fornSelA?.porRodada?.[r] || 0,
+      b: fornSelB?.porRodada?.[r] || 0,
+    }));
+  }, [jogos, fornSelA, fornSelB]);
+
   const brand = T.brand || "#10b981";
   const gridProps = { stroke: T.border, vertical: false };
   const axisTick = { fill: T.textMd, fontSize: 11 };
@@ -345,15 +393,21 @@ export default function TabGraficos({ divulgados = [], T }) {
       {/* ── Consulta por Serviço: quanto foi gasto em cada subKey ── */}
       <Card T={T}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
-          <PanelTitle T={T} title="Consulta por Serviço"
-            subtitle="Quanto gastamos em um serviço específico — respeita os filtros de período e categoria acima"/>
+          <PanelTitle T={T} title="Consulta de Gastos"
+            subtitle="Quanto gastamos por serviço ou por fornecedor — respeita os filtros de período e categoria acima"/>
           <div style={{display:"flex",alignItems:"center",gap:6,padding:"16px 20px 0",flexWrap:"wrap"}}>
-            <Chip T={T} ativo={servMetrica==="realizado"} onClick={()=>setServMetrica("realizado")}>Realizado (NF)</Chip>
-            <Chip T={T} ativo={servMetrica==="provisionado"} onClick={()=>setServMetrica("provisionado")}>Provisionado</Chip>
-            <Chip T={T} ativo={servMetrica==="orcado"} onClick={()=>setServMetrica("orcado")}>Orçado</Chip>
+            <Chip T={T} ativo={consultaModo==="servico"} onClick={()=>setConsultaModo("servico")}>Por serviço</Chip>
+            <Chip T={T} ativo={consultaModo==="fornecedor"} onClick={()=>setConsultaModo("fornecedor")}>Por fornecedor</Chip>
+            {consultaModo === "servico" && <>
+              <span style={{width:1,height:20,background:T.border,margin:"0 4px"}}/>
+              <Chip T={T} ativo={servMetrica==="realizado"} onClick={()=>setServMetrica("realizado")}>Realizado (NF)</Chip>
+              <Chip T={T} ativo={servMetrica==="provisionado"} onClick={()=>setServMetrica("provisionado")}>Provisionado</Chip>
+              <Chip T={T} ativo={servMetrica==="orcado"} onClick={()=>setServMetrica("orcado")}>Orçado</Chip>
+            </>}
           </div>
         </div>
 
+        {consultaModo === "servico" && <>
         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"12px 20px 0"}}>
           <Search size={14} color={T.textSm}/>
           <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Serviço</span>
@@ -453,6 +507,87 @@ export default function TabGraficos({ divulgados = [], T }) {
             })}
           </div>
         </div>
+        </>}
+
+        {/* ── Modo fornecedor: gasto NF por fornecedor ── */}
+        {consultaModo === "fornecedor" && (fornecedoresNF.length === 0 ? (
+          <p style={{fontSize:12,color:T.textSm,padding:"14px 20px 20px",margin:0}}>Nenhuma NF por jogo no período filtrado.</p>
+        ) : <>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"12px 20px 0"}}>
+          <Search size={14} color={T.textSm}/>
+          <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Fornecedor</span>
+          <select value={fornSelA?.key || ""} onChange={e=>setFornA(e.target.value)}
+            style={{background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontSize:13,fontWeight:600,fontFamily:"inherit",cursor:"pointer",maxWidth:280}}>
+            {fornecedoresNF.map(f => <option key={f.key} value={f.key}>{f.nome}</option>)}
+          </select>
+          <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginLeft:8}}>Comparar com</span>
+          <select value={fornB} onChange={e=>setFornB(e.target.value)}
+            style={{background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,borderRadius:8,color:fornB?T.text:T.textSm,padding:"7px 10px",fontSize:13,fontWeight:600,fontFamily:"inherit",cursor:"pointer",maxWidth:280}}>
+            <option value="">— nenhum —</option>
+            {fornecedoresNF.filter(f => f.key !== fornSelA?.key).map(f => <option key={f.key} value={f.key}>{f.nome}</option>)}
+          </select>
+          <span style={{fontSize:10,color:T.textSm}}>Valores de NFs aprovadas por jogo (realizado).</span>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,padding:"14px 20px 4px"}}>
+          {[fornSelA, fornSelB].filter(Boolean).map(f => (
+            <div key={f.key} style={{gridColumn:"1 / -1",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {[
+                { label:`${f.nome} · Total NF`,     valor:fmtRs(f.total), cor:"#2563EB" },
+                { label:`${f.nome} · Notas`,        valor:String(f.notasIds.size), cor:brand },
+                { label:`${f.nome} · Jogos`,        valor:String(f.jogosIds.size), cor:"#D97706" },
+                { label:`${f.nome} · Média/jogo`,   valor:fmtRs(f.jogosIds.size ? f.total / f.jogosIds.size : 0), cor:"#a855f7" },
+              ].map(k => (
+                <div key={k.label} style={{background:T.bg,border:`1px solid ${T.border}`,borderTop:`3px solid ${k.cor}`,borderRadius:10,padding:"10px 14px"}}>
+                  <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:0.6,textTransform:"uppercase",margin:"0 0 4px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={k.label}>{k.label}</p>
+                  <p className="num" style={{fontSize:17,fontWeight:700,color:T.text,margin:0}}>{k.valor}</p>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"minmax(380px,2fr) minmax(280px,1fr)",gap:16,padding:"8px 16px 16px"}}>
+          <div>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={fornecedorRodada}>
+                <CartesianGrid {...gridProps}/>
+                <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={false}/>
+                <YAxis tickFormatter={fmtK} tick={axisTick} axisLine={axisLine} tickLine={false} width={54}/>
+                <Tooltip content={<TipBox T={T}/>}/>
+                <Legend wrapperStyle={{fontSize:12}}/>
+                <Bar dataKey="a" name={fornSelA?.nome || "Fornecedor"} fill="#2563EB" barSize={fornSelB?12:18} radius={[4,4,0,0]}/>
+                {fornSelB && <Bar dataKey="b" name={fornSelB.nome} fill="#94a3b8" barSize={12} radius={[4,4,0,0]}/>}
+              </ComposedChart>
+            </ResponsiveContainer>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0",paddingLeft:8}}>NFs do fornecedor por rodada — NFs repetidas (mesma nota em vários registros) já divididas.</p>
+          </div>
+          <div>
+            <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"6px 0 10px"}}>
+              Top fornecedores no período (clique para consultar)
+            </p>
+            {fornecedoresNF.slice(0, 10).map(f => {
+              const max = fornecedoresNF[0]?.total || 1;
+              const ativo = f.key === fornSelA?.key;
+              return (
+                <button key={f.key} onClick={()=>setFornA(f.key)} style={{
+                  display:"block",width:"100%",textAlign:"left",cursor:"pointer",
+                  background: ativo ? "#2563EB14" : "transparent",
+                  border:"none",borderRadius:8,padding:"5px 8px",marginBottom:2,fontFamily:"inherit",
+                }}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:11,color:ativo?T.text:T.textMd,fontWeight:ativo?700:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"70%"}}>{f.nome}</span>
+                    <span className="num" style={{fontSize:11,fontWeight:700,color:T.text}}>{fmtK(f.total)}</span>
+                  </div>
+                  <div style={{height:6,borderRadius:3,background:"#2563EB22",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${(f.total/max)*100}%`,background:"#2563EB",borderRadius:3,transition:"width .4s ease"}}/>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        </>)}
       </Card>
 
       {/* ── Linha 2: curva acumulada + termômetro de decisão ── */}

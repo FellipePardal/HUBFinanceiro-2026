@@ -442,8 +442,6 @@ export default function TabGraficos({ divulgados = [], notas = [], dedupeNotasPo
                 { label:`${c.info?.label} · Orçado`,       valor:fmtRs(c.orc),  cor:"#94a3b8" },
                 { label:`${c.info?.label} · Provisionado`, valor:fmtRs(c.prov), cor:brand },
                 { label:`${c.info?.label} · Realizado NF`, valor:fmtRs(c.real), cor:"#2563EB" },
-                { label:`${c.info?.label} · Saving`,       valor:fmtRs(Math.abs(c.saving)), cor:c.saving>=0?GREEN:RED,
-                  sub:`${c.saving>=0?"dentro do orçado":"estouro"} · ${c.savingBase}` },
                 { label:`${c.info?.label} · Média/jogo`,   valor:fmtRs(c.medio), cor:c.info?.catColor||"#D97706",
                   sub:`${c.nJogos} jogos com o serviço` },
               ].map(k => (

@@ -41,6 +41,21 @@ export const SUBS_LIVEMODE_KEYS = ["maquinas", "starlink", "downlink", "distribu
 // Célula vazia herda o valor base da premissa do padrão para aquele subKey.
 export const SUBS_PADRAO_FAIXA_KEYS = ["um_b1", "um_b2", "um_b3", "geradores", "sng"];
 
+// Regras especiais do construtor (não editáveis linha a linha):
+//   • dslr + dslrs_transmissor são o MESMO serviço — unificados na linha `dslr`,
+//     com preço por quantidade contratada (1, 2 ou 3 DSLRs): orc.dslrTabela.
+//     A quantidade vem do padrão (orc.dslrQtd[padrao]) e o jogo pode sobrepor.
+//   • infra ("Infra + Distr.") é a SOMA das linhas Livemode — derivada, nunca
+//     digitada, para não duplicar o valor no orçamento.
+export const SUBS_NAO_EDITAVEIS = ["dslr", "dslrs_transmissor", "infra"];
+export const DSLR_QTDS = [1, 2, 3];
+
+export const valorDSLR = (orc, padrao, qtdOverride) => {
+  const qtd = qtdOverride ?? orc?.dslrQtd?.[padrao] ?? 0;
+  if (!qtd) return 0;
+  return Number(orc?.dslrTabela?.[qtd]) || 0;
+};
+
 // Legado (formato antigo da matriz, célula "um" sem subKey): infere a linha de
 // UM do padrão pela premissa preenchida ou pelo nome.
 export const umKeyDoPadrao = (orc, padrao) => {
@@ -113,6 +128,8 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
     padroes: [],
     premissas: {},          // { [padrao]: { [subKey]: number } }
     premissasFaixa: {},     // { [padrao]: { [faixaKey]: { [subKey]: valor } } } — célula vazia herda a premissa
+    dslrTabela: { 1: 0, 2: 0, 3: 0 },  // preço por quantidade de DSLRs contratadas
+    dslrQtd: {},            // { [padrao]: 0|1|2|3 } — quantidade padrão de DSLRs
     faixas: FAIXAS_PRESET.map(f => ({ ...f, logistica: { ...f.logistica } })),
     pracas: [],             // [{ id, cidade, faixaKey, logistica?:{5 subs} — própria vence a faixa }]
     jogos: [],              // [{ id, fase, rodada, mandante, visitante, pracaId, padrao, data, obs, overrides:{} }]
@@ -150,6 +167,12 @@ export const calcOrcadoJogo = (orc, jogo) => {
     if (pf[k] != null && pf[k] !== "") out[k] = Number(pf[k]) || 0;
   }
   if (pf.um != null && pf.um !== "") out[umKeyDoPadrao(orc, jogo?.padrao)] = Number(pf.um) || 0; // legado
+  // DSLR unificado (Microlink/Transmissor): preço pela quantidade contratada —
+  // a do padrão, ou a sobreposta no jogo
+  out.dslr = valorDSLR(orc, jogo?.padrao, jogo?.dslrQtd);
+  out.dslrs_transmissor = 0;
+  // Infra + Distr. é derivada: a soma já está nas linhas Livemode — zera para não duplicar
+  out.infra = 0;
   // Montagem de véspera: 50% do gerador + 30% da UM (já ajustados) na linha própria
   if (jogo?.antes13h) {
     const um = (out.um_b1 || 0) + (out.um_b2 || 0) + (out.um_b3 || 0);

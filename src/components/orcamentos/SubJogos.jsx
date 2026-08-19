@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, CATS, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { calcOrcadoJogo, blocosJogo, GRUPOS_PREMISSA } from "../../data/orcamentos";
+import { calcOrcadoJogo, blocosJogo, GRUPOS_PREMISSA, SUBS_NAO_EDITAVEIS, DSLR_QTDS, valorDSLR } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { CalendarDays, Plus, Trash2, Copy, ChevronDown, ChevronUp, Eraser, Zap } from "lucide-react";
 
@@ -221,7 +221,8 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                       <td colSpan={pontosCorridos ? 13 : 14} style={{padding:"14px 20px", borderTop:`1px dashed ${T.border}`}}>
                         <DetalheOverrides orc={orc} jogo={j} readOnly={readOnly} T={T}
                           onSetOverride={(k, v)=>setOverride(j.id, k, v)}
-                          onLimpar={()=>limparOverrides(j.id)}/>
+                          onLimpar={()=>limparOverrides(j.id)}
+                          onPatch={(patch)=>patchJogo(j.id, patch)}/>
                       </td>
                     </tr>
                   ),
@@ -265,11 +266,12 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
 
 // Linha expandida: overrides por subKey — placeholder mostra o valor derivado
 // (premissa + faixa); digitar cria o override; limpar o campo remove.
-function DetalheOverrides({ orc, jogo, readOnly, T, onSetOverride, onLimpar }) {
+function DetalheOverrides({ orc, jogo, readOnly, T, onSetOverride, onLimpar, onPatch }) {
   const IS = iSty(T);
   const semOverrides = { ...jogo, overrides: {} };
   const base = calcOrcadoJogo(orc, semOverrides);
   const nOverrides = Object.keys(jogo.overrides || {}).length;
+  const qtdPadrao = orc.dslrQtd?.[jogo.padrao] ?? 0;
 
   return (
     <div>
@@ -280,12 +282,28 @@ function DetalheOverrides({ orc, jogo, readOnly, T, onSetOverride, onLimpar }) {
         <p style={{margin:0,fontSize:11,color:T.textSm}}>
           Cinza = valor derivado (premissa + faixa). Digite para sobrescrever; apague para voltar ao derivado.
         </p>
+        {/* DSLR: o jogo pode sobrepor a quantidade do padrão */}
+        <span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:T.textMd,fontWeight:600}}>
+          DSLRs:
+          <select value={jogo.dslrQtd ?? ""} disabled={readOnly}
+            onChange={e=>onPatch({ dslrQtd: e.target.value === "" ? null : (parseInt(e.target.value) || 0) })}
+            style={{...IS, maxWidth:120, fontSize:11, padding:"3px 6px",
+                    borderColor: jogo.dslrQtd != null ? (T.warning||"#D97706")+"88" : undefined,
+                    opacity: readOnly ? 0.7 : 1}}>
+            <option value="">Herda ({qtdPadrao || "—"})</option>
+            <option value={0}>0</option>
+            {DSLR_QTDS.map(q => <option key={q} value={q}>{q}</option>)}
+          </select>
+          <span className="num" style={{fontFamily:FONT.num,color:T.textSm}}>{fmt(valorDSLR(orc, jogo.padrao, jogo.dslrQtd))}</span>
+        </span>
         {!readOnly && nOverrides > 0 && (
           <Button T={T} variant="ghost" size="sm" icon={Eraser} onClick={onLimpar}>Limpar overrides ({nOverrides})</Button>
         )}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
-        {[{ key:CATS[0].key, label:CATS[0].label, color:CATS[0].color, subs:CATS[0].subs }, ...GRUPOS_PREMISSA].map(cat => (
+        {[{ key:CATS[0].key, label:CATS[0].label, color:CATS[0].color, subs:CATS[0].subs }, ...GRUPOS_PREMISSA]
+          .map(g => ({ ...g, subs: g.subs.filter(s => s.key === "dslr" || !SUBS_NAO_EDITAVEIS.includes(s.key)) }))
+          .map(cat => (
           <div key={cat.key}>
             <p style={{margin:"0 0 8px",fontSize:10,fontWeight:700,color:cat.color,letterSpacing:"0.08em",textTransform:"uppercase"}}>{cat.label}</p>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>

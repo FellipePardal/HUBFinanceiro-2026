@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { PADROES_SUGERIDOS, GRUPOS_PREMISSA, SUBS_PADRAO_FAIXA_KEYS } from "../../data/orcamentos";
+import { PADROES_SUGERIDOS, GRUPOS_PREMISSA, SUBS_PADRAO_FAIXA_KEYS, SUBS_NAO_EDITAVEIS, DSLR_QTDS, valorDSLR } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { Layers, Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -65,8 +65,11 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
     });
   };
 
-  const totalPadrao = (p) =>
-    Object.values(orc.premissas?.[p] || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  const totalPadrao = (p) => {
+    const prem = orc.premissas?.[p] || {};
+    return Object.entries(prem).reduce((s, [k, v]) =>
+      SUBS_NAO_EDITAVEIS.includes(k) ? s : s + (Number(v) || 0), 0) + valorDSLR(orc, p);
+  };
 
   // Matriz padrão × faixa (sub-linhas de UM/Geradores/SNG): célula vazia
   // herda a premissa base do padrão para aquele subKey.
@@ -142,9 +145,15 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
       {/* ── Matriz de premissas (grupos recolhíveis) ── */}
       {padroes.length > 0 && gruposPremissa.map(cat => {
         const aberto = !!abertos[cat.key];
-        const resumoFechado = padroes
-          .map(p => `${p} ${fmt(cat.subs.reduce((s, sub) => s + (Number(orc.premissas?.[p]?.[sub.key]) || 0), 0))}`)
-          .join(" · ");
+        const ehOperacoes = cat.key === "operacoes";
+        const ehLivemode = cat.key === "livemode";
+        // dslr/dslrs_transmissor/infra não são editáveis linha a linha:
+        // DSLR vira linha especial (qtd × tabela) e Infra+Distr é derivada.
+        const subsEditaveis = cat.subs.filter(sub => !SUBS_NAO_EDITAVEIS.includes(sub.key));
+        const totalGrupo = (p) =>
+          subsEditaveis.reduce((s, sub) => s + (Number(orc.premissas?.[p]?.[sub.key]) || 0), 0)
+          + (ehOperacoes ? valorDSLR(orc, p) : 0);
+        const resumoFechado = padroes.map(p => `${p} ${fmt(totalGrupo(p))}`).join(" · ");
         return (
         <Card T={T} key={cat.key}>
           <button onClick={()=>toggleAberto(cat.key)} style={{
@@ -172,7 +181,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
               <div style={{minWidth:0}}>
                 <h3 style={{margin:0,fontSize:13,fontWeight:600,color:T.text,letterSpacing:"-0.005em"}}>{cat.label}</h3>
                 <p style={{margin:"2px 0 0",fontSize:11,color:T.textSm,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                  {aberto ? `Valores por jogo, para cada padrão — ${cat.subs.length} linhas` : resumoFechado}
+                  {aberto ? `Valores por jogo, para cada padrão — ${subsEditaveis.length + (ehOperacoes ? 1 : 0)} linhas` : resumoFechado}
                 </p>
               </div>
             </div>
@@ -190,7 +199,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                 </tr>
               </thead>
               <tbody>
-                {cat.subs.map(sub => {
+                {subsEditaveis.map(sub => {
                   const porFaixa = SUBS_PADRAO_FAIXA_KEYS.includes(sub.key) && faixas.length > 0;
                   const faixasAbertas = porFaixa && !!faixasVisiveis[sub.key];
                   const celulasPreenchidas = porFaixa
@@ -283,16 +292,71 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                     )) : []),
                   ];
                 })}
+                {/* DSLR unificado: quantidade por padrão × tabela de preço por quantidade */}
+                {ehOperacoes && (
+                  <tr style={ts.tr}>
+                    <td style={{...ts.td, color: cat.color, fontWeight:500, fontSize:12}}>
+                      DSLR (Microlink/Transmissor)
+                      <span style={{color:T.textSm, fontWeight:400, fontSize:10}}> · quantidade por padrão</span>
+                    </td>
+                    {padroes.map(p => {
+                      const qtd = orc.dslrQtd?.[p] ?? 0;
+                      return (
+                        <td key={p} style={{...ts.tdNum, padding:"6px 10px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end"}}>
+                            <select value={qtd} disabled={readOnly}
+                              onChange={e=>setOrc(prev => ({ ...prev, dslrQtd: { ...(prev.dslrQtd || {}), [p]: parseInt(e.target.value) || 0 } }))}
+                              style={{...IS, maxWidth:64, fontSize:12, padding:"5px 6px",
+                                      background: qtd ? (cat.color+"0d") : (T.surface||T.bg),
+                                      opacity: readOnly ? 0.7 : 1}}>
+                              <option value={0}>—</option>
+                              {DSLR_QTDS.map(q => <option key={q} value={q}>{q}</option>)}
+                            </select>
+                            <span className="num" style={{fontSize:11,color:T.textMd,fontFamily:FONT.num,minWidth:64,textAlign:"right"}}>
+                              {fmt(valorDSLR(orc, p))}
+                            </span>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )}
                 <tr style={ts.totalRow}>
-                  <td style={{...ts.td, fontWeight:700, fontSize:12}}>Total {cat.label}</td>
-                  {padroes.map(p => {
-                    const t = cat.subs.reduce((s, sub) => s + (Number(orc.premissas?.[p]?.[sub.key]) || 0), 0);
-                    return <td key={p} style={{...ts.tdNum, fontWeight:700}}>{fmt(t)}</td>;
-                  })}
+                  <td style={{...ts.td, fontWeight:700, fontSize:12}}>
+                    {ehLivemode ? "Total Livemode = Infra + Distr." : `Total ${cat.label}`}
+                    {ehLivemode && <span style={{color:T.textSm, fontWeight:400, fontSize:10}}> · derivado, não se repete no orçamento</span>}
+                  </td>
+                  {padroes.map(p => (
+                    <td key={p} style={{...ts.tdNum, fontWeight:700}}>{fmt(totalGrupo(p))}</td>
+                  ))}
                 </tr>
               </tbody>
             </table>
           </div>}
+          {/* Tabela de preço do DSLR por quantidade contratada */}
+          {aberto && ehOperacoes && (
+            <div style={{padding:"12px 20px 16px",borderTop:`1px solid ${T.border}`,display:"flex",gap:14,alignItems:"flex-end",flexWrap:"wrap"}}>
+              <span style={{fontSize:11,color:cat.color,fontWeight:700,paddingBottom:6}}>Preço DSLR por quantidade:</span>
+              {DSLR_QTDS.map(q => (
+                <div key={q}>
+                  <label style={{display:"block",fontSize:10,color:T.textSm,fontWeight:600,marginBottom:3,letterSpacing:"0.04em",textTransform:"uppercase"}}>{q} DSLR{q>1?"s":""}</label>
+                  <input
+                    value={orc.dslrTabela?.[q] ?? ""}
+                    disabled={readOnly}
+                    onChange={e=>{
+                      const v = String(e.target.value).replace(/[^0-9.,\-]/g, "").replace(",", ".");
+                      setOrc(prev => ({ ...prev, dslrTabela: { ...(prev.dslrTabela || {}), [q]: v === "" ? 0 : (parseFloat(v) || 0) } }));
+                    }}
+                    placeholder="0"
+                    inputMode="decimal"
+                    style={{...IS, maxWidth:110, textAlign:"right", fontFamily:FONT.num, fontSize:12, padding:"5px 8px",
+                            background: Number(orc.dslrTabela?.[q]) ? (cat.color+"0d") : (T.surface||T.bg),
+                            opacity: readOnly ? 0.7 : 1}}/>
+                </div>
+              ))}
+              <span style={{fontSize:10,color:T.textSm,paddingBottom:8}}>O valor do jogo usa a quantidade do padrão (o jogo pode sobrepor no detalhe).</span>
+            </div>
+          )}
         </Card>
         );
       })}

@@ -56,15 +56,17 @@ export const valorDSLR = (orc, padrao, qtdOverride) => {
   return Number(orc?.dslrTabela?.[qtd]) || 0;
 };
 
-// Legado (formato antigo da matriz, célula "um" sem subKey): infere a linha de
-// UM do padrão pela premissa preenchida ou pelo nome.
+// Linha de UM de cada padrão: o NOME do padrão manda (B1→um_b1, B2→um_b2,
+// B3/B3+→um_b3) — as outras linhas de UM ficam travadas para esse padrão.
+// Nome sem B1/B2/B3: usa a premissa preenchida como pista; senão um_b3.
 export const umKeyDoPadrao = (orc, padrao) => {
-  const prem = orc?.premissas?.[padrao] || {};
-  const comValor = ["um_b1", "um_b2", "um_b3"].filter(k => Number(prem[k]) > 0);
-  if (comValor.length === 1) return comValor[0];
   const s = String(padrao || "").toLowerCase();
   if (s.includes("b1")) return "um_b1";
   if (s.includes("b2")) return "um_b2";
+  if (s.includes("b3")) return "um_b3";
+  const prem = orc?.premissas?.[padrao] || {};
+  const comValor = ["um_b1", "um_b2", "um_b3"].filter(k => Number(prem[k]) > 0);
+  if (comValor.length === 1) return comValor[0];
   return "um_b3";
 };
 
@@ -166,6 +168,10 @@ export const calcOrcadoJogo = (orc, jogo) => {
     if (pf[k] != null && pf[k] !== "") out[k] = Number(pf[k]) || 0;
   }
   if (pf.um != null && pf.um !== "") out[umKeyDoPadrao(orc, jogo?.padrao)] = Number(pf.um) || 0; // legado
+  // Trava de categoria: só a linha de UM do padrão conta — valores digitados
+  // por engano nas outras linhas de UM nunca entram no jogo
+  const umKey = umKeyDoPadrao(orc, jogo?.padrao);
+  ["um_b1", "um_b2", "um_b3"].forEach(k => { if (k !== umKey) out[k] = 0; });
   // DSLR unificado (Microlink/Transmissor): preço pela quantidade contratada —
   // a do padrão, ou a sobreposta no jogo
   out.dslr = valorDSLR(orc, jogo?.padrao, jogo?.dslrQtd);

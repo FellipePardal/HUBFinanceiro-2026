@@ -73,7 +73,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
   const totalPadrao = (p) => {
     const prem = orc.premissas?.[p] || {};
     return Object.entries(prem).reduce((s, [k, v]) =>
-      SUBS_NAO_EDITAVEIS.includes(k) ? s : s + (Number(v) || 0), 0) + valorDSLR(orc, p);
+      (SUBS_NAO_EDITAVEIS.includes(k) || !celulaAtiva(k, p)) ? s : s + (Number(v) || 0), 0) + valorDSLR(orc, p);
   };
 
   // Matriz padrão × faixa (sub-linhas de UM/Geradores/SNG): célula vazia
@@ -156,7 +156,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
         // DSLR vira linha especial (qtd × tabela) e Infra+Distr é derivada.
         const subsEditaveis = cat.subs.filter(sub => !SUBS_NAO_EDITAVEIS.includes(sub.key));
         const totalGrupo = (p) =>
-          subsEditaveis.reduce((s, sub) => s + (Number(orc.premissas?.[p]?.[sub.key]) || 0), 0)
+          subsEditaveis.reduce((s, sub) => celulaAtiva(sub.key, p) ? s + (Number(orc.premissas?.[p]?.[sub.key]) || 0) : s, 0)
           + (ehOperacoes ? valorDSLR(orc, p) : 0);
         const resumoFechado = padroes.map(p => `${p} ${fmt(totalGrupo(p))}`).join(" · ");
         return (

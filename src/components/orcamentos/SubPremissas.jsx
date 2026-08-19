@@ -14,6 +14,9 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
   // Grupos da matriz recolhidos por padrão — a tabela é grande; abre o que precisa.
   const [abertos, setAbertos] = useState({});
   const toggleAberto = (key) => setAbertos(prev => ({ ...prev, [key]: !prev[key] }));
+  // Sub-linhas de faixa (UM/Geradores/SNG) começam ocultas — botão na linha base mostra.
+  const [faixasVisiveis, setFaixasVisiveis] = useState({});
+  const toggleFaixas = (subKey) => setFaixasVisiveis(prev => ({ ...prev, [subKey]: !prev[subKey] }));
 
   const padroes = orc.padroes || [];
   const faixas = orc.faixas || [];
@@ -189,11 +192,35 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
               <tbody>
                 {cat.subs.map(sub => {
                   const porFaixa = SUBS_PADRAO_FAIXA_KEYS.includes(sub.key) && faixas.length > 0;
+                  const faixasAbertas = porFaixa && !!faixasVisiveis[sub.key];
+                  const celulasPreenchidas = porFaixa
+                    ? padroes.reduce((n, p) => n + faixas.filter(f => {
+                        const v = orc.premissasFaixa?.[p]?.[f.key]?.[sub.key];
+                        return v != null && v !== "";
+                      }).length, 0)
+                    : 0;
                   return [
                     <tr key={sub.key} style={ts.tr}>
                       <td style={{...ts.td, color: cat.color, fontWeight:500, fontSize:12}}>
-                        {sub.label}
-                        {porFaixa && <span style={{color:T.textSm, fontWeight:400, fontSize:10}}> · base (faixas abaixo)</span>}
+                        <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
+                          {sub.label}
+                          {porFaixa && (
+                            <button onClick={()=>toggleFaixas(sub.key)}
+                              title={faixasAbertas ? "Ocultar valores por faixa" : "Mostrar valores por faixa de distância"}
+                              style={{
+                                display:"inline-flex", alignItems:"center", gap:4,
+                                border:`1px solid ${faixasAbertas ? "#D9770688" : T.border}`,
+                                background: faixasAbertas ? "#D9770614" : "transparent",
+                                color: celulasPreenchidas > 0 || faixasAbertas ? "#D97706" : T.textSm,
+                                borderRadius:6, padding:"2px 8px",
+                                fontSize:10, fontWeight:600, cursor:"pointer",
+                                fontFamily:FONT.ui, whiteSpace:"nowrap",
+                              }}>
+                              {faixasAbertas ? <ChevronUp size={11}/> : <ChevronDown size={11}/>}
+                              faixas{celulasPreenchidas > 0 ? ` · ${celulasPreenchidas}` : ""}
+                            </button>
+                          )}
+                        </span>
                       </td>
                       {padroes.map(p => {
                         const v = orc.premissas?.[p]?.[sub.key];
@@ -221,7 +248,7 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                     </tr>,
                     // Sub-linhas por faixa (UM/Geradores/SNG): valor absoluto para
                     // jogos naquela faixa; vazio herda a linha base acima.
-                    ...(porFaixa ? faixas.map(f => (
+                    ...(faixasAbertas ? faixas.map(f => (
                       <tr key={`${sub.key}-${f.key}`} style={{...ts.tr, background:T.surfaceAlt||T.bg}}>
                         <td style={{...ts.td, padding:"4px 14px 4px 28px", fontSize:11, color:T.textMd}}>
                           └ {f.label}

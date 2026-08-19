@@ -6,7 +6,7 @@ import {
 import { fmt, fmtK, fmtRs, subTotal, catTotal } from "../../utils";
 import { CATS } from "../../constants";
 import { Card, PanelTitle } from "../ui";
-import { TrendingUp, TrendingDown, Target, Trophy, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, Trophy, AlertTriangle, Search } from "lucide-react";
 
 // ─── Painel de Análise ────────────────────────────────────────────────────────
 // Dashboard interativo para tomada de decisão: filtros de rodada/categoria no
@@ -104,10 +104,16 @@ function StatTile({ label, value, sub, subColor, color, spark, sparkColor, T }) 
   );
 }
 
+// Todos os serviços (subKeys) com a categoria de origem — para a Consulta por Serviço
+const SUBS_ALL = CATS.flatMap(c => c.subs.map(s => ({ key: s.key, label: s.label, catLabel: c.label, catColor: c.color })));
+
 export default function TabGraficos({ divulgados = [], T }) {
   const [periodo, setPeriodo] = useState("todas");   // todas | u5 | u10
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [maturidade, setMaturidade] = useState(5);   // rodadas recentes ignoradas na calibração (NFs ainda chegando)
+  const [servA, setServA] = useState("coord_um");    // Consulta por Serviço
+  const [servB, setServB] = useState("");            // comparação opcional
+  const [servMetrica, setServMetrica] = useState("realizado"); // orcado | provisionado | realizado
 
   const categorias = useMemo(() =>
     Array.from(new Set(divulgados.map(j => j.categoria).filter(Boolean))).sort(),
@@ -253,6 +259,48 @@ export default function TabGraficos({ divulgados = [], T }) {
       .slice(0, 10),
   [jogos]);
 
+  // ── Consulta por Serviço: gasto por subKey no slice filtrado ────────────────
+  const somaServico = (j, tipo, key) => Number(j?.[tipo]?.[key]) || 0;
+
+  const consultaTotais = useMemo(() => {
+    const calc = (key) => {
+      if (!key) return null;
+      const info = SUBS_ALL.find(s => s.key === key);
+      let orc = 0, prov = 0, real = 0, nJogos = 0;
+      jogos.forEach(j => {
+        const o = somaServico(j, "orcado", key), p = somaServico(j, "provisionado", key), r = somaServico(j, "realizado", key);
+        orc += o; prov += p; real += r;
+        if (o > 0 || p > 0 || r > 0) nJogos++;
+      });
+      return { key, info, orc, prov, real, nJogos,
+               saving: orc - prov,
+               medio: nJogos ? { orcado: orc, provisionado: prov, realizado: real }[servMetrica] / nJogos : 0 };
+    };
+    return { a: calc(servA), b: calc(servB) };
+  }, [jogos, servA, servB, servMetrica]);
+
+  const consultaRodada = useMemo(() => {
+    const map = {};
+    jogos.forEach(j => {
+      const r = j.rodada;
+      if (!map[r]) map[r] = { rodada: r, name: `R${r}`, a: 0, b: 0, aOrc: 0 };
+      map[r].a    += somaServico(j, servMetrica === "orcado" ? "orcado" : servMetrica === "provisionado" ? "provisionado" : "realizado", servA);
+      map[r].aOrc += somaServico(j, "orcado", servA);
+      if (servB) map[r].b += somaServico(j, servMetrica === "orcado" ? "orcado" : servMetrica === "provisionado" ? "provisionado" : "realizado", servB);
+    });
+    return Object.values(map).sort((x, y) => x.rodada - y.rodada);
+  }, [jogos, servA, servB, servMetrica]);
+
+  // Ranking dos serviços mais gastos no slice (mesma métrica) — clique define a consulta
+  const rankingServicos = useMemo(() => {
+    const tipo = servMetrica === "orcado" ? "orcado" : servMetrica === "provisionado" ? "provisionado" : "realizado";
+    return SUBS_ALL
+      .map(s => ({ ...s, total: jogos.reduce((acc, j) => acc + somaServico(j, tipo, s.key), 0) }))
+      .filter(s => s.total > 0)
+      .sort((x, y) => y.total - x.total)
+      .slice(0, 10);
+  }, [jogos, servMetrica]);
+
   const brand = T.brand || "#10b981";
   const gridProps = { stroke: T.border, vertical: false };
   const axisTick = { fill: T.textMd, fontSize: 11 };
@@ -293,6 +341,119 @@ export default function TabGraficos({ divulgados = [], T }) {
           sub={`${Math.min(999,tot.nfPct).toFixed(0)}% do provisionado`} subColor={T.textMd}
           spark={porRodada.map(r=>r.realAcum)} sparkColor="#D97706"/>
       </div>
+
+      {/* ── Consulta por Serviço: quanto foi gasto em cada subKey ── */}
+      <Card T={T}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <PanelTitle T={T} title="Consulta por Serviço"
+            subtitle="Quanto gastamos em um serviço específico — respeita os filtros de período e categoria acima"/>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"16px 20px 0",flexWrap:"wrap"}}>
+            <Chip T={T} ativo={servMetrica==="realizado"} onClick={()=>setServMetrica("realizado")}>Realizado (NF)</Chip>
+            <Chip T={T} ativo={servMetrica==="provisionado"} onClick={()=>setServMetrica("provisionado")}>Provisionado</Chip>
+            <Chip T={T} ativo={servMetrica==="orcado"} onClick={()=>setServMetrica("orcado")}>Orçado</Chip>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",padding:"12px 20px 0"}}>
+          <Search size={14} color={T.textSm}/>
+          <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Serviço</span>
+          <select value={servA} onChange={e=>setServA(e.target.value)}
+            style={{background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,borderRadius:8,color:T.text,padding:"7px 10px",fontSize:13,fontWeight:600,fontFamily:"inherit",cursor:"pointer",maxWidth:260}}>
+            {CATS.map(c => (
+              <optgroup key={c.key} label={c.label}>
+                {c.subs.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginLeft:8}}>Comparar com</span>
+          <select value={servB} onChange={e=>setServB(e.target.value)}
+            style={{background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`,borderRadius:8,color:servB?T.text:T.textSm,padding:"7px 10px",fontSize:13,fontWeight:600,fontFamily:"inherit",cursor:"pointer",maxWidth:260}}>
+            <option value="">— nenhum —</option>
+            {CATS.map(c => (
+              <optgroup key={c.key} label={c.label}>
+                {c.subs.filter(s => s.key !== servA).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {/* KPIs do(s) serviço(s) */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,padding:"14px 20px 4px"}}>
+          {[consultaTotais.a, consultaTotais.b].filter(Boolean).map(c => (
+            <div key={c.key} style={{gridColumn:"1 / -1",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {[
+                { label:`${c.info?.label} · Orçado`,       valor:fmtRs(c.orc),  cor:"#94a3b8" },
+                { label:`${c.info?.label} · Provisionado`, valor:fmtRs(c.prov), cor:brand },
+                { label:`${c.info?.label} · Realizado NF`, valor:fmtRs(c.real), cor:"#2563EB" },
+                { label:`${c.info?.label} · Saving`,       valor:fmtRs(Math.abs(c.saving)), cor:c.saving>=0?GREEN:RED,
+                  sub:c.saving>=0?"dentro do orçado":"estouro" },
+                { label:`${c.info?.label} · Média/jogo`,   valor:fmtRs(c.medio), cor:c.info?.catColor||"#D97706",
+                  sub:`${c.nJogos} jogos com o serviço` },
+              ].map(k => (
+                <div key={k.label} style={{background:T.bg,border:`1px solid ${T.border}`,borderTop:`3px solid ${k.cor}`,borderRadius:10,padding:"10px 14px"}}>
+                  <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:0.6,textTransform:"uppercase",margin:"0 0 4px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={k.label}>{k.label}</p>
+                  <p className="num" style={{fontSize:17,fontWeight:700,color:T.text,margin:0}}>{k.valor}</p>
+                  {k.sub && <p style={{fontSize:10,color:k.cor,fontWeight:600,margin:"3px 0 0"}}>{k.sub}</p>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"minmax(380px,2fr) minmax(280px,1fr)",gap:16,padding:"8px 16px 16px"}}>
+          {/* Evolução por rodada do(s) serviço(s) */}
+          <div>
+            <ResponsiveContainer width="100%" height={280}>
+              <ComposedChart data={consultaRodada}>
+                <CartesianGrid {...gridProps}/>
+                <XAxis dataKey="name" tick={axisTick} axisLine={axisLine} tickLine={false}/>
+                <YAxis tickFormatter={fmtK} tick={axisTick} axisLine={axisLine} tickLine={false} width={54}/>
+                <Tooltip content={<TipBox T={T}/>}/>
+                <Legend wrapperStyle={{fontSize:12}}/>
+                <Bar dataKey="a" name={consultaTotais.a?.info?.label || "Serviço"} fill={consultaTotais.a?.info?.catColor || brand} barSize={servB?12:18} radius={[4,4,0,0]}/>
+                {servB && <Bar dataKey="b" name={consultaTotais.b?.info?.label || "Comparação"} fill="#94a3b8" barSize={12} radius={[4,4,0,0]}/>}
+                {servMetrica !== "orcado" && !servB && (
+                  <Line type="monotone" dataKey="aOrc" name="Orçado do serviço" stroke={T.textMd} strokeWidth={2} strokeDasharray="5 4"
+                    dot={false} activeDot={{r:4,stroke:T.surface||T.card,strokeWidth:2}}/>
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+            <p style={{fontSize:10,color:T.textSm,margin:"4px 0 0",paddingLeft:8}}>
+              {servMetrica === "realizado" ? "Realizado = NFs aprovadas por jogo." : servMetrica === "provisionado" ? "Provisionado por rodada." : "Orçado por rodada."}
+              {!servB && servMetrica !== "orcado" ? " Linha tracejada = orçado do serviço." : ""}
+            </p>
+          </div>
+
+          {/* Ranking: onde o dinheiro foi */}
+          <div>
+            <p style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"6px 0 10px"}}>
+              Top serviços · {servMetrica === "realizado" ? "realizado" : servMetrica} no período (clique para consultar)
+            </p>
+            {rankingServicos.length === 0 && <p style={{fontSize:12,color:T.textSm}}>Nenhum valor lançado ainda nessa métrica.</p>}
+            {rankingServicos.map(s => {
+              const max = rankingServicos[0]?.total || 1;
+              const ativo = s.key === servA;
+              return (
+                <button key={s.key} onClick={()=>setServA(s.key)} style={{
+                  display:"block",width:"100%",textAlign:"left",cursor:"pointer",
+                  background: ativo ? (s.catColor+"14") : "transparent",
+                  border:"none",borderRadius:8,padding:"5px 8px",marginBottom:2,fontFamily:"inherit",
+                }}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:11,color:ativo?T.text:T.textMd,fontWeight:ativo?700:500,display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",background:s.catColor,flexShrink:0}}/>{s.label}
+                    </span>
+                    <span className="num" style={{fontSize:11,fontWeight:700,color:T.text}}>{fmtK(s.total)}</span>
+                  </div>
+                  <div style={{height:6,borderRadius:3,background:s.catColor+"22",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${(s.total/max)*100}%`,background:s.catColor,borderRadius:3,transition:"width .4s ease"}}/>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
 
       {/* ── Linha 2: curva acumulada + termômetro de decisão ── */}
       <div style={{display:"grid",gridTemplateColumns:"minmax(380px,2fr) minmax(280px,1fr)",gap:16}}>

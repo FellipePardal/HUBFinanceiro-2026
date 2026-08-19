@@ -98,10 +98,9 @@ export const CATALOGO_SERVICOS_FIXOS = (() => {
 // Faixas de distância padrão — valores iniciais zerados exceto Uber (piso comum);
 // o operador ajusta na aba Praças & Logística.
 export const FAIXAS_PRESET = [
-  { key:"sp",        label:"SP",        logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"grande_sp", label:"Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"sp200",     label:"SP200",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
-  { key:"sp400",     label:"SP400",     logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp",    label:"SP / Grande SP", logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp200", label:"SP200",          logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
+  { key:"sp400", label:"SP400",          logistica:{ transporte:0, uber:250, hospedagem:0, diaria:0, outros_log:0 } },
 ];
 
 export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, icon, descricao }) => {

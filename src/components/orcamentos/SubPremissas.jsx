@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
-import { PADROES_SUGERIDOS, GRUPOS_PREMISSA, SUBS_PADRAO_FAIXA_KEYS, SUBS_NAO_EDITAVEIS, DSLR_QTDS, valorDSLR } from "../../data/orcamentos";
+import { PADROES_SUGERIDOS, GRUPOS_PREMISSA, SUBS_PADRAO_FAIXA_KEYS, SUBS_NAO_EDITAVEIS, DSLR_QTDS, valorDSLR, umKeyDoPadrao } from "../../data/orcamentos";
 import { fmt } from "../../utils";
 import { Layers, Plus, Trash2, Copy, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -64,6 +64,11 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
       return { ...prev, premissas: { ...prev.premissas, [p]: atual } };
     });
   };
+
+  // Linhas de UM já embutem a categoria (um_b1 = padrão B1): a célula só é
+  // ativa na coluna do padrão correspondente — as demais mostram "—".
+  const UM_KEYS = ["um_b1", "um_b2", "um_b3"];
+  const celulaAtiva = (subKey, p) => !UM_KEYS.includes(subKey) || umKeyDoPadrao(orc, p) === subKey;
 
   const totalPadrao = (p) => {
     const prem = orc.premissas?.[p] || {};
@@ -233,6 +238,10 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                       </td>
                       {padroes.map(p => {
                         const v = orc.premissas?.[p]?.[sub.key];
+                        if (!celulaAtiva(sub.key, p)) return (
+                          <td key={p} style={{...ts.tdNum, color:T.textSm, fontSize:11}}
+                            title={`${sub.label} não se aplica ao padrão ${p}`}>—</td>
+                        );
                         return (
                           <td key={p} style={{...ts.tdNum, padding:"6px 10px"}}>
                             <input
@@ -266,6 +275,9 @@ export default function SubPremissas({ orc, setOrc, readOnly, T }) {
                           const v = orc.premissasFaixa?.[p]?.[f.key]?.[sub.key];
                           const temValor = v != null && v !== "";
                           const base = Number(orc.premissas?.[p]?.[sub.key]) || 0;
+                          if (!celulaAtiva(sub.key, p)) return (
+                            <td key={p} style={{...ts.tdNum, color:T.textSm, fontSize:11}}>—</td>
+                          );
                           return (
                             <td key={p} style={{...ts.tdNum, padding:"4px 10px"}}>
                               <input

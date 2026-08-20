@@ -3,12 +3,13 @@ import { btnStyle, iSty } from "../../constants";
 import { parseBR, fmtNum, fmtR, fmtRs } from "../../utils";
 import { Card, Button } from "../ui";
 import { KPI } from "../shared";
-import { BarChart3, Lock, LayoutGrid, ChevronDown, ChevronRight, Settings2, X } from "lucide-react";
+import { BarChart3, Lock, LayoutGrid, ChevronDown, ChevronRight, Settings2, X, Receipt, Clock } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
   PieChart, Pie, Cell,
 } from "recharts";
 import { calcVariaveis, calcFixos, calcVisaoGeral, fmtBRL, MESES_FIX, MESES_SHORT } from "../../lib/apresentacoesCalc";
+import { buildFechamentoPorRodada } from "../../lib/fechamentoRodada";
 
 // Error Boundary para capturar erros de render e exibir mensagem em vez de tela branca
 class ErrorBoundary extends Component {
@@ -491,7 +492,151 @@ function AjustesFixos({ d, T, orcTotOvr, provTotOvr, gastoTotOvr, setField, setF
 // PPTX). Estado compartilhado: `apres` vive no app_state (uma chave por
 // campeonato, wire nos componentes-pai) — overrides valem para todos os
 // usuários, não mais por navegador.
-export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMensais = [], apres, setApres, orcGlobal = 0, mesInicio = 0, saldoUsaGasto = false, nomeCampeonato = "" }) {
+// ─── VIEW EXTRATO POR RODADA ─────────────────────────────────────────────────
+// A dor da entidade pagadora: o extrato bancário traz cada NF pelo valor cheio,
+// mas parte das NFs é compartilhada entre rodadas (mensais rateadas, blocos de
+// infra, reembolsos multi-rodada). Esta view mostra, NF a NF: valor no extrato,
+// parcela que pertence à rodada selecionada e ONDE está o restante — assim a
+// diferença "extrato × total da rodada" se explica sozinha na apresentação.
+const NATUREZA = {
+  exclusiva:     { label: "Exclusiva da rodada",      color: "#22c55e" },
+  compartilhada: { label: "Compartilhada entre rodadas", color: "#d97706" },
+  "Seg. Espacial":  { label: "Mensal rateada (Seg. Espacial)", color: "#f59e0b" },
+  "Infra Livemode": { label: "Infra Livemode (bloco)", color: "#a855f7" },
+  "liveU":          { label: "liveU (bloco)",          color: "#0ea5e9" },
+};
+const PillNat = ({ nat }) => {
+  const n = NATUREZA[nat] || NATUREZA.compartilhada;
+  return (
+    <span style={{background:n.color+"1a",color:n.color,border:`1px solid ${n.color}40`,borderRadius:99,
+      padding:"1px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",height:20}}>
+      {n.label}
+    </span>
+  );
+};
+
+function SlideExtrato({ fech, rodada, T }) {
+  // destino de cada NF em todos os grupos — pra dizer "onde está o restante"
+  const destinosPorNota = useMemo(() => {
+    const map = new Map();
+    const add = (k, label, valor) => { if (!map.has(k)) map.set(k, []); map.get(k).push({ label, valor }); };
+    fech.rodadas.forEach(r => {
+      r.diretas.forEach(l => add(`d${l.id}`, r.label, l.valor));
+      r.rateios.forEach(l => add(`${l.origem}_${l.notaId}`, r.label, l.valor));
+    });
+    fech.naoAlocado.forEach(l => add(`${l.origem}_${l.notaId}`, "Não alocado a rodadas", l.valor));
+    return map;
+  }, [fech]);
+
+  const r = rodada;
+  const linhas = useMemo(() => {
+    if (!r) return [];
+    const rows = [];
+    r.diretas.forEach(l => {
+      const chave = `d${l.id}`;
+      const extrato = l.valorNF || 0;
+      const destinos = (destinosPorNota.get(chave) || []).filter(d => d.label !== r.label);
+      const mapeado = l.valor + destinos.reduce((s, d) => s + d.valor, 0);
+      const restoNaoMapeado = extrato * (l.scale ?? 1) - mapeado;
+      if (Math.abs(restoNaoMapeado) > 0.01) destinos.push({ label: "Outros (vínculo parcial / fora de rodadas)", valor: restoNaoMapeado });
+      rows.push({
+        key: chave, fornecedor: l.fornecedor, numeroNF: l.numeroNF || l.codigo || "—",
+        natureza: destinos.length === 0 ? "exclusiva" : "compartilhada",
+        extrato, parcela: l.valor, destinos,
+      });
+    });
+    r.rateios.forEach(l => {
+      const chave = `${l.origem}_${l.notaId}`;
+      const destinos = (destinosPorNota.get(chave) || []).filter(d => d.label !== r.label);
+      rows.push({
+        key: `${chave}_${r.key}`, fornecedor: l.fornecedor, numeroNF: l.numeroNF || "—",
+        natureza: l.origem, extrato: l.valorNF || 0, parcela: l.valor, destinos,
+        memoria: `${fmtRs(l.valorNF||0)} ÷ ${l.cobreLabel} = ${fmtRs(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length>1?"s":""}`,
+      });
+    });
+    return rows.sort((a, b) => b.parcela - a.parcela);
+  }, [r, destinosPorNota]);
+
+  if (!r) return <p style={{ color: T.textSm, padding: 24 }}>Nenhuma rodada com jogos divulgados.</p>;
+
+  const exclusivas = linhas.filter(l => l.natureza === "exclusiva");
+  const compartilhadas = linhas.filter(l => l.natureza !== "exclusiva");
+  const somaExcl = exclusivas.reduce((s, l) => s + l.parcela, 0);
+  const somaComp = compartilhadas.reduce((s, l) => s + l.parcela, 0);
+  const somaExtrato = linhas.reduce((s, l) => s + l.extrato, 0);
+
+  return (
+    <div>
+      <TituloView icone={Receipt} cor="#0ea5e9" corFundo="rgba(14,165,233,0.12)" titulo={`Extrato — ${r.label}`}
+        subtitulo="Cada NF pelo valor que aparece no extrato bancário, a parcela que pertence a esta rodada e onde está o restante" T={T}/>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:20}}>
+        <KPI label={`Custo da ${r.label}`} value={fmtR(r.total)} sub={`${r.jogos.length} jogo${r.jogos.length>1?"s":""} · ${linhas.length} NFs envolvidas`} color={T.text} T={T}/>
+        <KPI label="Em NFs exclusivas da rodada" value={fmtR(somaExcl)} sub={`${exclusivas.length} NFs — extrato bate 1:1`} color="#22c55e" T={T}/>
+        <KPI label="Em NFs compartilhadas/rateadas" value={fmtR(somaComp)} sub={`${compartilhadas.length} NFs — só a parcela pertence à rodada`} color="#d97706" T={T}/>
+        <KPI label="Total dessas NFs no extrato" value={fmtR(somaExtrato)} sub="valor cheio dos documentos" color={T.textSm} T={T}/>
+      </div>
+
+      <Card T={T} style={{marginBottom:16}}>
+        <div style={{padding:"16px 20px",overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:760,color:T.text}}>
+            <thead><tr>
+              <th style={thSty(T)}>Fornecedor</th>
+              <th style={thSty(T)}>NF</th>
+              <th style={thSty(T)}>Natureza</th>
+              <th style={thSty(T,true)}>Valor no extrato</th>
+              <th style={thSty(T,true)}>Parcela desta rodada</th>
+              <th style={thSty(T)}>Onde está o restante</th>
+            </tr></thead>
+            <tbody>
+              {linhas.map(l => (
+                <tr key={l.key} style={{borderBottom:`1px solid ${T.border}`}}>
+                  <td style={tdSty()}>{l.fornecedor}</td>
+                  <td style={{...tdSty(),maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={l.numeroNF}>{l.numeroNF}</td>
+                  <td style={tdSty()}>
+                    <PillNat nat={l.natureza}/>
+                    {l.memoria && <div style={{fontSize:10,color:T.textSm,marginTop:2}}>{l.memoria}</div>}
+                  </td>
+                  <td style={{...tdSty(true),color:T.textMd,fontVariantNumeric:"tabular-nums"}}>{fmtNum(l.extrato)}</td>
+                  <td style={{...tdSty(true),fontWeight:700,color:l.natureza==="exclusiva"?"#22c55e":"#d97706",fontVariantNumeric:"tabular-nums"}}>{fmtNum(l.parcela)}</td>
+                  <td style={{...tdSty(),fontSize:11,color:T.textMd}}>
+                    {l.destinos.length === 0 ? "—" : l.destinos.map(d => `${d.label}: ${fmtNum(d.valor)}`).join(" · ")}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{background:T.bg}}>
+                <td style={{...tdSty(),fontWeight:700}} colSpan={3}>Total</td>
+                <td style={{...tdSty(true),fontWeight:700,color:T.textMd,fontVariantNumeric:"tabular-nums"}}>{fmtNum(somaExtrato)}</td>
+                <td style={{...tdSty(true),fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{fmtNum(r.total)}</td>
+                <td style={tdSty()}/>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <div style={{padding:"12px 16px",borderRadius:10,border:`1px solid #0ea5e940`,background:"rgba(14,165,233,0.07)",marginBottom:12}}>
+        <p style={{margin:0,fontSize:12,color:T.textMd,lineHeight:1.5}}>
+          <b style={{color:T.text}}>Por que o extrato não bate 1:1 com a rodada:</b> as NFs marcadas como
+          compartilhadas/rateadas passam no extrato pelo <b>valor cheio</b>, mas apenas a <b>parcela</b> indicada
+          pertence a esta rodada — o restante está nas rodadas listadas ao lado. A soma das parcelas ({fmtNum(r.total)})
+          é o custo exato da rodada.
+        </p>
+      </div>
+
+      {r.pendencias.length > 0 && (
+        <div style={{padding:"12px 16px",borderRadius:10,border:`1px solid #d9770640`,background:"rgba(217,119,6,0.07)"}}>
+          <p style={{margin:"0 0 4px",fontSize:12,fontWeight:700,color:"#d97706",display:"flex",alignItems:"center",gap:6}}><Clock size={13}/> Esta rodada ainda vai receber rateios</p>
+          {r.pendencias.map((p,i) => (
+            <p key={i} style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}><b>{p.tipo}:</b> {p.detalhe}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMensais = [], apres, setApres, orcGlobal = 0, mesInicio = 0, saldoUsaGasto = false, nomeCampeonato = "", notas = [], notasLivemode = [], notasLiveU = [], dedupeNotasPorNF = false, grupoDoJogo = null }) {
   const a = apres || {};
   const upd = updater => setApres(prev => updater(prev || {}));
   const setField = (field, v) => upd(p => ({ ...p, [field]: v }));
@@ -520,6 +665,18 @@ export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMe
 
   const vg = useMemo(() => calcVisaoGeral({ dadosVar, dadosFix, orcGlobalVar: orcGlobal }), [dadosVar, dadosFix, orcGlobal]);
 
+  // Extrato por Rodada: mesmo motor da Rastreabilidade — bate com o dashboard
+  const fech = useMemo(
+    () => buildFechamentoPorRodada({ jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF, grupoDoJogo }),
+    [jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF, grupoDoJogo]
+  );
+  const [extratoKey, setExtratoKey] = useState(null);
+  const rodadasComMovimento = fech.rodadas.filter(r => r.total > 0 || r.diretas.length > 0);
+  const rodadaExtrato = fech.rodadas.find(r => r.key === extratoKey)
+    || rodadasComMovimento[rodadasComMovimento.length - 1]
+    || fech.rodadas[0]
+    || null;
+
   const [view, setView] = useState("visaogeral");
   const [editMode, setEditMode] = useState(false);
 
@@ -527,8 +684,9 @@ export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMe
     {value:"visaogeral", label:"Visão Geral",      icon:LayoutGrid},
     {value:"variaveis",  label:"Custos Variáveis", icon:BarChart3},
     {value:"fixos",      label:"Custos Fixos",     icon:Lock},
+    {value:"extrato",    label:"Extrato por Rodada", icon:Receipt},
   ];
-  const temAjustes = view !== "visaogeral";
+  const temAjustes = view === "variaveis" || view === "fixos";
   const teal = "#14b8a6";
 
   return (
@@ -563,6 +721,11 @@ export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMe
               )}
             </>
           )}
+          {view === "extrato" && fech.rodadas.length > 0 && (
+            <select value={rodadaExtrato?.key || ""} onChange={e=>setExtratoKey(e.target.value)} style={{...iSty(T),padding:"6px 10px"}}>
+              {fech.rodadas.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
+          )}
           {temAjustes && (
             <Button T={T} variant={editMode?"primary":"secondary"} size="md" icon={editMode?X:Settings2} onClick={()=>setEditMode(m=>!m)}>
               {editMode ? "Fechar ajustes" : "Ajustar dados"}
@@ -582,6 +745,11 @@ export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMe
         <ErrorBoundary>
           <SlideFixos d={dadosFix} T={T} saldoUsaGasto={saldoUsaGasto}/>
           {editMode && <AjustesFixos d={dadosFix} T={T} orcTotOvr={orcTotOvr} provTotOvr={provTotOvr} gastoTotOvr={gastoTotOvr} setField={setField} setFixField={setFixField} resetFix={resetFix} saldoUsaGasto={saldoUsaGasto}/>}
+        </ErrorBoundary>
+      )}
+      {view === "extrato" && (
+        <ErrorBoundary>
+          <SlideExtrato fech={fech} rodada={rodadaExtrato} T={T}/>
         </ErrorBoundary>
       )}
 

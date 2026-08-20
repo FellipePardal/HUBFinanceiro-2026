@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { iSty, CATS, FONT } from "../../constants";
 import { Card, SectionHeader, Button, Badge, tableStyles } from "../ui";
 import { calcOrcadoJogo, blocosJogo, GRUPOS_PREMISSA, SUBS_NAO_EDITAVEIS, DSLR_QTDS, valorDSLR } from "../../data/orcamentos";
@@ -12,6 +12,7 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   const IS = iSty(T);
   const ts = tableStyles(T);
   const [expandido, setExpandido] = useState(null);
+  const [agrupar, setAgrupar] = useState(true);   // agrupa por padrão × faixa de distância
   const [loteQtd, setLoteQtd]     = useState("2");
   const [loteFase, setLoteFase]   = useState("");
   const [lotePraca, setLotePraca] = useState("");
@@ -22,6 +23,40 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   const padroes = orc.padroes || [];
   const times   = orc.times || [];
   const totalPrevisto = Object.values(orc.meta.jogosPrevistos || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  const faixasDoc = orc.faixas || [];
+
+  // Linhas da tabela: sem agrupamento = ordem original; agrupado = seções
+  // padrão × faixa de distância (ordem dos padrões e das faixas do orçamento)
+  // com cabeçalho somando os jogos do grupo.
+  const linhasRender = useMemo(() => {
+    const comIdx = jogos.map((jogo, idx) => ({ tipo: "jogo", jogo, idx }));
+    if (!agrupar) return comIdx;
+    const faixaDoJogo = (j) => {
+      const praca = pracas.find(p => p.id === j.pracaId);
+      return faixasDoc.find(f => f.key === praca?.faixaKey) || null;
+    };
+    const rankPadrao = (p) => { const i = padroes.indexOf(p); return i === -1 ? 99 : i; };
+    const rankFaixa = (f) => { const i = faixasDoc.findIndex(x => x.key === f?.key); return i === -1 ? 99 : i; };
+    const grupos = new Map();
+    comIdx.forEach(item => {
+      const j = item.jogo;
+      const faixa = faixaDoJogo(j);
+      const key = `${j.padrao || "—"}|${faixa?.key || "—"}`;
+      if (!grupos.has(key)) grupos.set(key, {
+        key,
+        padrao: j.padrao || "—",
+        faixaLabel: faixa?.label || "sem faixa",
+        rank: rankPadrao(j.padrao) * 100 + rankFaixa(faixa),
+        itens: [], total: 0,
+      });
+      const g = grupos.get(key);
+      g.itens.push(item);
+      g.total += blocosJogo(orc, j).total;
+    });
+    return [...grupos.values()]
+      .sort((a, b) => a.rank - b.rank)
+      .flatMap(g => [{ tipo: "grupo", grupo: g }, ...g.itens]);
+  }, [jogos, agrupar, pracas, faixasDoc, padroes, orc]);
   const pontosCorridos = orc.meta.formato === "pontos_corridos";
   const fases = pontosCorridos ? [] : (orc.meta.fases || []);
 
@@ -117,6 +152,24 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
           </p>
         )}
 
+        {jogos.length > 0 && (
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 20px 0"}}>
+            <span style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Agrupar</span>
+            <button onClick={()=>setAgrupar(true)} style={{
+              padding:"4px 12px",borderRadius:14,fontSize:11,fontWeight:600,cursor:"pointer",
+              border:`1px solid ${agrupar ? (T.brand||"#65B32E") : T.border}`,
+              background: agrupar ? (T.brand||"#65B32E") : "transparent",
+              color: agrupar ? "#fff" : T.textMd,
+            }}>Padrão × Faixa</button>
+            <button onClick={()=>setAgrupar(false)} style={{
+              padding:"4px 12px",borderRadius:14,fontSize:11,fontWeight:600,cursor:"pointer",
+              border:`1px solid ${!agrupar ? (T.brand||"#65B32E") : T.border}`,
+              background: !agrupar ? (T.brand||"#65B32E") : "transparent",
+              color: !agrupar ? "#fff" : T.textMd,
+            }}>Sem agrupamento</button>
+          </div>
+        )}
+
         <div style={ts.wrap}>
           <table style={{...ts.table, minWidth:1120}}>
             <thead style={ts.thead}>
@@ -138,7 +191,26 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
               </tr>
             </thead>
             <tbody>
-              {jogos.map((j, idx) => {
+              {linhasRender.flatMap(item => {
+                if (item.tipo === "grupo") {
+                  const g = item.grupo;
+                  return [(
+                    <tr key={`g-${g.key}`} style={{background:T.surfaceAlt||T.bg}}>
+                      <td colSpan={pontosCorridos ? 13 : 14} style={{
+                        padding:"8px 14px",
+                        borderTop:`2px solid ${T.borderStrong||T.border}`,
+                        fontSize:11, fontWeight:700, color:T.text, fontFamily:FONT.ui,
+                      }}>
+                        <span style={{color:T.brand||"#65B32E"}}>{g.padrao}</span>
+                        <span style={{color:T.textSm, fontWeight:500}}> · </span>
+                        {g.faixaLabel}
+                        <span style={{color:T.textSm, fontWeight:500}}> — {g.itens.length} jogo{g.itens.length===1?"":"s"} · </span>
+                        <span className="num" style={{fontFamily:FONT.num}}>{fmt(g.total)}</span>
+                      </td>
+                    </tr>
+                  )];
+                }
+                const { jogo: j, idx } = item;
                 const blocos = blocosJogo(orc, j);
                 const nOverrides = Object.keys(j.overrides || {}).length;
                 const aberto = expandido === j.id;

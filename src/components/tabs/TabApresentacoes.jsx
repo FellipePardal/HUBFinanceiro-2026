@@ -568,7 +568,6 @@ function SlideExtrato({ fech, rodada, T }) {
   const compartilhadas = linhas.filter(l => l.natureza !== "exclusiva");
   const somaExcl = exclusivas.reduce((s, l) => s + l.parcela, 0);
   const somaComp = compartilhadas.reduce((s, l) => s + l.parcela, 0);
-  const somaExtrato = linhas.reduce((s, l) => s + l.extrato, 0);
 
   return (
     <div>
@@ -579,7 +578,7 @@ function SlideExtrato({ fech, rodada, T }) {
         <KPI label={`Custo da ${r.label}`} value={fmtR(r.total)} sub={`${r.jogos.length} jogo${r.jogos.length>1?"s":""} · ${linhas.length} NFs envolvidas`} color={T.text} T={T}/>
         <KPI label="Em NFs exclusivas da rodada" value={fmtR(somaExcl)} sub={`${exclusivas.length} NFs — extrato bate 1:1`} color="#22c55e" T={T}/>
         <KPI label="Em NFs compartilhadas/rateadas" value={fmtR(somaComp)} sub={`${compartilhadas.length} NFs — só a parcela pertence à rodada`} color="#d97706" T={T}/>
-        <KPI label="Total dessas NFs no extrato" value={fmtR(somaExtrato)} sub="valor cheio dos documentos" color={T.textSm} T={T}/>
+        <KPI label="Documentos no extrato" value={`${linhas.length} NFs`} sub={`${compartilhadas.length} compartilhada${compartilhadas.length===1?"":"s"} com outras rodadas`} color={T.textSm} T={T}/>
       </div>
 
       <Card T={T} style={{marginBottom:16}}>
@@ -609,9 +608,12 @@ function SlideExtrato({ fech, rodada, T }) {
                   </td>
                 </tr>
               ))}
+              {/* O total da coluna "Valor no extrato" não é somado de propósito:
+                  documentos compartilhados aparecem pelo valor cheio em cada
+                  rodada que tocam — somá-los duplicaria entre rodadas. */}
               <tr style={{background:T.bg}}>
-                <td style={{...tdSty(),fontWeight:700}} colSpan={3}>Total</td>
-                <td style={{...tdSty(true),fontWeight:700,color:T.textMd,fontVariantNumeric:"tabular-nums"}}>{fmtNum(somaExtrato)}</td>
+                <td style={{...tdSty(),fontWeight:700}} colSpan={3}>Custo da rodada (soma das parcelas)</td>
+                <td style={{...tdSty(true),color:T.textSm}}>—</td>
                 <td style={{...tdSty(true),fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{fmtNum(r.total)}</td>
                 <td style={tdSty()}/>
               </tr>

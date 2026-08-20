@@ -99,15 +99,28 @@ export function buildFechamentoPorRodada({
     l.subs.add(subKey);
     l.porJogo[jogoId] = (l.porJogo[jogoId] || 0) + valor;
   };
+  // Reembolso de Logística (NF consolidada da Livemode cobrindo vários jogos):
+  // também é rateio — não entra nas "diretas", vira fatia com quebra própria.
+  const reembolsoNotas = new Map(); // notaId -> {nota, porJogo:{}, }
+  const reembolsoPorJogo = {};      // jogoId -> valor (pra split direto×rateado do jogo)
   notas.forEach(n => {
     const scale = nfScales[n.id] ?? 1;
+    const isReembolso = n.tipo === "reembolso_livemode";
     const registrar = (jogoId, subKey, valor) => {
       if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
       const finalKey = ALIAS_SUBKEY[subKey] || subKey;
       if (finalKey === "infra" || finalKey === "seg_espacial") return; // sobrescritos pelo motor
       const grupoKey = jogoGrupo[jogoId];
       if (grupoKey == null) return;
-      addDireta(grupoKey, n, jogoId, finalKey, (valor || 0) * scale);
+      const v = (valor || 0) * scale;
+      if (isReembolso) {
+        if (!reembolsoNotas.has(n.id)) reembolsoNotas.set(n.id, { nota: n, porJogo: {} });
+        const e = reembolsoNotas.get(n.id);
+        e.porJogo[jogoId] = (e.porJogo[jogoId] || 0) + v;
+        reembolsoPorJogo[jogoId] = (reembolsoPorJogo[jogoId] || 0) + v;
+        return;
+      }
+      addDireta(grupoKey, n, jogoId, finalKey, v);
     };
     if (n.servicosDetalhe) {
       Object.entries(n.servicosDetalhe).forEach(([k, valor]) => {
@@ -137,7 +150,7 @@ export function buildFechamentoPorRodada({
     const share = (n.valor || 0) / ids.length;
     Object.entries(distribuiPorGrupo(ids)).forEach(([grupoKey, jogosIds]) => {
       addRateio(grupoKey, {
-        origem: "Seg. Espacial", id: `se_${n.id}_${grupoKey}`, notaId: n.id,
+        origem: "Seg. Espacial", fonte: "mensal", id: `se_${n.id}_${grupoKey}`, notaId: n.id,
         fornecedor: n.fornecedor || "—", numeroNF: n.numeroNF || "",
         referencia: n.mesLabel || MESES[n.mes] || "", hasFile: !!n.hasFile,
         valorNF: n.valor || 0, cobre: ids.length, cobreLabel: `${ids.length} jogo(s) do mês`,
@@ -168,7 +181,7 @@ export function buildFechamentoPorRodada({
     }
     Object.entries(distribuiPorGrupo(ids)).forEach(([grupoKey, jogosIds]) => {
       addRateio(grupoKey, {
-        origem, id: `${origem === "liveU" ? "lu" : "lm"}_${n.id}_${grupoKey}`, notaId: n.id,
+        origem, fonte: "livemode", id: `${origem === "liveU" ? "lu" : "lm"}_${n.id}_${grupoKey}`, notaId: n.id,
         fornecedor: n.fornecedor || (origem === "liveU" ? "liveU" : "Livemode"),
         numeroNF: n.numeroNF || "", referencia: n.rodadasLabel || n.jogosResumoLabel || "",
         hasFile: !!n.hasFile,
@@ -180,11 +193,26 @@ export function buildFechamentoPorRodada({
   (notasLivemode || []).forEach(n => addBloco(n, "Infra Livemode"));
   (notasLiveU || []).forEach(n => addBloco(n, "liveU"));
 
+  // fatias do Reembolso Logística — quebra própria por jogo (não é ÷ N uniforme)
+  reembolsoNotas.forEach(({ nota: n, porJogo }) => {
+    const ids = Object.keys(porJogo).map(Number);
+    Object.entries(distribuiPorGrupo(ids)).forEach(([grupoKey, jogosIds]) => {
+      addRateio(grupoKey, {
+        origem: "Reembolso Logística", fonte: "nota", id: `rl_${n.id}_${grupoKey}`, notaId: n.id,
+        fornecedor: n.fornecedor || "Livemode", numeroNF: n.numeroNF || "",
+        referencia: n.jogoLabel || "", hasFile: !!n.hasFile,
+        valorNF: n.valorNF || 0, cobre: ids.length, cobreLabel: `${ids.length} jogo(s) consolidados`,
+        fatiaPorJogo: null, jogosIds, valor: jogosIds.reduce((s, id) => s + (porJogo[id] || 0), 0),
+      });
+    });
+  });
+
   // pendências só para tipos de rateio que o campeonato usa
   const espera = {
     segEspacial: esperaSegEspacial ?? seNotas.length > 0,
     infra: esperaInfra ?? (notasLivemode || []).length > 0,
     liveU: esperaLiveU ?? (notasLiveU || []).length > 0,
+    reembolso: reembolsoNotas.size > 0,
   };
 
   // ── montagem por grupo, fechando contra o realizado final do dashboard ─────
@@ -205,11 +233,12 @@ export function buildFechamentoPorRodada({
       const direto = diretas.reduce((s, l) => s + (l.porJogo[j.id] || 0), 0);
       const segEspacial = final.seg_espacial || 0;
       const infra = final.infra || 0;
+      const reembolso = reembolsoPorJogo[j.id] || 0;
       // resíduo sem NF: seg_extra manual + qualquer chave legada armazenada no jogo
-      const manual = total - direto - segEspacial - infra;
+      const manual = total - direto - segEspacial - infra - reembolso;
       return {
         id: j.id, label: `${j.mandante} x ${j.visitante}`, data: j.data || "",
-        categoria: j.categoria || "", direto, rateado: segEspacial + infra,
+        categoria: j.categoria || "", direto, rateado: segEspacial + infra + reembolso,
         manual: Math.abs(manual) < 0.005 ? 0 : manual, total,
         segExtra: final.seg_extra || 0,
       };
@@ -235,6 +264,10 @@ export function buildFechamentoPorRodada({
     if (espera.liveU) {
       const semLiveU = jogosR.filter(j => !(notasLiveU || []).some(n => (n.jogosIds || []).includes(j.id)));
       if (semLiveU.length) pendencias.push({ tipo: "liveU", detalhe: `${semLiveU.length} jogo(s) sem fatia liveU: ${semLiveU.map(j => `${j.mandante} x ${j.visitante}`).join(", ")}` });
+    }
+    if (espera.reembolso) {
+      const semReembolso = jogosR.filter(j => !reembolsoPorJogo[j.id]);
+      if (semReembolso.length) pendencias.push({ tipo: "Reembolso Logística", detalhe: `${semReembolso.length} jogo(s) sem NF de reembolso: ${semReembolso.map(j => `${j.mandante} x ${j.visitante}`).join(", ")}` });
     }
 
     return { key: g.key, label: g.label, jogos: linhasJogos, diretas, rateios, direto, rateado, manual, total, pendencias, fechada: pendencias.length === 0 };

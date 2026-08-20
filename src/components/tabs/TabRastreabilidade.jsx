@@ -19,7 +19,7 @@ const mesDeData = dataStr => {
 const SUBKEY_TO_CAT = {};
 const SUBKEY_LABEL = {};
 CATS.forEach(cat => cat.subs.forEach(sub => { SUBKEY_TO_CAT[sub.key] = cat; SUBKEY_LABEL[sub.key] = sub.label; }));
-const ORIGEM_COLOR = { "Seg. Espacial": "#D97706", "Infra Livemode": "#a855f7", "liveU": "#0ea5e9" };
+const ORIGEM_COLOR = { "Seg. Espacial": "#D97706", "Infra Livemode": "#a855f7", "liveU": "#0ea5e9", "Reembolso Logística": "#16A34A" };
 
 
 // Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId.
@@ -302,11 +302,14 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
         _fatia: false,
       }));
       const rateios = r.rateios.map(l => ({
-        key: `f_${l.id}`, previewId: l.origem === "Seg. Espacial" ? l.notaId : `livemode_${l.notaId}`,
-        tipo: l.origem === "Seg. Espacial" ? "mensal" : "livemode",
+        key: `f_${l.id}`,
+        previewId: l.fonte === "livemode" ? `livemode_${l.notaId}` : l.notaId,
+        tipo: l.fonte === "mensal" ? "mensal" : l.fonte === "nota" ? "reembolso" : "livemode",
         fornecedor: l.fornecedor, numeroNF: l.numeroNF, codigo: "",
         categorias: [l.origem], origem: l.origem,
-        descricao: `${fmtR(l.valorNF)} ÷ ${l.cobreLabel} = ${fmtR(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length > 1 ? "s" : ""} desta rodada`,
+        descricao: l.fatiaPorJogo != null
+          ? `${fmtR(l.valorNF)} ÷ ${l.cobreLabel} = ${fmtR(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length > 1 ? "s" : ""} desta rodada`
+          : `NF consolidada de ${fmtR(l.valorNF)} cobrindo ${l.cobre} jogos — parcela desta rodada conforme quebra da NF`,
         valor: l.valor, hasFile: l.hasFile,
         nota: l.referencia || null,
         _fatia: true,

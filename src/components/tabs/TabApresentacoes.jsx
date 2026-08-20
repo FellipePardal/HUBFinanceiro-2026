@@ -504,6 +504,7 @@ const NATUREZA = {
   "Seg. Espacial":  { label: "Mensal rateada (Seg. Espacial)", color: "#f59e0b" },
   "Infra Livemode": { label: "Infra Livemode (bloco)", color: "#a855f7" },
   "liveU":          { label: "liveU (bloco)",          color: "#0ea5e9" },
+  "Reembolso Logística": { label: "Reembolso Logística (consolidada)", color: "#16A34A" },
 };
 const PillNat = ({ nat }) => {
   const n = NATUREZA[nat] || NATUREZA.compartilhada;
@@ -548,10 +549,14 @@ function SlideExtrato({ fech, rodada, T }) {
     r.rateios.forEach(l => {
       const chave = `${l.origem}_${l.notaId}`;
       const destinos = (destinosPorNota.get(chave) || []).filter(d => d.label !== r.label);
+      const resto = (l.valorNF || 0) - l.valor - destinos.reduce((s, d) => s + d.valor, 0);
+      if (Math.abs(resto) > 0.01) destinos.push({ label: "Outros (não alocado)", valor: resto });
       rows.push({
         key: `${chave}_${r.key}`, fornecedor: l.fornecedor, numeroNF: l.numeroNF || "—",
         natureza: l.origem, extrato: l.valorNF || 0, parcela: l.valor, destinos,
-        memoria: `${fmtRs(l.valorNF||0)} ÷ ${l.cobreLabel} = ${fmtRs(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length>1?"s":""}`,
+        memoria: l.fatiaPorJogo != null
+          ? `${fmtRs(l.valorNF||0)} ÷ ${l.cobreLabel} = ${fmtRs(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length>1?"s":""}`
+          : `NF consolidada de ${l.cobre} jogos — quebra própria por jogo`,
       });
     });
     return rows.sort((a, b) => b.parcela - a.parcela);

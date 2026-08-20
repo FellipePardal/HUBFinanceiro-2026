@@ -3,7 +3,7 @@ import { btnStyle, iSty } from "../../constants";
 import { parseBR, fmtNum, fmtR, fmtRs } from "../../utils";
 import { Card, Button } from "../ui";
 import { KPI } from "../shared";
-import { BarChart3, Lock, LayoutGrid, ChevronDown, ChevronRight, Settings2, X, Receipt, Clock } from "lucide-react";
+import { BarChart3, Lock, LayoutGrid, ChevronDown, ChevronRight, Settings2, X, Receipt } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
   PieChart, Pie, Cell,
@@ -629,14 +629,6 @@ function SlideExtrato({ fech, rodada, T }) {
         </p>
       </div>
 
-      {r.pendencias.length > 0 && (
-        <div style={{padding:"12px 16px",borderRadius:10,border:`1px solid #d9770640`,background:"rgba(217,119,6,0.07)"}}>
-          <p style={{margin:"0 0 4px",fontSize:12,fontWeight:700,color:"#d97706",display:"flex",alignItems:"center",gap:6}}><Clock size={13}/> Esta rodada ainda vai receber rateios</p>
-          {r.pendencias.map((p,i) => (
-            <p key={i} style={{margin:"2px 0 0",fontSize:12,color:T.textMd}}><b>{p.tipo}:</b> {p.detalhe}</p>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

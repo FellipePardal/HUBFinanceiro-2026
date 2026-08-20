@@ -20,6 +20,8 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   const jogos   = orc.jogos || [];
   const pracas  = orc.pracas || [];
   const padroes = orc.padroes || [];
+  const times   = orc.times || [];
+  const totalPrevisto = Object.values(orc.meta.jogosPrevistos || {}).reduce((s, v) => s + (Number(v) || 0), 0);
   const pontosCorridos = orc.meta.formato === "pontos_corridos";
   const fases = pontosCorridos ? [] : (orc.meta.fases || []);
 
@@ -98,7 +100,14 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       <Card T={T}>
-        <SectionHeader T={T} icon={CalendarDays} title={`Jogos estimados (${jogos.length})`}
+        {/* Sugestões de time (Configuração → Times participantes) */}
+        {times.length > 0 && (
+          <datalist id="orc-times">
+            {times.map(t => <option key={t} value={t}/>)}
+          </datalist>
+        )}
+        <SectionHeader T={T} icon={CalendarDays}
+          title={`Jogos estimados (${jogos.length}${totalPrevisto ? ` de ${totalPrevisto} previstos` : ""})`}
           subtitle="Lista placeholder — a lista real chega quando o campeonato existir; célula laranja = override manual"
           right={!readOnly && <Button T={T} variant="primary" size="sm" icon={Plus} onClick={addJogo} disabled={pracas.length===0 || padroes.length===0}>Adicionar jogo</Button>}/>
 
@@ -155,10 +164,12 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                     )}
                     <td style={{...ts.td, padding:"6px 10px"}}>
                       <input value={j.mandante} disabled={readOnly} placeholder={`Time ${idx*2+1}`}
+                        list={times.length ? "orc-times" : undefined}
                         onChange={e=>patchJogo(j.id, {mandante:e.target.value})} style={{...inpSty, minWidth:110}}/>
                     </td>
                     <td style={{...ts.td, padding:"6px 10px"}}>
                       <input value={j.visitante} disabled={readOnly} placeholder={`Time ${idx*2+2}`}
+                        list={times.length ? "orc-times" : undefined}
                         onChange={e=>patchJogo(j.id, {visitante:e.target.value})} style={{...inpSty, minWidth:110}}/>
                     </td>
                     <td style={{...ts.td, padding:"6px 10px"}}>

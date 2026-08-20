@@ -119,6 +119,8 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
       formato: formato || "mata_mata",
       numRodadas: formato === "pontos_corridos" ? (parseInt(numRodadas) || 0) : null,
       fases: fases || [],
+      jogosPrevistos: {},     // { [faseKey]: número de jogos previstos } — meta do plano
+
       status: "rascunho",
       aprovadoEm: null,
       aprovadoPor: null,
@@ -126,6 +128,7 @@ export const novoOrcamento = ({ nome, edicao, formato, numRodadas, fases, cor, i
       createdAt: now,
       updatedAt: now,
     },
+    times: [],              // times participantes da edição (alimenta os selects de Jogos)
     padroes: [],
     premissas: {},          // { [padrao]: { [subKey]: number } }
     premissasFaixa: {},     // { [padrao]: { [faixaKey]: { [subKey]: valor } } } — célula vazia herda a premissa
@@ -306,6 +309,7 @@ export const orcamentoParaCampeonato = (orc) => {
     formato: m.formato,
     numRodadas: m.formato === "pontos_corridos" ? (m.numRodadas || 0) : null,
     fases,
+    times: orc.times || [],
     createdAt: new Date().toISOString(),
     origemOrcamento: orc.id,
   };

@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Badge, Button, Chip } from "../ui";
 import { FASES_PRESETS } from "../../data/customCampeonato";
 import { ORC_STATUS } from "../../data/orcamentos";
-import { Settings, History, Send, Undo2, Trophy, Lock } from "lucide-react";
+import { Settings, History, Send, Undo2, Trophy, Lock, Users, Plus, X, CalendarDays } from "lucide-react";
 
 const COR_PRESETS = ["#ec4899","#10b981","#3b82f6","#f59e0b","#8b5cf6","#ef4444","#06b6d4","#22c55e"];
 
@@ -21,8 +22,34 @@ export default function SubConfiguracao({ orc, setOrc, readOnly, T, eventos = []
   const IS = iSty(T);
   const m = orc.meta;
   const st = ORC_STATUS[m.status] || ORC_STATUS.rascunho;
+  const [novoTime, setNovoTime] = useState("");
 
   const setMeta = (patch) => setOrc(prev => ({ ...prev, meta: { ...prev.meta, ...patch } }));
+
+  const times = orc.times || [];
+  const addTime = (nome) => {
+    const t = String(nome || "").trim();
+    if (!t) return;
+    if (times.some(x => x.toLowerCase() === t.toLowerCase())) { window.alert(`"${t}" já está na lista.`); return; }
+    setOrc(prev => ({ ...prev, times: [...(prev.times || []), t] }));
+    setNovoTime("");
+  };
+  const removeTime = (nome) => {
+    const emUso = (orc.jogos || []).filter(j => j.mandante === nome || j.visitante === nome).length;
+    if (emUso > 0 && !window.confirm(`"${nome}" está em ${emUso} jogo(s) — os jogos não mudam, só a lista. Remover mesmo assim?`)) return;
+    setOrc(prev => ({ ...prev, times: (prev.times || []).filter(x => x !== nome) }));
+  };
+
+  const setJogosPrevistos = (faseKey, raw) => {
+    const n = parseInt(String(raw).replace(/[^0-9]/g, ""));
+    setOrc(prev => {
+      const jp = { ...(prev.meta.jogosPrevistos || {}) };
+      if (!n) delete jp[faseKey];
+      else jp[faseKey] = n;
+      return { ...prev, meta: { ...prev.meta, jogosPrevistos: jp } };
+    });
+  };
+  const totalPrevisto = Object.values(m.jogosPrevistos || {}).reduce((s, v) => s + (Number(v) || 0), 0);
 
   const toggleFase = (preset) => {
     if (readOnly) return;
@@ -104,6 +131,70 @@ export default function SubConfiguracao({ orc, setOrc, readOnly, T, eventos = []
             )}
           </div>
         </Card>
+
+        {/* ── Times participantes ── */}
+        <Card T={T}>
+          <SectionHeader T={T} icon={Users} title={`Times participantes (${times.length})`}
+            subtitle="Alimentam os campos de mandante/visitante na aba Jogos"/>
+          <div style={{padding:20}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {times.map(t => (
+                <span key={t} style={{
+                  display:"inline-flex",alignItems:"center",gap:6,
+                  background:(m.cor||"#65B32E")+"12",
+                  border:`1px solid ${(m.cor||"#65B32E")}44`,
+                  color:T.text,
+                  borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:600,
+                }}>
+                  {t}
+                  {!readOnly && (
+                    <button title={`Remover ${t}`} onClick={()=>removeTime(t)}
+                      style={{border:"none",background:"transparent",cursor:"pointer",color:T.textSm,padding:0,display:"flex"}}>
+                      <X size={12}/>
+                    </button>
+                  )}
+                </span>
+              ))}
+              {times.length === 0 && <p style={{margin:0,fontSize:12,color:T.textSm}}>Nenhum time cadastrado ainda.</p>}
+            </div>
+            {!readOnly && (
+              <div style={{display:"flex",gap:8,marginTop:14,alignItems:"center"}}>
+                <input value={novoTime} onChange={e=>setNovoTime(e.target.value)}
+                  onKeyDown={e=>{ if (e.key === "Enter") addTime(novoTime); }}
+                  style={{...IS, maxWidth:240}} placeholder="Novo time..."/>
+                <Button T={T} variant="secondary" size="sm" icon={Plus} onClick={()=>addTime(novoTime)} disabled={!novoTime.trim()}>
+                  Adicionar
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Jogos previstos por fase ── */}
+        {m.formato !== "pontos_corridos" && (m.fases || []).length > 0 && (
+          <Card T={T}>
+            <SectionHeader T={T} icon={CalendarDays} title="Jogos previstos por fase"
+              subtitle="Meta do plano — a aba Jogos mostra o avanço contra esses números"
+              right={<span className="num" style={{fontSize:14,fontWeight:700,color:T.text,fontFamily:FONT.num}}>{totalPrevisto} jogos</span>}/>
+            <div style={{padding:20,display:"flex",gap:16,flexWrap:"wrap"}}>
+              {(m.fases || []).map(f => {
+                const criados = (orc.jogos || []).filter(j => j.fase === f.key).length;
+                const previsto = m.jogosPrevistos?.[f.key] || 0;
+                return (
+                  <div key={f.key}>
+                    <label style={{display:"block",fontSize:10,color:f.color,fontWeight:700,marginBottom:3,letterSpacing:"0.04em",textTransform:"uppercase"}}>{f.label}</label>
+                    <input value={previsto || ""} disabled={readOnly} inputMode="numeric" placeholder="0"
+                      onChange={e=>setJogosPrevistos(f.key, e.target.value)}
+                      style={{...IS, maxWidth:80, textAlign:"right", fontFamily:FONT.num, opacity:readOnly?0.7:1}}/>
+                    <p className="num" style={{margin:"4px 0 0",fontSize:10,color: previsto && criados !== previsto ? (T.warning||"#D97706") : T.textSm,fontFamily:FONT.num}}>
+                      {criados} criado{criados===1?"":"s"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         {/* ── Status ── */}
         <Card T={T}>

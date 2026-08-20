@@ -30,6 +30,14 @@ import { COTACAO_INIT } from "../data/negociacoes";
 import { PAULISTAO_JOGOS_INIT, PAULISTAO_SERVICOS_INIT, getFase, ordemFase } from "../data/paulistao";
 import { useAgendaPortal } from "../hooks/useAgendaPortal";
 
+// Agrupador da Rastreabilidade "Por Rodada": fase + rodada, senão a "Rodada 1"
+// da fase de grupos colidiria com a "Rodada 1" do mata-mata.
+const grupoDoJogoPaulistao = j => ({
+  key: `f${ordemFase(j.fase)}_r${j.rodada || 0}`,
+  label: `${getFase(j.fase)?.label || j.fase || "Fase"}${j.rodada ? ` — Rodada ${j.rodada}` : ""}`,
+  ordem: ordemFase(j.fase) * 100 + (j.rodada || 0),
+});
+
 // Serviços Livemode — valores exclusivos do Paulistão F (sem Starlink, valores próprios
 // de Máquinas de Grafismo/Downlink/Distribuição). Não afeta Brasileirão nem outros
 // campeonatos, que continuam usando os valores padrão de TabLivemode.jsx.
@@ -721,7 +729,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} historicoKey="paulistao_nf_historico" T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} apres={apres} setApres={setApres} orcGlobal={orcGlobalVariaveis} mesInicio={4} saldoUsaGasto={true} nomeCampeonato="Paulistão Feminino 2026"/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios} dedupeNotasPorNF={true} role={role} agruparReembolsoComLivemode/>}
-        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true} grupoDoJogo={grupoDoJogoPaulistao}/>}
         </Suspense>
 
         </div>

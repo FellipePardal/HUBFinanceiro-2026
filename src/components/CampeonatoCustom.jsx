@@ -37,6 +37,18 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const { getFase, ordemFase } = makeFaseHelpers(fases);
   const isPC = formato === "pontos_corridos";
 
+  // Agrupador da Rastreabilidade "Por Rodada": pontos corridos agrupa por rodada
+  // pura; mata-mata usa fase + rodada (senão "Rodada 1" colide entre fases).
+  const grupoDoJogoRastreab = useMemo(() => {
+    if (isPC) return null; // default do motor: Rodada N
+    const { getFase: gf, ordemFase: of } = makeFaseHelpers(fases);
+    return j => ({
+      key: `f${of(j.fase)}_r${j.rodada || 0}`,
+      label: `${gf(j.fase)?.label || j.fase || "Fase"}${j.rodada ? ` — Rodada ${j.rodada}` : ""}`,
+      ordem: of(j.fase) * 100 + (j.rodada || 0),
+    });
+  }, [isPC, fases]);
+
   // Chaves namespaced no Supabase — uma por campeonato.
   const K = {
     jogos:            `${campId}_jogos`,
@@ -574,7 +586,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} apres={apres} setApres={setApres} orcGlobal={orcadoTotalCampeonato} mesInicio={0} nomeCampeonato={`${nome} ${edicao}`}/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios}/>}
-        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)}/>}
+        {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} grupoDoJogo={grupoDoJogoRastreab}/>}
         </Suspense>
         </div>
 

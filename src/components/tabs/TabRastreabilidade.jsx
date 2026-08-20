@@ -67,7 +67,7 @@ const TIPOS = [
   { value:"reembolso",  label:"Reembolso Livemode" },
 ];
 
-export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false }) {
+export default function TabRastreabilidade({ notas, notasMensais, servicos, jogos, notasLivemode = [], notasLiveU = [], T, filtroInicial, onClearFiltroInicial, dedupeNotasPorNF = false, grupoDoJogo = null }) {
   const TS = tableStyles(T);
   const purple = "#a855f7";
 
@@ -277,8 +277,8 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
   // rateio (Seg. Espacial mensal, Infra Livemode, liveU) com memória de cálculo.
   // O total do grupo bate por construção com o realizado da rodada no dashboard.
   const fechamento = useMemo(
-    () => buildFechamentoPorRodada({ jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF }),
-    [jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF]
+    () => buildFechamentoPorRodada({ jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF, grupoDoJogo }),
+    [jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF, grupoDoJogo]
   );
 
   const gruposRodada = useMemo(() => {
@@ -312,14 +312,14 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
         _fatia: true,
       }));
       const manuais = Math.abs(r.manual) >= 0.01 ? [{
-        key: `m_${r.rodada}`, previewId: null, tipo: "manual",
+        key: `m_${r.key}`, previewId: null, tipo: "manual",
         fornecedor: "—", numeroNF: "", codigo: "",
         categorias: ["Manual / sem NF"], descricao: "Valores lançados direto no jogo (ex: Seg. Extra)",
         valor: r.manual, hasFile: false, _fatia: true,
       }] : [];
       const itens = [...diretas, ...rateios, ...manuais].filter(passa);
       return {
-        chave: `Rodada ${r.rodada}`, itens,
+        chave: r.label, itens,
         valor: itens.reduce((s, l) => s + l.valor, 0),
         meta: {
           direto: itens.filter(l => !l._fatia).reduce((s, l) => s + l.valor, 0),

@@ -20,17 +20,37 @@ const parseMes = dataStr => {
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
-// Decompõe o realizado de cada rodada em: NFs diretas (etiquetadas nos jogos da
-// rodada), fatias de rateio (Seg. Espacial mensal, Infra Livemode, liveU) e
-// resíduo manual (valores armazenados no jogo sem NF, ex: seg_extra). A soma das
-// três partes é, por construção, igual ao realizado que o dashboard exibe — as
-// fatias vêm do mesmo motor (buildRealizadoPorJogo / buildInfraRealizadoPorJogo
-// / rateio mensal), só que rastreadas NF a NF em vez de fundidas no total.
-export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais = [], notasLivemode = [], notasLiveU = [], dedupeNotasPorNF = true } = {}) {
+// Agrupador padrão: uma "rodada" por número (Brasileirão, pontos corridos).
+// Campeonatos com fases (Paulistão, customs mata-mata) passam um grupoDoJogo
+// próprio — senão "Rodada 1" da fase de grupos colide com "Rodada 1" da semi.
+const grupoPorRodada = j => (j.rodada != null
+  ? { key: `r${j.rodada}`, label: `Rodada ${j.rodada}`, ordem: j.rodada }
+  : null);
+const GRUPO_SEM_RODADA = { key: "__sem__", label: "Sem rodada definida", ordem: Number.MAX_SAFE_INTEGER };
+
+// Decompõe o realizado de cada rodada (ou fase+rodada) em: NFs diretas
+// (etiquetadas nos jogos do grupo), fatias de rateio (Seg. Espacial mensal,
+// Infra Livemode, liveU) e resíduo manual (valores armazenados no jogo sem NF,
+// ex: seg_extra). A soma das três partes é, por construção, igual ao realizado
+// que o dashboard exibe — as fatias vêm do mesmo motor (buildRealizadoPorJogo /
+// buildInfraRealizadoPorJogo / rateio mensal), só que rastreadas NF a NF.
+// Pendências só são cobradas para tipos de rateio que o campeonato usa
+// (inferido pela existência de ao menos uma NF do tipo; sobreponível via opts).
+export function buildFechamentoPorRodada({
+  jogos = [], notas = [], notasMensais = [], notasLivemode = [], notasLiveU = [],
+  dedupeNotasPorNF = true, grupoDoJogo = null,
+  esperaSegEspacial = null, esperaInfra = null, esperaLiveU = null,
+} = {}) {
   const divulgados = jogos.filter(j => j.mandante !== "A definir");
-  const rodadas = [...new Set(divulgados.map(j => j.rodada))].filter(r => r != null).sort((a, b) => a - b);
-  const jogoRodada = {};
-  divulgados.forEach(j => { jogoRodada[j.id] = j.rodada; });
+  const gFn = grupoDoJogo || grupoPorRodada;
+  const grupoInfo = new Map(); // key -> {key,label,ordem}
+  const jogoGrupo = {};        // jogoId -> key
+  divulgados.forEach(j => {
+    const g = gFn(j) || GRUPO_SEM_RODADA;
+    if (!grupoInfo.has(g.key)) grupoInfo.set(g.key, g);
+    jogoGrupo[j.id] = g.key;
+  });
+  const gruposOrdenados = [...grupoInfo.values()].sort((a, b) => a.ordem - b.ordem || String(a.key).localeCompare(String(b.key)));
 
   // ── motor idêntico ao do dashboard ──────────────────────────────────────────
   const realizadoBase = buildRealizadoPorJogo(divulgados, notas, { dedupeNotasPorNF });
@@ -62,11 +82,11 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
 
   // ── contribuições diretas NF a NF (só subKeys que sobrevivem ao override de
   //    jogosCalc: seg_espacial e infra são substituídos pelo rateio/bloco) ─────
-  const diretasPorRodada = {}; // rodada -> Map(notaId -> linha)
-  const addDireta = (rodada, nota, jogoId, subKey, valor) => {
-    const porRodada = (diretasPorRodada[rodada] = diretasPorRodada[rodada] || new Map());
-    if (!porRodada.has(nota.id)) {
-      porRodada.set(nota.id, {
+  const diretasPorGrupo = {}; // grupoKey -> Map(notaId -> linha)
+  const addDireta = (grupoKey, nota, jogoId, subKey, valor) => {
+    const porGrupo = (diretasPorGrupo[grupoKey] = diretasPorGrupo[grupoKey] || new Map());
+    if (!porGrupo.has(nota.id)) {
+      porGrupo.set(nota.id, {
         id: nota.id, fornecedor: nota.fornecedor || "—",
         numeroNF: nota.numeroNF || "", codigo: nota.codigo || "",
         valorNF: nota.valorNF || 0, scale: nfScales[nota.id] ?? 1,
@@ -74,7 +94,7 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
         subs: new Set(), valor: 0, porJogo: {},
       });
     }
-    const l = porRodada.get(nota.id);
+    const l = porGrupo.get(nota.id);
     l.valor += valor;
     l.subs.add(subKey);
     l.porJogo[jogoId] = (l.porJogo[jogoId] || 0) + valor;
@@ -85,9 +105,9 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
       if (SUBS_IGNORAR_REALIZADO_NF.has(subKey)) return;
       const finalKey = ALIAS_SUBKEY[subKey] || subKey;
       if (finalKey === "infra" || finalKey === "seg_espacial") return; // sobrescritos pelo motor
-      const rodada = jogoRodada[jogoId];
-      if (rodada == null) return;
-      addDireta(rodada, n, jogoId, finalKey, (valor || 0) * scale);
+      const grupoKey = jogoGrupo[jogoId];
+      if (grupoKey == null) return;
+      addDireta(grupoKey, n, jogoId, finalKey, (valor || 0) * scale);
     };
     if (n.servicosDetalhe) {
       Object.entries(n.servicosDetalhe).forEach(([k, valor]) => {
@@ -100,21 +120,24 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
   });
 
   // ── fatias de rateio NF a NF ────────────────────────────────────────────────
-  const rateiosPorRodada = {}; // rodada -> [linha]
-  const addRateio = (rodada, linha) => (rateiosPorRodada[rodada] = rateiosPorRodada[rodada] || []).push(linha);
+  const rateiosPorGrupo = {}; // grupoKey -> [linha]
+  const addRateio = (grupoKey, linha) => (rateiosPorGrupo[grupoKey] = rateiosPorGrupo[grupoKey] || []).push(linha);
+  const distribuiPorGrupo = ids => {
+    const porGrupo = {};
+    ids.forEach(id => {
+      const g = jogoGrupo[id];
+      if (g == null) return;
+      (porGrupo[g] = porGrupo[g] || []).push(id);
+    });
+    return porGrupo;
+  };
   seNotas.forEach(n => {
     const ids = jogosPorMes[n.mes] || [];
     if (ids.length === 0) return;
     const share = (n.valor || 0) / ids.length;
-    const porRodadaIds = {};
-    ids.forEach(id => {
-      const r = jogoRodada[id];
-      if (r == null) return;
-      (porRodadaIds[r] = porRodadaIds[r] || []).push(id);
-    });
-    Object.entries(porRodadaIds).forEach(([rodada, jogosIds]) => {
-      addRateio(parseInt(rodada), {
-        origem: "Seg. Espacial", id: `se_${n.id}`, notaId: n.id,
+    Object.entries(distribuiPorGrupo(ids)).forEach(([grupoKey, jogosIds]) => {
+      addRateio(grupoKey, {
+        origem: "Seg. Espacial", id: `se_${n.id}_${grupoKey}`, notaId: n.id,
         fornecedor: n.fornecedor || "—", numeroNF: n.numeroNF || "",
         referencia: n.mesLabel || MESES[n.mes] || "", hasFile: !!n.hasFile,
         valorNF: n.valor || 0, cobre: ids.length, cobreLabel: `${ids.length} jogo(s) do mês`,
@@ -143,15 +166,9 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
         valor: resto, motivo: `diferença entre o valor da NF e ${ids.length} × valor/jogo — não alocada a rodadas`,
       });
     }
-    const porRodadaIds = {};
-    ids.forEach(id => {
-      const r = jogoRodada[id];
-      if (r == null) return;
-      (porRodadaIds[r] = porRodadaIds[r] || []).push(id);
-    });
-    Object.entries(porRodadaIds).forEach(([rodada, jogosIds]) => {
-      addRateio(parseInt(rodada), {
-        origem, id: `${origem === "liveU" ? "lu" : "lm"}_${n.id}`, notaId: n.id,
+    Object.entries(distribuiPorGrupo(ids)).forEach(([grupoKey, jogosIds]) => {
+      addRateio(grupoKey, {
+        origem, id: `${origem === "liveU" ? "lu" : "lm"}_${n.id}_${grupoKey}`, notaId: n.id,
         fornecedor: n.fornecedor || (origem === "liveU" ? "liveU" : "Livemode"),
         numeroNF: n.numeroNF || "", referencia: n.rodadasLabel || n.jogosResumoLabel || "",
         hasFile: !!n.hasFile,
@@ -163,20 +180,27 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
   (notasLivemode || []).forEach(n => addBloco(n, "Infra Livemode"));
   (notasLiveU || []).forEach(n => addBloco(n, "liveU"));
 
-  // ── montagem por rodada, fechando contra o realizado final do dashboard ────
-  const resultado = rodadas.map(rodada => {
-    const jogosR = divulgados.filter(j => j.rodada === rodada).sort((a, b) => a.id - b.id);
-    const diretas = [...(diretasPorRodada[rodada]?.values() || [])]
+  // pendências só para tipos de rateio que o campeonato usa
+  const espera = {
+    segEspacial: esperaSegEspacial ?? seNotas.length > 0,
+    infra: esperaInfra ?? (notasLivemode || []).length > 0,
+    liveU: esperaLiveU ?? (notasLiveU || []).length > 0,
+  };
+
+  // ── montagem por grupo, fechando contra o realizado final do dashboard ─────
+  const resultado = gruposOrdenados.map(g => {
+    const jogosR = divulgados.filter(j => jogoGrupo[j.id] === g.key).sort((a, b) => a.id - b.id);
+    const diretas = [...(diretasPorGrupo[g.key]?.values() || [])]
       .map(l => ({ ...l, subs: [...l.subs] }))
       .sort((a, b) => b.valor - a.valor);
-    const rateios = (rateiosPorRodada[rodada] || []).sort((a, b) => b.valor - a.valor);
+    const rateios = (rateiosPorGrupo[g.key] || []).sort((a, b) => b.valor - a.valor);
 
     const linhasJogos = jogosR.map(j => {
       const base = realizadoBase[j.id] || {};
       const se = seMap[j.id];
       const final = { ...base, ...(se ? { seg_espacial: se } : {}), infra: infraMap[j.id] || 0 };
       const total = Object.values(final).reduce((s, v) => s + (v || 0), 0);
-      // direto = o que as NFs etiquetadas nos jogos desta rodada contribuíram —
+      // direto = o que as NFs etiquetadas nos jogos deste grupo contribuíram —
       // assim a coluna "direto" concilia 1:1 com a tabela de NFs diretas abaixo
       const direto = diretas.reduce((s, l) => s + (l.porJogo[j.id] || 0), 0);
       const segEspacial = final.seg_espacial || 0;
@@ -196,18 +220,24 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
     const manual = linhasJogos.reduce((s, j) => s + j.manual, 0);
     const total = linhasJogos.reduce((s, j) => s + j.total, 0);
 
-    // pendências: rateios que a rodada ainda não recebeu
+    // pendências: rateios que este grupo ainda não recebeu
     const pendencias = [];
-    const mesesRodada = [...new Set(jogosR.map(j => parseMes(j.data)).filter(m => m != null))];
-    mesesRodada.forEach(mes => {
-      if (!seNotas.some(n => n.mes === mes)) pendencias.push({ tipo: "Seg. Espacial", detalhe: `NF mensal de ${MESES[mes]} ainda não recebida` });
-    });
-    const semInfra = jogosR.filter(j => !(notasLivemode || []).some(n => (n.jogosIds || []).includes(j.id)));
-    if (semInfra.length) pendencias.push({ tipo: "Infra Livemode", detalhe: `${semInfra.length} jogo(s) sem NF de infra: ${semInfra.map(j => j.label || `${j.mandante} x ${j.visitante}`).join(", ")}` });
-    const semLiveU = jogosR.filter(j => !(notasLiveU || []).some(n => (n.jogosIds || []).includes(j.id)));
-    if (semLiveU.length) pendencias.push({ tipo: "liveU", detalhe: `${semLiveU.length} jogo(s) sem fatia liveU: ${semLiveU.map(j => `${j.mandante} x ${j.visitante}`).join(", ")}` });
+    if (espera.segEspacial) {
+      const mesesGrupo = [...new Set(jogosR.map(j => parseMes(j.data)).filter(m => m != null))];
+      mesesGrupo.forEach(mes => {
+        if (!seNotas.some(n => n.mes === mes)) pendencias.push({ tipo: "Seg. Espacial", detalhe: `NF mensal de ${MESES[mes]} ainda não recebida` });
+      });
+    }
+    if (espera.infra) {
+      const semInfra = jogosR.filter(j => !(notasLivemode || []).some(n => (n.jogosIds || []).includes(j.id)));
+      if (semInfra.length) pendencias.push({ tipo: "Infra Livemode", detalhe: `${semInfra.length} jogo(s) sem NF de infra: ${semInfra.map(j => `${j.mandante} x ${j.visitante}`).join(", ")}` });
+    }
+    if (espera.liveU) {
+      const semLiveU = jogosR.filter(j => !(notasLiveU || []).some(n => (n.jogosIds || []).includes(j.id)));
+      if (semLiveU.length) pendencias.push({ tipo: "liveU", detalhe: `${semLiveU.length} jogo(s) sem fatia liveU: ${semLiveU.map(j => `${j.mandante} x ${j.visitante}`).join(", ")}` });
+    }
 
-    return { rodada, jogos: linhasJogos, diretas, rateios, direto, rateado, manual, total, pendencias, fechada: pendencias.length === 0 };
+    return { key: g.key, label: g.label, jogos: linhasJogos, diretas, rateios, direto, rateado, manual, total, pendencias, fechada: pendencias.length === 0 };
   });
 
   const totais = resultado.reduce((acc, r) => ({

@@ -44,10 +44,18 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
     (jogosPorMes[mes] = jogosPorMes[mes] || []).push(j.id);
   });
   const seMap = {};
+  const naoAlocado = []; // valores de NFs rateáveis que não chegaram a nenhum jogo/rodada
   const seNotas = (notasMensais || []).filter(n => n.categoria === "Seg. Espacial");
   seNotas.forEach(n => {
     const ids = jogosPorMes[n.mes] || [];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      naoAlocado.push({
+        origem: "Seg. Espacial", id: `se_orfa_${n.id}`, notaId: n.id,
+        fornecedor: n.fornecedor || "—", numeroNF: n.numeroNF || "", hasFile: !!n.hasFile,
+        valor: n.valor || 0, motivo: `${n.mesLabel || MESES[n.mes] || "mês"} sem jogos — órfã, somada direto em Operações`,
+      });
+      return;
+    }
     const share = (n.valor || 0) / ids.length;
     ids.forEach(id => { seMap[id] = (seMap[id] || 0) + share; });
   });
@@ -116,8 +124,25 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
   });
   const addBloco = (n, origem) => {
     const ids = n.jogosIds || [];
-    if (ids.length === 0) return;
+    if (ids.length === 0) {
+      naoAlocado.push({
+        origem, id: `${origem === "liveU" ? "lu" : "lm"}_na_${n.id}`, notaId: n.id,
+        fornecedor: n.fornecedor || (origem === "liveU" ? "liveU" : "Livemode"),
+        numeroNF: n.numeroNF || "", hasFile: !!n.hasFile,
+        valor: n.valor || 0, motivo: "NF sem jogos vinculados — não entra em nenhuma rodada",
+      });
+      return;
+    }
     const vpj = n.valorPorJogo || ((n.valor || 0) / ids.length);
+    const resto = (n.valor || 0) - vpj * ids.length;
+    if (Math.abs(resto) > 0.005) {
+      naoAlocado.push({
+        origem, id: `${origem === "liveU" ? "lu" : "lm"}_resto_${n.id}`, notaId: n.id,
+        fornecedor: n.fornecedor || (origem === "liveU" ? "liveU" : "Livemode"),
+        numeroNF: n.numeroNF || "", hasFile: !!n.hasFile,
+        valor: resto, motivo: `diferença entre o valor da NF e ${ids.length} × valor/jogo — não alocada a rodadas`,
+      });
+    }
     const porRodadaIds = {};
     ids.forEach(id => {
       const r = jogoRodada[id];
@@ -192,5 +217,5 @@ export function buildFechamentoPorRodada({ jogos = [], notas = [], notasMensais 
     total: acc.total + r.total,
   }), { direto: 0, rateado: 0, manual: 0, total: 0 });
 
-  return { rodadas: resultado, totais };
+  return { rodadas: resultado, totais, naoAlocado };
 }

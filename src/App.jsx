@@ -23,7 +23,6 @@ const TabEnvio         = lazy(() => import("./components/tabs/TabEnvio"));
 const TabLivemode      = lazy(() => import("./components/tabs/TabLivemode"));
 const TabLogistica     = lazy(() => import("./components/tabs/TabLogistica"));
 const TabRastreabilidade = lazy(() => import("./components/tabs/TabRastreabilidade"));
-const TabFechamentoRodada = lazy(() => import("./components/tabs/TabFechamentoRodada"));
 import { NovoJogoModal, NovoRapidoModal } from "./components/modals/NovoJogoModal";
 import { getState, setState as setSupabaseState, supabase, createPersistedSetter, isPersistPending } from "./lib/supabase";
 import { lerApresentacoesDoLocalStorage } from "./lib/apresentacoesCalc";
@@ -407,7 +406,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   }, [jogos]);
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
-  const TABS_NF   = ["notas fiscais","mensal","serviços livemode","rastreabilidade","fechamento"];
+  const TABS_NF   = ["notas fiscais","mensal","serviços livemode","rastreabilidade"];
   const TABS_REL  = role === 'visualizador' ? ["envio"] : ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor === "orcamento" ? TABS_ORC : setor === "notas" ? TABS_NF : setor === "logistica" ? TABS_LOG : TABS_REL;
@@ -734,7 +733,6 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} T={T} apres={apres} setApres={setApres} orcGlobal={10130480} mesInicio={0} nomeCampeonato="Brasileirão 2026"/>}
         {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={[...notasLivemode, ...notasLiveU]} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey="envios" role={role} dedupeNotasPorNF={true} agruparReembolsoComLivemode/>}
         {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} dedupeNotasPorNF={true}/>}
-        {tab==="fechamento"    && <TabFechamentoRodada jogos={jogos} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} notasLiveU={notasLiveU} T={T} dedupeNotasPorNF={true}/>}
         </Suspense>
 
       </div>

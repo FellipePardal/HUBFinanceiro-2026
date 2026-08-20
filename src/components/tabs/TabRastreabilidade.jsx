@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { CATS, VAR_CAT_TO_CATKEY, FONT } from "../../constants";
-import { fmt } from "../../utils";
+import { fmt, fmtR } from "../../utils";
 import { Pill } from "../shared";
 import { Card, PanelTitle, Segmented, Chip, tableStyles } from "../ui";
 import { getNFFile } from "../../lib/supabase";
 import { ALIAS_SUBKEY, SUBS_IGNORAR_REALIZADO_NF, getNotaFiscalScales } from "../../lib/notasFiscais";
-import { FileText, X, ChevronDown, ChevronRight } from "lucide-react";
+import { buildFechamentoPorRodada } from "../../lib/fechamentoRodada";
+import { FileText, X, ChevronDown, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 
 const MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const mesDeData = dataStr => {
@@ -16,7 +17,9 @@ const mesDeData = dataStr => {
 };
 
 const SUBKEY_TO_CAT = {};
-CATS.forEach(cat => cat.subs.forEach(sub => { SUBKEY_TO_CAT[sub.key] = cat; }));
+const SUBKEY_LABEL = {};
+CATS.forEach(cat => cat.subs.forEach(sub => { SUBKEY_TO_CAT[sub.key] = cat; SUBKEY_LABEL[sub.key] = sub.label; }));
+const ORIGEM_COLOR = { "Seg. Espacial": "#D97706", "Infra Livemode": "#a855f7", "liveU": "#0ea5e9" };
 
 
 // Explode a nota (jogo) no mapa subKey → valor, ignorando o prefixo jogoId.
@@ -156,6 +159,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       descricao: n.categoria || n.descricao || "Mensal",
       categorias: [categoriaLabel], dataEmissao: n.dataEmissao || "", hasFile: !!n.hasFile,
       _papel: {}, _servicoId: n.servicoId || null, _catKeyMensal: catKeyMensal, _isOutrosMensais: isOutrosMensais,
+      _segEspacial: n.categoria === "Seg. Espacial",
     };
   }), [notasMensais, servicoInfo]);
 
@@ -267,8 +271,90 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
     return [...map.values()].sort((a,b) => b.valor - a.valor);
   }, [agrupamento, linhasFiltradas, filtroInicial]);
 
-  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", livemode:"Livemode", reembolso:"Reembolso Livemode" };
-  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", livemode:"#a855f7", reembolso:"#64748b" };
+  // ── Por Rodada: usa o motor do fechamento (lib/fechamentoRodada) ────────────
+  // Cada rodada lista TODAS as notas que compõem o realizado dela: as NFs diretas
+  // (pelo valor que contribuem à rodada, não pelo valor cheio) e as fatias de
+  // rateio (Seg. Espacial mensal, Infra Livemode, liveU) com memória de cálculo.
+  // O total do grupo bate por construção com o realizado da rodada no dashboard.
+  const fechamento = useMemo(
+    () => buildFechamentoPorRodada({ jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF }),
+    [jogos, notas, notasMensais, notasLivemode, notasLiveU, dedupeNotasPorNF]
+  );
+
+  const gruposRodada = useMemo(() => {
+    if (agrupamento !== "rodada") return null;
+    const q = busca.trim().toLowerCase();
+    const passa = l => {
+      if (tipoSel !== "todos" && l.tipo !== tipoSel) return false;
+      if (q && !(`${l.fornecedor} ${l.numeroNF} ${l.codigo || ""} ${l.descricao || ""}`.toLowerCase().includes(q))) return false;
+      return true;
+    };
+    const tipoDireta = t => t === "avulsa" ? "avulsa" : t === "reembolso_livemode" ? "reembolso" : "prevista";
+
+    const gs = fechamento.rodadas.map(r => {
+      const diretas = r.diretas.map(l => ({
+        key: `d_${l.id}`, previewId: l.id, tipo: tipoDireta(l.tipo),
+        fornecedor: l.fornecedor, numeroNF: l.numeroNF, codigo: l.codigo,
+        categorias: [...new Set(l.subs.map(sk => SUBKEY_TO_CAT[sk]?.label || "Sem categoria"))],
+        descricao: l.subs.map(sk => SUBKEY_LABEL[sk] || sk).join(", "),
+        valor: l.valor, hasFile: l.hasFile,
+        nota: l.scale !== 1 ? `NF compartilhada — valor cheio ${fmtR(l.valorNF)}` : null,
+        _fatia: false,
+      }));
+      const rateios = r.rateios.map(l => ({
+        key: `f_${l.id}`, previewId: l.origem === "Seg. Espacial" ? l.notaId : `livemode_${l.notaId}`,
+        tipo: l.origem === "Seg. Espacial" ? "mensal" : "livemode",
+        fornecedor: l.fornecedor, numeroNF: l.numeroNF, codigo: "",
+        categorias: [l.origem], origem: l.origem,
+        descricao: `${fmtR(l.valorNF)} ÷ ${l.cobreLabel} = ${fmtR(l.fatiaPorJogo)}/jogo × ${l.jogosIds.length} jogo${l.jogosIds.length > 1 ? "s" : ""} desta rodada`,
+        valor: l.valor, hasFile: l.hasFile,
+        nota: l.referencia || null,
+        _fatia: true,
+      }));
+      const manuais = Math.abs(r.manual) >= 0.01 ? [{
+        key: `m_${r.rodada}`, previewId: null, tipo: "manual",
+        fornecedor: "—", numeroNF: "", codigo: "",
+        categorias: ["Manual / sem NF"], descricao: "Valores lançados direto no jogo (ex: Seg. Extra)",
+        valor: r.manual, hasFile: false, _fatia: true,
+      }] : [];
+      const itens = [...diretas, ...rateios, ...manuais].filter(passa);
+      return {
+        chave: `Rodada ${r.rodada}`, itens,
+        valor: itens.reduce((s, l) => s + l.valor, 0),
+        meta: {
+          direto: itens.filter(l => !l._fatia).reduce((s, l) => s + l.valor, 0),
+          rateado: itens.filter(l => l._fatia).reduce((s, l) => s + l.valor, 0),
+          totalRodada: r.total, pendencias: r.pendencias, fechada: r.fechada,
+        },
+      };
+    });
+
+    // Mensais que não são rateadas por jogo continuam num grupo próprio
+    const mensaisResto = linhasMensal.filter(l => !l._segEspacial).filter(l => passa({ ...l, valor: l.valorNF })).map(l => ({
+      key: `mensal_${l.id}`, previewId: l.id, tipo: l.tipo,
+      fornecedor: l.fornecedor, numeroNF: l.numeroNF, codigo: l.codigo,
+      categorias: l.categorias, descricao: l.descricao,
+      valor: l.valorNF, hasFile: l.hasFile, _fatia: false,
+    }));
+    if (mensaisResto.length) gs.push({ chave: "Mensais (sem rodada)", itens: mensaisResto, valor: mensaisResto.reduce((s, l) => s + l.valor, 0), meta: null });
+
+    // Fatias que não chegaram a nenhuma rodada (órfãs / NF sem jogos vinculados)
+    const naoAloc = fechamento.naoAlocado.filter(l => passa({ ...l, descricao: l.motivo })).map(l => ({
+      key: `na_${l.id}`, previewId: l.origem === "Seg. Espacial" ? l.notaId : `livemode_${l.notaId}`,
+      tipo: l.origem === "Seg. Espacial" ? "mensal" : "livemode",
+      fornecedor: l.fornecedor, numeroNF: l.numeroNF, codigo: "",
+      categorias: [l.origem], origem: l.origem, descricao: l.motivo,
+      valor: l.valor, hasFile: l.hasFile, _fatia: true,
+    }));
+    if (naoAloc.length) gs.push({ chave: "Não alocado a rodadas", itens: naoAloc, valor: naoAloc.reduce((s, l) => s + l.valor, 0), meta: null });
+
+    return gs;
+  }, [agrupamento, fechamento, linhasMensal, tipoSel, busca]);
+
+  const TIPO_LABEL = { prevista:"Prevista", avulsa:"Avulsa", mensal:"Mensal", fixo:"Fixo", livemode:"Livemode", reembolso:"Reembolso Livemode", manual:"Manual" };
+  const TIPO_PILL_COLOR = { prevista:"#2563EB", avulsa:"#D97706", mensal:"#7C3AED", fixo:"#7C3AED", livemode:"#a855f7", reembolso:"#64748b", manual:"#64748b" };
+  const green = T.success || "#16A34A";
+  const amber = "#D97706";
 
   const LinhaRow = ({ l }) => (
     <tr style={TS.tr}>
@@ -303,6 +389,33 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
 
   const headerCols = ["Código/NF","Fornecedor","Categoria","Rodada/Mês","Tipo","Descrição","Valor","NF"];
 
+  // Linha de nota dentro de um grupo de rodada (dados vindos do motor de fechamento)
+  const rodadaCols = ["Fornecedor","NF","Categoria","Tipo","Memória / Descrição","Valor","Arq."];
+  const RodadaItemRow = ({ l }) => (
+    <tr style={TS.tr}>
+      <td style={TS.td}>{l.fornecedor}</td>
+      <td style={TS.td}>{l.numeroNF || l.codigo || "—"}</td>
+      <td style={TS.td}>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {l.categorias.map(c => <Pill key={c} label={c} color={l._fatia ? (ORIGEM_COLOR[l.origem] || "#64748b") : "#06b6d4"}/>)}
+        </div>
+      </td>
+      <td style={TS.td}><Pill label={TIPO_LABEL[l.tipo]||l.tipo} color={TIPO_PILL_COLOR[l.tipo]||"#64748b"}/></td>
+      <td style={{...TS.td, fontSize:12, color:l._fatia ? (T.textMd||T.textSm) : T.text}}>
+        {l.descricao || "—"}
+        {l.nota && <div style={{fontSize:10,color:T.textSm}}>{l.nota}</div>}
+      </td>
+      <td style={{...TS.tdNum, color: l._fatia ? amber : green, fontWeight:600}}>{fmtR(l.valor)}</td>
+      <td style={TS.td}>
+        {l.hasFile && l.previewId != null ? (
+          <button onClick={() => abrirPreview(l.previewId)} style={{background:"none",border:"none",cursor:"pointer",color:"#0ea5e9",display:"flex",alignItems:"center",gap:4,fontSize:12}}>
+            <FileText size={13}/> Ver
+          </button>
+        ) : <span style={{color:T.textSm,fontSize:12}}>—</span>}
+      </td>
+    </tr>
+  );
+
   return (
     <div>
       <PanelTitle T={T} title="Rastreabilidade de Notas Fiscais"
@@ -330,9 +443,15 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       </div>
 
       <Card T={T} padding={0} style={{marginBottom:16}}>
-        <div style={{padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`}}>
-          <span style={{color:T.textSm,fontSize:12}}>{linhasFiltradas.length} nota(s)</span>
-          <span style={{fontWeight:700,fontSize:16,color:T.success||"#16A34A",fontFamily:FONT.num}}>{fmt(totalGeral)}</span>
+        <div style={{padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`,gap:12,flexWrap:"wrap"}}>
+          <span style={{color:T.textSm,fontSize:12}}>
+            {agrupamento === "rodada"
+              ? `${(gruposRodada||[]).reduce((s,g)=>s+g.itens.length,0)} linha(s) — NFs diretas + fatias de rateio por rodada`
+              : `${linhasFiltradas.length} nota(s)`}
+          </span>
+          <span style={{fontWeight:700,fontSize:16,color:T.success||"#16A34A",fontFamily:FONT.num}}>
+            {agrupamento === "rodada" ? fmtR((gruposRodada||[]).reduce((s,g)=>s+g.valor,0)) : fmt(totalGeral)}
+          </span>
         </div>
 
         {agrupamento === "individual" ? (
@@ -346,6 +465,74 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
                 {linhasFiltradas.map(l => <LinhaRow key={`${l.origem}_${l.id}`} l={l}/>)}
               </tbody>
             </table>
+          </div>
+        ) : agrupamento === "rodada" ? (
+          <div>
+            {(gruposRodada || []).length === 0 && (
+              <p style={{color:T.textSm,fontSize:13,padding:20,textAlign:"center"}}>Nenhuma NF encontrada</p>
+            )}
+            {(gruposRodada || []).map(g => {
+              const aberto = grupoAberto === g.chave;
+              return (
+                <div key={g.chave} style={{borderBottom:`1px solid ${T.border}`}}>
+                  <div onClick={() => setGrupoAberto(aberto ? null : g.chave)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px",cursor:"pointer",gap:12,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                      {aberto ? <ChevronDown size={14} color={T.textSm}/> : <ChevronRight size={14} color={T.textSm}/>}
+                      <span style={{fontWeight:600,fontSize:13,color:T.text}}>{g.chave}</span>
+                      <span style={{color:T.textSm,fontSize:12}}>({g.itens.length})</span>
+                      {g.meta && (g.meta.fechada
+                        ? <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:green}}><CheckCircle2 size={13}/> Fechada</span>
+                        : <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:amber}}><Clock size={13}/> {g.meta.pendencias.length} pendência{g.meta.pendencias.length>1?"s":""}</span>)}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:16}}>
+                      {g.meta && (
+                        <span style={{fontSize:11,color:T.textSm,fontFamily:FONT.num}}>
+                          <span style={{color:green}}>{fmtR(g.meta.direto)}</span> diretas + <span style={{color:amber}}>{fmtR(g.meta.rateado)}</span> rateios
+                        </span>
+                      )}
+                      <span style={{fontWeight:700,fontSize:13,color:T.success||"#16A34A",fontFamily:FONT.num}}>{fmtR(g.valor)}</span>
+                    </div>
+                  </div>
+                  {aberto && (
+                    <div style={{padding:"0 0 14px"}}>
+                      <div style={TS.wrap}>
+                        <table style={{...TS.table, minWidth:720}}>
+                          <thead><tr>{rodadaCols.map(h => <th key={h} style={{...TS.th, ...(h==="Valor"?TS.thRight:TS.thLeft)}}>{h}</th>)}</tr></thead>
+                          <tbody>
+                            {g.itens.map(l => <RodadaItemRow key={l.key} l={l}/>)}
+                            {g.meta && (
+                              <tr style={{...TS.tr, background:T.surfaceAlt||T.bg}}>
+                                <td style={{...TS.td, fontWeight:700}} colSpan={5}>
+                                  {g.chave} — Total
+                                  <span style={{fontWeight:400,fontSize:11,color:T.textSm,marginLeft:8}}>
+                                    ({fmtR(g.meta.direto)} diretas + {fmtR(g.meta.rateado)} rateios)
+                                  </span>
+                                </td>
+                                <td style={{...TS.tdNum, fontWeight:700}}>{fmtR(g.valor)}</td>
+                                <td style={TS.td}/>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      {g.meta && g.meta.pendencias.length > 0 && (
+                        <div style={{margin:"12px 20px 0",padding:"10px 14px",borderRadius:10,border:`1px solid ${amber}40`,background:`${amber}0d`}}>
+                          <div style={{fontSize:12,fontWeight:600,color:amber,marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
+                            <Clock size={13}/> Rateios ainda não recebidos — o total desta rodada ainda vai crescer
+                          </div>
+                          {g.meta.pendencias.map((p,i) => (
+                            <div key={i} style={{fontSize:12,color:T.textMd||T.text,padding:"1px 0"}}>
+                              <strong style={{color:ORIGEM_COLOR[p.tipo]||T.text}}>{p.tipo}:</strong> {p.detalhe}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div>

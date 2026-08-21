@@ -4,7 +4,7 @@ import { fmt } from "../../utils";
 import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, hashDataUrl } from "../../lib/supabase";
 import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
-import { acharDuplicatasNF, confirmarDuplicatas } from "../../lib/dedupeNF";
+import { acharDuplicatasNF, confirmarDuplicatas, grafiaCanonica } from "../../lib/dedupeNF";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText, Edit2, Check } from "lucide-react";
 
@@ -124,10 +124,12 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
     // Trava de duplicata ANTES de subir o arquivo: mesmo nº+fornecedor (em
     // qualquer grafia) ou mesmo PDF já cadastrado exige confirmação — foi numa
     // mensal assim que a NF 16 do João Marcos entrou (e foi paga) em dobro.
+    // Grafia canônica do cadastro (não fragmenta agrupamentos por fornecedor).
+    const fornecedorCanonico = grafiaCanonica(form.fornecedor, fornecedores);
     const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
     const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
     const dups = acharDuplicatasNF(
-      { fornecedor: form.fornecedor, numeroNF: form.numeroNF, fileHash },
+      { fornecedor: fornecedorCanonico, numeroNF: form.numeroNF, fileHash },
       [{ origem: "nota mensal", notas: notasExistentes }]
     );
     if (!confirmarDuplicatas(dups, "cadastrar esta NF mensal")) { setUploading(false); return; }
@@ -150,6 +152,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
     onSave({
       id: notaId,
       ...rest,
+      fornecedor: fornecedorCanonico,
       categoria,
       servicoId,
       valor: parseFloat(form.valor) || 0,

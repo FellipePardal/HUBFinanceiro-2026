@@ -55,6 +55,17 @@ export function confirmarDuplicatas(matches, oQue = "salvar esta NF") {
   );
 }
 
+// Grafia canônica do fornecedor: se o nome bate (normalizado) com um apelido
+// do cadastro, devolve o apelido como está no cadastro — assim toda nota entra
+// com UMA grafia e os agrupamentos por fornecedor não se fragmentam. Nome sem
+// cadastro passa intocado (fornecedor novo é fluxo legítimo).
+export function grafiaCanonica(nome, fornecedores = []) {
+  const nk = normTexto(nome);
+  if (!nk) return nome;
+  const f = fornecedores.find(f => normTexto(f?.apelido) === nk);
+  return f ? f.apelido.trim() : nome;
+}
+
 // Mapa chave→rótulo do envio para toda NF que já está dentro de algum envio.
 // Usa os resumos gravados no próprio envio (têm fornecedor+numeroNF), então
 // funciona mesmo quando a nota original já não existe mais.

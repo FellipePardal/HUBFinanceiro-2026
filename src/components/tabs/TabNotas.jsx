@@ -7,7 +7,7 @@ import { pushHistorico } from "../../lib/historico";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
 import { countNotasFiscais, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
-import { acharDuplicatasNF, confirmarDuplicatas } from "../../lib/dedupeNF";
+import { acharDuplicatasNF, confirmarDuplicatas, grafiaCanonica } from "../../lib/dedupeNF";
 import { ReembolsoLogisticaModal } from "../modals/ReembolsoLogisticaModal";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Paperclip, Copy as CopyIcon, FileText } from "lucide-react";
@@ -612,7 +612,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 
 
 // ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
-function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario' }) {
+function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos, fornecedores = [], T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario' }) {
   const [submissions, setSubmissions] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -702,7 +702,12 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
   // A nota sai com decisao:"aprovada" — o addNota do TabNotas usa isso pra NÃO
   // gravar a entrada "registrada" no histórico (o aprovar já grava a "aprovada";
   // antes entravam as duas, com o mesmo id, e o histórico ficava duplicado).
-  const montarNotaAprovada = (sub, editVals) => {
+  const montarNotaAprovada = (subOriginal, editVals) => {
+    // Grafia do fornecedor vira a canônica do cadastro na aprovação — o
+    // formulário público aceita texto livre, e grafias divergentes fragmentam
+    // os agrupamentos por fornecedor (Rastreabilidade) além de dificultarem
+    // ver duplicata a olho nu (caso da NF 16 paga em dobro, 08/2026).
+    const sub = { ...subOriginal, fornecedor: grafiaCanonica(subOriginal.fornecedor, fornecedores) };
     const decididas = { decisao: "aprovada", decidoEm: new Date().toISOString() };
     if (sub.tipo === "mensal") {
       const valorNF = editVals ? (editVals._mensal || 0) : (sub.valorNF || 0);
@@ -1315,7 +1320,10 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   // (buildRealizadoPorJogo, em lib/notasFiscais.js) — sempre em dia, em qualquer aba,
   // em vez de só quando esta aba estava montada e persistia o valor via setJogos.
 
-  const addNota = nota => {
+  const addNota = notaOriginal => {
+    // Grafia do fornecedor entra sempre como a canônica do cadastro (não
+    // fragmenta agrupamentos por fornecedor; ver dedupeNF.js).
+    const nota = { ...notaOriginal, fornecedor: grafiaCanonica(notaOriginal.fornecedor, fornecedores) };
     // Trava de duplicata nos fluxos manuais (Registrar NF, NF Avulsa,
     // Reembolso): mesmo nº/fornecedor (qualquer grafia) ou mesmo arquivo já
     // registrado exige confirmação. Notas vindas de aprovação (decisao
@@ -1864,7 +1872,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
       {/* ── RECEBIDAS (do formulário externo) ── */}
       {tab === "recebidas" && (
-        <RecebidasTab notas={notas} notasMensais={notasMensais} addNota={addNota} addNotaMensal={setNotasMensais ? (nota => setNotasMensais(ms => [...ms, nota])) : null} jogos={jogos} T={T} submissionsKey={submissionsKey} historicoKey={historicoKey} formHash={formHash}/>
+        <RecebidasTab notas={notas} notasMensais={notasMensais} addNota={addNota} addNotaMensal={setNotasMensais ? (nota => setNotasMensais(ms => [...ms, nota])) : null} jogos={jogos} fornecedores={fornecedores} T={T} submissionsKey={submissionsKey} historicoKey={historicoKey} formHash={formHash}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T} portal={portal} subsExcluir={subsExcluir}/>}

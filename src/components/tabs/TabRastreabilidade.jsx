@@ -5,6 +5,7 @@ import { Pill } from "../shared";
 import { Card, PanelTitle, Segmented, Chip, tableStyles } from "../ui";
 import { getNFFile } from "../../lib/supabase";
 import { ALIAS_SUBKEY, SUBS_IGNORAR_REALIZADO_NF, getNotaFiscalScales } from "../../lib/notasFiscais";
+import { normTexto } from "../../lib/dedupeNF";
 import { buildFechamentoPorRodada } from "../../lib/fechamentoRodada";
 import { FileText, X, ChevronDown, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 
@@ -232,6 +233,24 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
 
   const totalGeral = linhasFiltradas.reduce((s, l) => s + valorAtribuido(l), 0);
 
+  // "Por Fornecedor": grafias diferentes do mesmo nome ("João Marcos" ×
+  // "joão marcos") viravam linhas separadas — mesma raiz do pagamento em dobro
+  // da NF 16 (08/2026). Agrupa pela grafia normalizada e exibe a mais comum.
+  const grafiaFornecedor = useMemo(() => {
+    const contagem = new Map(); // norm -> Map(grafia -> ocorrências)
+    linhasFiltradas.forEach(l => {
+      const raw = String(l.fornecedor || "").trim();
+      if (!raw) return;
+      const k = normTexto(raw);
+      if (!contagem.has(k)) contagem.set(k, new Map());
+      const c = contagem.get(k);
+      c.set(raw, (c.get(raw) || 0) + 1);
+    });
+    const map = new Map();
+    contagem.forEach((c, k) => map.set(k, [...c.entries()].sort((a, b) => b[1] - a[1])[0][0]));
+    return map;
+  }, [linhasFiltradas]);
+
   const grupos = useMemo(() => {
     if (agrupamento === "individual") return null;
     const map = new Map();
@@ -247,7 +266,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       } else if (agrupamento === "mes") {
         add(l.mes || "Sem data", l, valorAtribuido(l));
       } else if (agrupamento === "fornecedor") {
-        add(l.fornecedor || "—", l, valorAtribuido(l));
+        add(grafiaFornecedor.get(normTexto(l.fornecedor)) || "—", l, valorAtribuido(l));
       } else if (agrupamento === "categoria") {
         if (l.origem === "jogo") {
           // Se já há um filtro de categoria ativo, restringe o rateio às subKeys
@@ -269,7 +288,7 @@ export default function TabRastreabilidade({ notas, notasMensais, servicos, jogo
       }
     });
     return [...map.values()].sort((a,b) => b.valor - a.valor);
-  }, [agrupamento, linhasFiltradas, filtroInicial]);
+  }, [agrupamento, linhasFiltradas, filtroInicial, grafiaFornecedor]);
 
   // ── Por Rodada: usa o motor do fechamento (lib/fechamentoRodada) ────────────
   // Cada rodada lista TODAS as notas que compõem o realizado dela: as NFs diretas

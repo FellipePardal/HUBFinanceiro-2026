@@ -2,7 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 import { Pill } from "./shared";
 import { CATS } from "../constants";
-import { getState, appendState, fileToDataUrl, saveNFFile } from "../lib/supabase";
+import { getState, appendState, fileToDataUrl, saveNFFile, hashDataUrl } from "../lib/supabase";
+import { nfDuplicadaServidor } from "../lib/dedupeNF";
+
+// Mensagem quando o servidor acusa que esta NF já entrou antes (mesmo
+// fornecedor + nº, em qualquer grafia, ou o mesmo arquivo anexado).
+const MSG_DUPLICADA = (numeroNF) =>
+  `⚠️ Esta nota fiscal (nº ${numeroNF}) já foi enviada anteriormente.\n\n` +
+  `Para evitar pagamento em duplicidade, o envio foi bloqueado.\n` +
+  `Se você acredita que é um engano, fale com a equipe Livemode.`;
 
 const SUBS_EXCLUIR = new Set(["transporte","uber","hospedagem","seg_espacial","infra"]);
 const DARK_T = {
@@ -182,6 +190,15 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      // Trava de duplicata ANTES de gravar qualquer coisa: mesmo fornecedor +
+      // nº (qualquer grafia) ou mesmo arquivo já enviado/aprovado = bloqueia.
+      // Checagem indisponível (null) não bloqueia — o operador ainda vê o
+      // aviso de "possível duplicata" na aba Recebidas.
+      const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
+      const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
+      const dup = await nfDuplicadaServidor('brasileirao', { ...nfData, fileHash });
+      if (dup?.dup) { alert(MSG_DUPLICADA(nfData.numeroNF)); setSubmitting(false); return; }
+
       const submissions = [];
       for (const jogoId of jogosSel) {
         const jogo = divulgados.find(j => j.id === jogoId);
@@ -194,11 +211,11 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
         const allServicos = extrairServicos(jogo);
         const submissionId = Date.now() + jogoId;
         let hasFile = false;
-        if (arquivo) {
-          try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+        if (dataUrlNF) {
+          try { await saveNFFile(submissionId, dataUrlNF); hasFile = true; } catch(_){}
         }
         submissions.push({
-          id: submissionId, clientRef, ...nfData, valorNF, rodada: jogo.rodada, jogoId: jogo.id,
+          id: submissionId, clientRef, ...nfData, ...(fileHash ? { fileHash } : {}), valorNF, rodada: jogo.rodada, jogoId: jogo.id,
           jogoLabel: `${jogo.mandante} x ${jogo.visitante}`, mandante: jogo.mandante, visitante: jogo.visitante,
           servicosKeys: subs.map(sk => `${jogo.id}_${sk}`),
           servicosLabels: allServicos.filter(s => subs.includes(s.subKey)).map(s => s.subLabel),
@@ -435,13 +452,20 @@ function FormMensal({ fornecedores, onDone, T }) {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      // Trava de duplicata: ver comentário no FormJogo. Foi exatamente neste
+      // fluxo mensal que a NF 16 do João Marcos entrou em dobro (08/2026).
+      const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
+      const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
+      const dup = await nfDuplicadaServidor('brasileirao', { ...nfData, fileHash });
+      if (dup?.dup) { alert(MSG_DUPLICADA(nfData.numeroNF)); setSubmitting(false); return; }
+
       const submissionId = Date.now();
       let hasFile = false;
-      if (arquivo) {
-        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      if (dataUrlNF) {
+        try { await saveNFFile(submissionId, dataUrlNF); hasFile = true; } catch(_){}
       }
       const submission = {
-        id: submissionId, clientRef, tipo:"mensal", ...nfData,
+        id: submissionId, clientRef, tipo:"mensal", ...nfData, ...(fileHash ? { fileHash } : {}),
         valorNF: parseFloat(valor) || 0,
         mes: mesSel, mesLabel: MESES[mesSel],
         servicoId: servicoSel.servicoId,        // pode ser null (categoria variável)

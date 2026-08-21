@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
-import { getState, appendState, fileToDataUrl, saveNFFile } from "../lib/supabase";
+import { getState, appendState, fileToDataUrl, saveNFFile, hashDataUrl } from "../lib/supabase";
+import { nfDuplicadaServidor } from "../lib/dedupeNF";
+
+// Mensagem quando o servidor acusa que esta NF já entrou antes (mesmo
+// fornecedor + nº, em qualquer grafia, ou o mesmo arquivo anexado).
+const MSG_DUPLICADA = (numeroNF) =>
+  `⚠️ Esta nota fiscal (nº ${numeroNF}) já foi enviada anteriormente.\n\n` +
+  `Para evitar pagamento em duplicidade, o envio foi bloqueado.\n` +
+  `Se você acredita que é um engano, fale com a equipe Livemode.`;
 
 const DARK_T = {
   bg:"#060912", card:"#0f1623", border:"#1e293b", muted:"#334155",
@@ -185,8 +193,15 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
       const jogosResumo = [];
       let hasFile = false;
 
-      if (arquivo) {
-        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      // Trava de duplicata ANTES de gravar (mesma do Brasileirão — ver
+      // FormularioPublico.jsx e a migration 20260821000000).
+      const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
+      const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
+      const dup = await nfDuplicadaServidor('paulistao', { ...nfData, fileHash });
+      if (dup?.dup) { alert(MSG_DUPLICADA(nfData.numeroNF)); setSubmitting(false); return; }
+
+      if (dataUrlNF) {
+        try { await saveNFFile(submissionId, dataUrlNF); hasFile = true; } catch(_){}
       }
 
       for (const jogoId of jogosSel) {
@@ -208,7 +223,7 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
       const valorNF = Object.values(servicosDetalhe).reduce((s, v) => s + (v || 0), 0);
       const firstJogo = jogosResumo[0];
       const submission = {
-        id: submissionId, clientRef, tipo:"jogo", ...nfData, valorNF, valorFiscalTotal: valorNF,
+        id: submissionId, clientRef, tipo:"jogo", ...nfData, ...(fileHash ? { fileHash } : {}), valorNF, valorFiscalTotal: valorNF,
         fase: firstJogo?.fase, rodada: firstJogo?.rodada, jogoId: firstJogo?.id,
         jogoIds: jogosResumo.map(j => j.id),
         jogoLabel: jogosResumo.map(j => `${j.mandante} x ${j.visitante}`).join(" + "),
@@ -436,13 +451,19 @@ function FormMensal({ fornecedores, onDone, T }) {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      // Trava de duplicata: ver comentário no FormJogo.
+      const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
+      const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
+      const dup = await nfDuplicadaServidor('paulistao', { ...nfData, fileHash });
+      if (dup?.dup) { alert(MSG_DUPLICADA(nfData.numeroNF)); setSubmitting(false); return; }
+
       const submissionId = Date.now();
       let hasFile = false;
-      if (arquivo) {
-        try { const d = await fileToDataUrl(arquivo); await saveNFFile(submissionId, d); hasFile = true; } catch(_){}
+      if (dataUrlNF) {
+        try { await saveNFFile(submissionId, dataUrlNF); hasFile = true; } catch(_){}
       }
       const submission = {
-        id: submissionId, clientRef, tipo:"mensal", ...nfData,
+        id: submissionId, clientRef, tipo:"mensal", ...nfData, ...(fileHash ? { fileHash } : {}),
         valorNF: parseFloat(valor) || 0,
         mes: mesSel, mesLabel: MESES[mesSel],
         servicoId: servicoSel.id,

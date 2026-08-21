@@ -126,9 +126,9 @@ export function ReembolsoLogisticaModal({ jogos, fornecedores, onSave, onClose, 
     if (jogosSel.size === 0 || totalNF === 0) return;
     setUploading(true);
     const notaId = Date.now();
-    let hasFile = false;
+    let hasFile = false, fileHash = null;
     if (arquivo) {
-      try { const dataUrl = await fileToDataUrl(arquivo); await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_) {}
+      try { const dataUrl = await fileToDataUrl(arquivo); fileHash = await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_) {}
     }
     const jogoIds = [...jogosSel];
     const servicosDetalhe = {};
@@ -142,6 +142,7 @@ export function ReembolsoLogisticaModal({ jogos, fornecedores, onSave, onClose, 
       servicosKeys: [], servicosLabels: ["Reembolso Log. Livemode"],
       servicosDetalhe,
       tipo: "reembolso_livemode", status: "Conferida", hasFile,
+      ...(fileHash ? { fileHash } : {}),
     });
     setUploading(false);
   };

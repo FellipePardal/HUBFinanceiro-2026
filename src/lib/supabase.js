@@ -218,8 +218,25 @@ export function fileToDataUrl(file) {
   });
 }
 
+// sha-256 (hex) do dataUrl — mesma conta que o Postgres faz com
+// digest(value #>> '{}', 'sha256'), então o hash gravado na nota pode ser
+// comparado com o do arquivo armazenado. null quando não dá pra calcular
+// (contexto inseguro sem crypto.subtle) — nunca bloqueia o fluxo.
+export async function hashDataUrl(dataUrl) {
+  try {
+    if (!globalThis.crypto?.subtle || !dataUrl) return null;
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(dataUrl));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
+
+// Devolve o fileHash do arquivo salvo, para o caller guardar na nota — é o que
+// permite detectar o mesmo PDF entrando de novo com outro nº (dedupeNF.js).
 export async function saveNFFile(notaId, dataUrl) {
   await setState(`nf_file_${notaId}`, dataUrl);
+  return hashDataUrl(dataUrl);
 }
 
 export async function getNFFile(notaId) {

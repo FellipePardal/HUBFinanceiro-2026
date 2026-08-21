@@ -7,6 +7,7 @@ import { pushHistorico } from "../../lib/historico";
 import { usePortalLink } from "../../hooks/usePortalLink";
 import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../../lib/portalLink";
 import { countNotasFiscais, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
+import { acharDuplicatasNF, confirmarDuplicatas } from "../../lib/dedupeNF";
 import { ReembolsoLogisticaModal } from "../modals/ReembolsoLogisticaModal";
 import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, Paperclip, Copy as CopyIcon, FileText } from "lucide-react";
@@ -294,9 +295,9 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     if (selKeys.length === 0) return;
     setUploading(true);
     const notaId = Date.now();
-    let hasFile = false;
+    let hasFile = false, fileHash = null;
     if (arquivo) {
-      try { const dataUrl = await fileToDataUrl(arquivo); await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_){}
+      try { const dataUrl = await fileToDataUrl(arquivo); fileHash = await saveNFFile(notaId, dataUrl); hasFile = true; } catch(_){}
     }
     // servicosValores agrupado por subKey (para sync realizado), mas servicosKeys com jogoId
     const servicosValores = {};
@@ -328,6 +329,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
       tipo: "prevista",
       status: "Conferida",
       hasFile,
+      ...(fileHash ? { fileHash } : {}),
     });
     setUploading(false);
   };
@@ -499,11 +501,11 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
     if (!jogo || (!form.numeroNF && !form.fornecedor)) return;
     setUploading(true);
     const notaId = Date.now();
-    let hasFile = false;
+    let hasFile = false, fileHash = null;
     if (arquivo) {
       try {
         const dataUrl = await fileToDataUrl(arquivo);
-        await saveNFFile(notaId, dataUrl);
+        fileHash = await saveNFFile(notaId, dataUrl);
         hasFile = true;
       } catch(_){}
     }
@@ -524,6 +526,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
       tipo: "avulsa",
       status: "Conferida",
       hasFile,
+      ...(fileHash ? { fileHash } : {}),
     });
     setUploading(false);
   };
@@ -609,7 +612,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
 
 
 // ─── RECEBIDAS (submissões do formulário externo) ────────────────────────────
-function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario' }) {
+function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario' }) {
   const [submissions, setSubmissions] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -655,6 +658,19 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
     opQueue.current = run.catch(() => {});
     return run;
   };
+
+  // Duplicatas de uma submissão: outras pendentes da fila + notas já aprovadas
+  // (de jogo E mensais — a NF 16 duplicada era mensal e a checagem antiga não
+  // olhava lá). Irmãs da mesma submissão multi-jogo (mesmo clientRef) são
+  // legítimas — a mesma NF cobre 2 jogos — e ficam de fora.
+  const dupsDaSubmissao = (sub) => acharDuplicatasNF(
+    { fornecedor: sub.fornecedor, numeroNF: sub.numeroNF, fileHash: sub.fileHash },
+    [
+      { origem: "pendente na fila", notas: submissions.filter(s => s.id !== sub.id && (!sub.clientRef || s.clientRef !== sub.clientRef)) },
+      { origem: "nota de jogo aprovada", notas: notas.filter(n => !sub.clientRef || n.clientRef !== sub.clientRef) },
+      { origem: "nota mensal aprovada", notas: notasMensais },
+    ]
+  );
 
   const startEdit = (sub) => {
     setEditingId(sub.id);
@@ -752,6 +768,9 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
 
   const aprovar = async (sub) => {
     if (processing[sub.id]) return;
+    // Trava de duplicata ANTES de tirar a submissão da fila: aprovar uma NF que
+    // já existe (mesmo nº/arquivo) exige confirmação explícita do operador.
+    if (!confirmarDuplicatas(dupsDaSubmissao(sub), "aprovar esta NF")) return;
     const editVals = editingId === sub.id ? { ...editServicos } : null;
     setProcessing(p => ({ ...p, [sub.id]: true }));
     setEditingId(null);
@@ -905,11 +924,12 @@ function RecebidasTab({ notas, addNota, addNotaMensal, jogos, T, submissionsKey 
         const valorAtual = sub.tipo === "mensal"
           ? (isEditing ? (editServicos._mensal || 0) : (sub.valorNF || 0))
           : Object.values(svAtual).reduce((s, v) => s + (v || 0), 0);
-        // Mesmo fornecedor + mesmo nº de NF + mesmo valor em outra pendente ou em
-        // nota já aprovada = provável reenvio do formulário; sinaliza pro operador.
-        const chaveDup = s => `${(s.fornecedor||"").trim().toLowerCase()}|${(s.numeroNF||"").trim()}|${s.valorNF||0}`;
-        const possivelDuplicata = submissions.some(s => s.id !== sub.id && chaveDup(s) === chaveDup(sub))
-          || notas.some(n => chaveDup(n) === chaveDup(sub));
+        // Mesmo fornecedor + nº de NF (grafia normalizada) ou mesmo arquivo em
+        // outra pendente ou nota já aprovada (jogo OU mensal) = provável reenvio.
+        // A versão antiga só olhava `notas` e exigia grafia idêntica — foi assim
+        // que a NF 16 do João Marcos (mensal, "joão marcos" × "João Marcos")
+        // passou e acabou paga em dobro (08/2026).
+        const possivelDuplicata = dupsDaSubmissao(sub).length > 0;
 
         return (
           <div key={sub.id} style={{background:T.card,borderRadius:12,padding:"16px 20px",marginBottom:12}}>
@@ -1142,7 +1162,7 @@ function InlineFornecedor({ value, onChange, fornecedores, T }) {
   );
 }
 
-export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false, role = 'admin', onReembolsoCriado }) {
+export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedores = [], envios = [], setEnvios, fornecedoresJogo = {}, setFornecedoresJogo, notasMensais = [], setNotasMensais, T, submissionsKey = 'nf_submissions', historicoKey = 'nf_historico', formHash = '#formulario', usarPortal = true, subsExcluirExtra = [], dedupeNotasPorNF = false, role = 'admin', onReembolsoCriado }) {
   const canEdit = role === 'admin';
   const subsExcluir = subsExcluirExtra.length ? new Set([...SUBS_EXCLUIR, ...subsExcluirExtra]) : SUBS_EXCLUIR;
   const { portal: _portalRaw } = usePortalLink('brasileirao', { enabled: usarPortal });
@@ -1230,13 +1250,13 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
     if (!file || !nota) return;
     try {
       const dataUrl = await fileToDataUrl(file);
-      await saveNFFile(nota.id, dataUrl);
+      const fileHash = await saveNFFile(nota.id, dataUrl);
       // Confirma que o arquivo está mesmo no banco antes de marcar a nota como
       // anexada — sem isso uma gravação que falhou em silêncio deixa a nota
       // prometendo um arquivo inexistente (caso das NFs perdidas em 07-08/2026).
       const gravado = await getNFFile(nota.id);
       if (!gravado) throw new Error("arquivo não persistiu no banco");
-      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: true} : n));
+      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: true, ...(fileHash ? { fileHash } : {})} : n));
     } catch (e) {
       console.error("Upload falhou:", e);
       alert("Não foi possível anexar o arquivo. Tente de novo — a nota segue marcada como sem arquivo.");
@@ -1296,11 +1316,33 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
   // em vez de só quando esta aba estava montada e persistia o valor via setJogos.
 
   const addNota = nota => {
+    // Trava de duplicata nos fluxos manuais (Registrar NF, NF Avulsa,
+    // Reembolso): mesmo nº/fornecedor (qualquer grafia) ou mesmo arquivo já
+    // registrado exige confirmação. Notas vindas de aprovação (decisao
+    // "aprovada") já passaram pela trava lá no RecebidasTab — não repetir.
+    const jaTemDecisao = nota.decisao === "aprovada" || nota.decisao === "rejeitada";
+    if (!jaTemDecisao) {
+      const dups = acharDuplicatasNF(
+        { fornecedor: nota.fornecedor, numeroNF: nota.numeroNF, fileHash: nota.fileHash, ignorarIds: [nota.id] },
+        [
+          { origem: "nota de jogo", notas },
+          { origem: "nota mensal", notas: notasMensais },
+        ]
+      );
+      if (!confirmarDuplicatas(dups, "registrar esta NF")) {
+        // O modal já subiu o arquivo antes de chamar onSave — sem a nota, o
+        // arquivo ficaria órfão no banco.
+        if (nota.hasFile) deleteNFFile(nota.id).catch(() => {});
+        setShowRegistrar(null);
+        setShowAvulsa(false);
+        setShowLivemode(false);
+        return;
+      }
+    }
     setNotas(ns => [...ns, nota]);
     // Histórico append-only: registra a criação. RecebidasTab já grava
     // "aprovada" para NFs vindas do formulário; aqui usamos "registrada"
     // para diferenciar criações via "Registrar NF" e "NF Avulsa".
-    const jaTemDecisao = nota.decisao === "aprovada" || nota.decisao === "rejeitada";
     if (!jaTemDecisao) {
       pushHistorico({
         ...nota,
@@ -1822,7 +1864,7 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
 
       {/* ── RECEBIDAS (do formulário externo) ── */}
       {tab === "recebidas" && (
-        <RecebidasTab notas={notas} addNota={addNota} addNotaMensal={setNotasMensais ? (nota => setNotasMensais(ms => [...ms, nota])) : null} jogos={jogos} T={T} submissionsKey={submissionsKey} historicoKey={historicoKey} formHash={formHash}/>
+        <RecebidasTab notas={notas} notasMensais={notasMensais} addNota={addNota} addNotaMensal={setNotasMensais ? (nota => setNotasMensais(ms => [...ms, nota])) : null} jogos={jogos} T={T} submissionsKey={submissionsKey} historicoKey={historicoKey} formHash={formHash}/>
       )}
 
       {showRegistrar && <RegistrarNFModal jogosRodada={jogosRodada} notasExistentes={notas} fornecedores={fornecedores} onSave={addNota} onClose={() => setShowRegistrar(null)} T={T} portal={portal} subsExcluir={subsExcluir}/>}

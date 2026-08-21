@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
 import { fmt } from "../../utils";
 import { btnStyle, iSty, RADIUS } from "../../constants";
-import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState } from "../../lib/supabase";
+import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, hashDataUrl } from "../../lib/supabase";
 import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
+import { acharDuplicatasNF, confirmarDuplicatas } from "../../lib/dedupeNF";
 import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText, Edit2, Check } from "lucide-react";
 
@@ -119,11 +120,22 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
     if (!form.fornecedor) return;
     setUploading(true);
     const notaId = Date.now();
+
+    // Trava de duplicata ANTES de subir o arquivo: mesmo nº+fornecedor (em
+    // qualquer grafia) ou mesmo PDF já cadastrado exige confirmação — foi numa
+    // mensal assim que a NF 16 do João Marcos entrou (e foi paga) em dobro.
+    const dataUrlNF = arquivo ? await fileToDataUrl(arquivo).catch(() => null) : null;
+    const fileHash = dataUrlNF ? await hashDataUrl(dataUrlNF) : null;
+    const dups = acharDuplicatasNF(
+      { fornecedor: form.fornecedor, numeroNF: form.numeroNF, fileHash },
+      [{ origem: "nota mensal", notas: notasExistentes }]
+    );
+    if (!confirmarDuplicatas(dups, "cadastrar esta NF mensal")) { setUploading(false); return; }
+
     let hasFile = false;
-    if (arquivo) {
+    if (dataUrlNF) {
       try {
-        const dataUrl = await fileToDataUrl(arquivo);
-        await saveNFFile(notaId, dataUrl);
+        await saveNFFile(notaId, dataUrlNF);
         hasFile = true;
       } catch(_){}
     }
@@ -145,6 +157,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
       mesLabel: MESES[parseInt(form.mes)],
       status: "Conferida",
       hasFile,
+      ...(fileHash ? { fileHash } : {}),
     });
     setUploading(false);
   };
@@ -311,8 +324,8 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
     if (!file || !nota) return;
     try {
       const dataUrl = await fileToDataUrl(file);
-      await saveNFFile(nota.id, dataUrl);
-      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: true} : n));
+      const fileHash = await saveNFFile(nota.id, dataUrl);
+      setNotas(ns => ns.map(n => n.id === nota.id ? {...n, hasFile: true, ...(fileHash ? { fileHash } : {})} : n));
     } catch(_){}
     setUploadTarget(null);
   };

@@ -4,6 +4,7 @@ import { fmt, subTotal } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { getNFFile } from "../../lib/supabase";
 import { countNotasFiscais, getEnvioMetricas, normalizeEnvioMetricas, sumNotasFiscais } from "../../lib/notasFiscais";
+import { chaveDuplicataNF, chavesEmEnvios } from "../../lib/dedupeNF";
 import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
 import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package, Edit2, PlusCircle, X, MessageSquare, Eraser } from "lucide-react";
 
@@ -72,6 +73,25 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
 
   const teal = "#14b8a6";
   const nfsEnviadas = new Set(envios.flatMap(e => [...(e.notasIds||[]), ...(e.mensaisIds||[]), ...(e.livemodeIds||[])]));
+  // O filtro acima é por ID — uma DUPLICATA (outro registro, mesma NF) continua
+  // "disponível" e pode entrar num segundo envio, como a NF 16 do João Marcos
+  // (envios 19 e 20, paga em dobro em 08/2026). Este mapa compara pela chave
+  // fornecedor+nº normalizada contra os resumos de TODOS os envios: quem tem
+  // rótulo aqui ganha aviso na lista e confirmação extra ao criar/adicionar.
+  const chavesJaEnviadas = chavesEmEnvios(envios);
+  const jaNoEnvio = n => chavesJaEnviadas.get(chaveDuplicataNF(n.fornecedor, n.numeroNF)) || null;
+  const confirmarNotasJaEnviadas = (notasSelecionadas, oQue) => {
+    const repetidas = notasSelecionadas
+      .map(n => ({ n, envio: jaNoEnvio(n) }))
+      .filter(x => x.envio);
+    if (repetidas.length === 0) return true;
+    const linhas = repetidas.slice(0, 6).map(({ n, envio }) =>
+      `• NF ${n.numeroNF || "s/nº"} · ${n.fornecedor || "?"} — já está no ${envio}`);
+    return window.confirm(
+      `⚠️ NF REPETIDA ENTRE ENVIOS\n\n${linhas.join("\n")}\n\n` +
+      `Incluir de novo pode gerar PAGAMENTO EM DOBRO. ${oQue} mesmo assim?`
+    );
+  };
   const nfsDisponiveis = notas.filter(n => !nfsEnviadas.has(n.id))
     .sort((a,b) => (a.rodada||0) - (b.rodada||0) || (a.fornecedor||"").localeCompare(b.fornecedor||""));
   const mensaisDisponiveis = notasMensais.filter(n => !nfsEnviadas.has(n.id));
@@ -168,6 +188,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
 
   const criarEnvio = () => {
     if (selJogosNFs.size === 0 && selMensaisNFs.size === 0 && selLivemodeNFs.size === 0) return;
+    if (!confirmarNotasJaEnviadas([...selJogosArrTodos, ...selMensaisArr, ...selLivemodeArr], "Criar o envio")) return;
     const numero = proximoNumeroEnvio;
     const totalLivemode = selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0) + selReembolsosArr.reduce((s, n) => s + (n.valorNF||0), 0);
     const novo = normalizeEnvioMetricas({
@@ -293,6 +314,12 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
 
   const confirmarAdicionarNotas = (envioId) => {
     if (addSelJogos.size === 0 && addSelMensais.size === 0 && addSelLivemode.size === 0) return;
+    const selecionadasAdd = [
+      ...notas.filter(n => addSelJogos.has(n.id)),
+      ...notasMensais.filter(n => addSelMensais.has(n.id)),
+      ...notasLivemode.filter(n => addSelLivemode.has(n.id)),
+    ];
+    if (!confirmarNotasJaEnviadas(selecionadasAdd, "Adicionar")) return;
     const novosJogosTodos = notas.filter(n => addSelJogos.has(n.id));
     const novosJogos = agruparReembolsoComLivemode ? novosJogosTodos.filter(n => n.tipo !== "reembolso_livemode") : novosJogosTodos;
     const novosReembolsos = agruparReembolsoComLivemode ? novosJogosTodos.filter(n => n.tipo === "reembolso_livemode") : [];
@@ -442,6 +469,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?T.brand+"15":"transparent",transition:"background .15s"}}>
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:T.brand}}/>
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{g.fornecedor}</span>
+                    {jaNoEnvio(g) && <Pill label={`⚠ já no ${jaNoEnvio(g)}`} color="#ef4444"/>}
                     <span style={{fontSize:11,color:T.textSm}}>NF {g.numeroNF||"—"}</span>
                     <span style={{fontSize:11,color:T.textSm}}>{g.jogoLabel}</span>
                     <Pill label={rodadaPillLabel(g)} color={T.warning}/>
@@ -468,6 +496,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                     style={{display:"flex",alignItems:"center",gap:12,padding:"10px 22px",cursor:"pointer",borderTop:`1px solid ${T.border}`,background:sel?cyan+"15":"transparent",transition:"background .15s"}}>
                     <input type="checkbox" checked={sel} readOnly style={{accentColor:cyan}}/>
                     <span style={{flex:1,fontSize:13,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                    {jaNoEnvio(n) && <Pill label={`⚠ já no ${jaNoEnvio(n)}`} color="#ef4444"/>}
                     <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                     <Pill label={n.mesLabel} color={cyan}/>
                     <Pill label={n.categoria} color={T.warning}/>
@@ -589,6 +618,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?T.brand+"15":"transparent",transition:"background .15s"}}>
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:T.brand}}/>
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{g.fornecedor}</span>
+                          {jaNoEnvio(g) && <Pill label={`⚠ já no ${jaNoEnvio(g)}`} color="#ef4444"/>}
                           <span style={{fontSize:10,color:T.textSm}}>NF {g.numeroNF||"—"}</span>
                           <span style={{fontSize:10,color:T.textSm}}>{g.jogoLabel}</span>
                           <Pill label={rodadaPillLabel(g)} color={T.warning}/>
@@ -610,6 +640,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                           style={{display:"flex",alignItems:"center",gap:12,padding:"8px 22px",cursor:"pointer",background:sel?cyan+"15":"transparent",transition:"background .15s"}}>
                           <input type="checkbox" checked={sel} readOnly style={{accentColor:cyan}}/>
                           <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{n.fornecedor}</span>
+                          {jaNoEnvio(n) && <Pill label={`⚠ já no ${jaNoEnvio(n)}`} color="#ef4444"/>}
                           <span style={{fontSize:10,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                           <Pill label={n.mesLabel} color={cyan}/>
                           <Pill label={n.categoria} color={T.warning}/>

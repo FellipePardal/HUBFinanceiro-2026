@@ -130,7 +130,7 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
     <div>
       <TituloView icone={Lock} cor={T.info} corFundo={T.info+"1f"} titulo="Custos Fixos" subtitulo={`Capital estrutural estritamente sob controle até o mês de ${d.mesLabel}.`} T={T}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:20}}>
-        <KPI label="Orçamento Total" value={fmtR(d.orcAnualTotal)} sub="Campeonato (anual)" color={T.textSm} T={T}/>
+        <KPI label="Orçamento Total" value={fmtR(d.orcAnualTotal)} sub={`Campeonato (${d.mesesCampeonato} meses)`} color={T.textSm} T={T}/>
         <KPI label={`Orçado Acum. até ${d.mesLabel}`} value={fmtR(d.orcTotEff)} sub={`${d.mesesDecorridos} meses decorridos`} color="#94a3b8" T={T}/>
         <KPI label={`Realizado até ${d.mesLabel}`} value={fmtR(d.realizadoEff)} sub={saldoUsaGasto?"Base: gasto (NFs)":"Base: provisionado mensal"} color={T.info} T={T}/>
         <KPI label="Saldo Acumulado" value={(d.saldoTotEff>=0?"▲ ":"▼ ")+fmtR(Math.abs(d.saldoTotEff))} sub={`${fmtR(d.orcTotEff)} − ${fmtR(d.realizadoEff)}`} color={d.saldoTotEff>=0?"#22c55e":"#ef4444"} T={T}/>
@@ -192,7 +192,7 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
                                   <td style={{padding:"3px 8px",textAlign:"right",color:it.tipo==="pontual"?"#d97706":it.tipo==="linear"?T.textSm:"#7c3aed"}}>{it.tipo}</td>
                                   <td style={{padding:"3px 8px",textAlign:"right",color:T.text}} className="num">{fmtBRL(it.prov)}</td>
                                   <td style={{padding:"3px 8px",textAlign:"right",color:T.textSm}}>{it.mesesAlocacao?.length ? it.mesesAlocacao.map(m => MESES_SHORT[m] ?? m).join(", ") : "—"}</td>
-                                  <td style={{padding:"3px 8px",textAlign:"right",color:T.textSm}}>{it.ratio !== null ? `${(it.ratio*100).toFixed(0)}%` : `÷12×${d.mesesDecorridos}`}</td>
+                                  <td style={{padding:"3px 8px",textAlign:"right",color:T.textSm}}>{it.ratio !== null ? `${(it.ratio*100).toFixed(0)}%` : `÷${d.mesesCampeonato}×${d.mesesDecorridos}`}</td>
                                   <td style={{padding:"3px 8px",textAlign:"right",fontWeight:700,color:T.info}} className="num">{fmtBRL(it.contribui)}</td>
                                 </tr>
                               ))}
@@ -596,7 +596,7 @@ function SlideExtrato({ fech, rodada, T }) {
   );
 }
 
-export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMensais = [], apres, setApres, orcGlobal = 0, mesInicio = 0, saldoUsaGasto = false, nomeCampeonato = "", notas = [], notasLivemode = [], notasLiveU = [], dedupeNotasPorNF = false, grupoDoJogo = null }) {
+export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMensais = [], apres, setApres, orcGlobal = 0, mesInicio = 0, mesFim = 11, saldoUsaGasto = false, nomeCampeonato = "", notas = [], notasLivemode = [], notasLiveU = [], dedupeNotasPorNF = false, grupoDoJogo = null }) {
   const a = apres || {};
   const upd = updater => setApres(prev => updater(prev || {}));
   const setField = (field, v) => upd(p => ({ ...p, [field]: v }));
@@ -618,10 +618,10 @@ export default function TabApresentacoes({ T, jogos = [], servicos = [], notasMe
 
   const dadosFix = useMemo(() => calcFixos({
     servicos, notasMensais, jogos,
-    mesSel: a.fixMes ?? null, rodadaSel: a.fixRodada ?? null, mesInicio,
+    mesSel: a.fixMes ?? null, rodadaSel: a.fixRodada ?? null, mesInicio, mesFim,
     overrides: a.fixOverrides || {}, orcTotOvr, provTotOvr, gastoTotOvr,
     saldoUsaGasto,
-  }), [servicos, notasMensais, jogos, a.fixMes, a.fixRodada, mesInicio, a.fixOverrides, orcTotOvr, provTotOvr, gastoTotOvr, saldoUsaGasto]);
+  }), [servicos, notasMensais, jogos, a.fixMes, a.fixRodada, mesInicio, mesFim, a.fixOverrides, orcTotOvr, provTotOvr, gastoTotOvr, saldoUsaGasto]);
 
   const vg = useMemo(() => calcVisaoGeral({ dadosVar, dadosFix, orcGlobalVar: orcGlobal }), [dadosVar, dadosFix, orcGlobal]);
 

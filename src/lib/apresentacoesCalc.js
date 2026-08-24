@@ -63,20 +63,23 @@ export function calcVariaveis({ jogos = [], rodadaSel = null, overrides = {}, nf
 // gastoTotOvr: "" = automático.
 export function calcFixos({
   servicos = [], notasMensais = [], jogos = [],
-  mesSel = null, rodadaSel = null, mesInicio = 0,
+  mesSel = null, rodadaSel = null, mesInicio = 0, mesFim = 11,
   overrides = {}, orcTotOvr = "", provTotOvr = "", gastoTotOvr = "",
   saldoUsaGasto = false,
 }) {
   const mesAtual = mesSel != null ? mesSel : new Date().getMonth();
   const rodadasDisp = Array.from(new Set(jogos.map(j => j.rodada))).sort((a, b) => a - b);
   const rodadaAtual = rodadaSel != null && rodadasDisp.includes(rodadaSel) ? rodadaSel : (rodadasDisp[rodadasDisp.length - 1] || 1);
-  // Orçado anual ÷ 12 × meses decorridos (acumulado até o mês selecionado)
-  const mesesDecorridos = Math.max(0, mesAtual - mesInicio + 1);
+  // Rateio linear pela DURAÇÃO do campeonato, não pelo ano: Paulistão F vai de
+  // maio a dezembro (8 meses), então cada mês libera 1/8 do total — ÷12 só vale
+  // para campeonato de ano cheio (Brasileirão). Meses decorridos param no fim.
+  const mesesCampeonato = Math.max(1, mesFim - mesInicio + 1);
+  const mesesDecorridos = Math.max(0, Math.min(mesAtual, mesFim) - mesInicio + 1);
 
   // Orçado e provisionado mensais por-item conforme flag "tipo":
-  //   linear  → total / 12 * mesesDecorridos
+  //   linear  → total / mesesCampeonato * mesesDecorridos
   //   pontual → total integral a partir do mês alocado
-  //   misto   → parte linear /12 + parte pontual a partir do mês alocado
+  //   misto   → parte linear /mesesCampeonato + parte pontual a partir do mês alocado
   // Encerrados: provisionado congela em realAoEncerrar (independente do tipo)
   // Rateio pontual: fração = (meses alocados decorridos) / (total de meses alocados)
   const pontualRatio = it => {
@@ -102,11 +105,11 @@ export function calcFixos({
         const tot = pl + pp;
         if (tot > 0) {
           const rL = pl / tot;
-          return s + (orc * rL / 12) * mesesDecorridos + orc * (1 - rL) * pontualRatio(it);
+          return s + (orc * rL / mesesCampeonato) * mesesDecorridos + orc * (1 - rL) * pontualRatio(it);
         }
-        return s + (orc / 12) * mesesDecorridos;
+        return s + (orc / mesesCampeonato) * mesesDecorridos;
       }
-      return s + (orc / 12) * mesesDecorridos;
+      return s + (orc / mesesCampeonato) * mesesDecorridos;
     }, 0);
     const itensDebug = itens.map(it => {
       if (it.status === "encerrado") return { nome: it.nome, tipo: "encerrado", prov: it.realAoEncerrar || 0, ratio: null, contribui: it.realAoEncerrar || 0, mesesAlocacao: [] };
@@ -123,9 +126,9 @@ export function calcFixos({
       }
       if (tipo === "misto") {
         const pl = it.parcelaLinear || 0; const pp = it.parcelaPontual || 0;
-        return { nome: it.nome, tipo, prov, ratio: null, contribui: (pl / 12) * mesesDecorridos + pp * pontualRatio(it), mesesAlocacao: it.mesesAlocacao || [] };
+        return { nome: it.nome, tipo, prov, ratio: null, contribui: (pl / mesesCampeonato) * mesesDecorridos + pp * pontualRatio(it), mesesAlocacao: it.mesesAlocacao || [] };
       }
-      return { nome: it.nome, tipo: "linear", prov, ratio: null, contribui: (prov / 12) * mesesDecorridos, mesesAlocacao: [] };
+      return { nome: it.nome, tipo: "linear", prov, ratio: null, contribui: (prov / mesesCampeonato) * mesesDecorridos, mesesAlocacao: [] };
     });
     const provAuto = itensDebug.reduce((s, it) => s + it.contribui, 0);
     const provTotalAnual = provAnual;
@@ -201,7 +204,7 @@ export function calcFixos({
   const pctRec = nfBase > 0 ? nfRecV / nfBase * 100 : 0;
 
   return {
-    mesAtual, mesLabel: MESES_FIX[mesAtual], rodadaAtual, rodadasDisp, mesesDecorridos,
+    mesAtual, mesLabel: MESES_FIX[mesAtual], rodadaAtual, rodadasDisp, mesesDecorridos, mesesCampeonato,
     sections, sectionsView, rows,
     orcAnualTotal, provTotalAnualAll,
     orcTotal, provTotal, gastoTotal, saldoTotal,

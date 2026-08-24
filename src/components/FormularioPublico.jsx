@@ -156,7 +156,10 @@ function FormJogo({ jogos, fornecedores, onDone, T }) {
   // (checamos no servidor se este clientRef já chegou antes de gravar).
   const clientRef = useRef("cr_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 9)).current;
 
-  const divulgados = jogos.filter(j => j.mandante !== "A definir");
+  // Só jogos liberados pelo operador (botão na aba Notas Fiscais) aparecem aqui —
+  // evita envio de NF antes do provisionado ser acertado (jogos novos herdam o
+  // orçado padrão como provisionado e exporiam serviços que não existem).
+  const divulgados = jogos.filter(j => j.mandante !== "A definir" && j.formLiberado);
   const rodadas = Array.from(new Set(divulgados.map(j => j.rodada))).sort((a, b) => a - b);
   const jogosRodada = divulgados.filter(j => j.rodada === rodadaSel);
 

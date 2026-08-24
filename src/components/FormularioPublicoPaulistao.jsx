@@ -606,7 +606,9 @@ export default function FormularioPublicoPaulistao() {
     });
   }, []);
 
-  const divulgados = jogos.filter(j => j.mandante !== "A definir");
+  // Só jogos liberados pelo operador (botão na aba Notas Fiscais) aparecem aqui —
+  // evita envio de NF antes do provisionado ser acertado.
+  const divulgados = jogos.filter(j => j.mandante !== "A definir" && j.formLiberado);
 
   const reset = () => { setTipo(null); setDone(false); };
 

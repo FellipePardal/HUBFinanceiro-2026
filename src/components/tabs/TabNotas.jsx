@@ -1587,6 +1587,19 @@ export default function TabNotas({ notas, setNotas, jogos, setJogos, fornecedore
                   </span>
                 </div>
                 <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  {/* Libera o jogo no formulário público — sem isso o fornecedor não
+                      vê o jogo lá, evitando envio antes do provisionado ser acertado. */}
+                  {canEdit && setJogos && (
+                    <button
+                      onClick={() => setJogos(js => js.map(j => j.id === jogo.id ? {...j, formLiberado: !j.formLiberado} : j))}
+                      title={jogo.formLiberado ? "Jogo visível no formulário público — clique para ocultar" : "Jogo oculto no formulário público — clique para liberar"}
+                      style={{cursor:"pointer",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:RADIUS.pill,
+                        color: jogo.formLiberado ? T.brand : T.textSm,
+                        background: jogo.formLiberado ? T.brand+"1f" : "transparent",
+                        border: `1px solid ${jogo.formLiberado ? T.brand+"55" : T.border}`}}>
+                      {jogo.formLiberado ? "✓ No formulário" : "Liberar p/ formulário"}
+                    </button>
+                  )}
                   <span style={{color:T.warning,fontSize:11,fontWeight:700,background:T.warning+"1f",padding:"3px 10px",borderRadius:RADIUS.pill,border:`1px solid ${T.warning}33`}}>{pendentes} pendente{pendentes!==1?"s":""}</span>
                   <span className="num" style={{color:T.brand,fontSize:11,fontWeight:700,background:T.brand+"1f",padding:"3px 10px",borderRadius:RADIUS.pill,border:`1px solid ${T.brand}33`}}>{conferidas}/{servicos.length}</span>
                 </div>

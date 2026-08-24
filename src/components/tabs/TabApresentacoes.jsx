@@ -126,7 +126,6 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
   const [expandedSecs, setExpandedSecs] = useState({});
   const toggleSec = secao => setExpandedSecs(prev => ({...prev, [secao]: !prev[secao]}));
   const pctReal = Math.min(1, d.realizadoEff / (d.orcTotEff || 1));
-  const realizadoTot = d.rows.reduce((s, r) => s + (r.secao === "Outros Mensais" ? r.gasto : r.prov), 0);
   return (
     <div>
       <TituloView icone={Lock} cor={T.info} corFundo={T.info+"1f"} titulo="Custos Fixos" subtitulo={`Capital estrutural estritamente sob controle até o mês de ${d.mesLabel}.`} T={T}/>
@@ -149,15 +148,14 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
       </Card>
       <Card T={T} style={{marginBottom:20}}>
         <div style={{padding:"16px 20px"}}>
-          <h4 style={{margin:"0 0 12px",color:T.text,fontSize:13,fontWeight:700}}>Seções — Orçado Acumulado × Realizado × Saldo</h4>
+          <h4 style={{margin:"0 0 12px",color:T.text,fontSize:13,fontWeight:700}}>Seções — Orçado Acumulado × Provisionado × Realizado × Saldo</h4>
           <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:560}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:640}}>
               <thead><tr style={{background:T.bg}}>
-                {["Seção","Orçado Acum.","Realizado","Saldo"].map((h,i)=><th key={h} style={thSty(T,i>0)}>{h}</th>)}
+                {["Seção","Orçado Acum.","Provisionado","Realizado (NFs)","Saldo"].map((h,i)=><th key={h} style={thSty(T,i>0)}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {d.rows.map(r => {
-                  const realizadoVal = r.secao === "Outros Mensais" ? r.gasto : r.prov;
                   const debug = d.sections.find(x => x.secao === r.secao)?.itensDebug || [];
                   const expanded = !!expandedSecs[r.secao];
                   return (
@@ -174,12 +172,13 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
                         </div>
                       </td>
                       <td style={{...tdSty(true),color:T.textMd}} className="num">{fmtR(r.orc)}</td>
-                      <td style={{...tdSty(true),color:T.text}} className="num">{fmtR(realizadoVal)}</td>
+                      <td style={{...tdSty(true),color:T.text}} className="num">{r.secao === "Outros Mensais" ? "—" : fmtR(r.prov)}</td>
+                      <td style={{...tdSty(true),color:T.text}} className="num">{fmtR(r.gasto)}</td>
                       <td style={{...tdSty(true),fontWeight:700,color:r.saldo>=0?"#a3e635":"#ef4444"}} className="num">{r.saldo>=0?"▲ ":"▼ "}{fmtR(Math.abs(r.saldo))}</td>
                     </tr>
                     {debug.length > 0 && expanded && (
                       <tr style={{background:T.bg}}>
-                        <td colSpan={4} style={{padding:"6px 12px 10px 24px"}}>
+                        <td colSpan={5} style={{padding:"6px 12px 10px 24px"}}>
                           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                             <thead><tr>
                               {["Item","Tipo","Prov. Anual","Meses Aloc.","Ratio/Fator","Contribui"].map((h,i)=>(
@@ -205,12 +204,13 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
                     </Fragment>
                   );
                 })}
-                {d.rows.length === 0 && <tr><td colSpan={4} style={{padding:24,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhuma seção no portal</td></tr>}
+                {d.rows.length === 0 && <tr><td colSpan={5} style={{padding:24,textAlign:"center",color:T.textSm,fontSize:12}}>Nenhuma seção no portal</td></tr>}
               </tbody>
               <tfoot><tr style={{background:T.bg}}>
                 <td style={{...tdSty(false),fontWeight:700,color:T.textSm,textTransform:"uppercase",fontSize:11,letterSpacing:1}}>Total</td>
                 <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(d.orcTotal)}</td>
-                <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(realizadoTot)}</td>
+                <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(d.provTotal)}</td>
+                <td style={{...tdSty(true),fontWeight:700,color:T.text}} className="num">{fmtR(d.gastoTotal)}</td>
                 <td style={{...tdSty(true),fontWeight:700,color:d.saldoTotal>=0?"#a3e635":"#ef4444"}} className="num">{d.saldoTotal>=0?"▲ ":"▼ "}{fmtR(Math.abs(d.saldoTotal))}</td>
               </tr></tfoot>
             </table>

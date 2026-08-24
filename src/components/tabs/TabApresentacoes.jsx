@@ -6,7 +6,6 @@ import { KPI } from "../shared";
 import { BarChart3, Lock, LayoutGrid, ChevronDown, ChevronRight, Settings2, X, Receipt } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
-  PieChart, Pie, Cell,
 } from "recharts";
 import { calcVariaveis, calcFixos, calcVisaoGeral, fmtBRL, MESES_FIX, MESES_SHORT } from "../../lib/apresentacoesCalc";
 import { buildFechamentoPorRodada } from "../../lib/fechamentoRodada";
@@ -30,31 +29,6 @@ class ErrorBoundary extends Component {
 }
 
 // ─── PEÇAS COMPARTILHADAS DAS VIEWS ──────────────────────────────────────────
-function DonutNF({ rec, pend, pct, T, size = 110 }) {
-  const vazio = rec + pend <= 0;
-  const data = vazio ? [{ name: "—", value: 1 }] : [{ name: "Recebidas", value: rec }, { name: "Pendentes", value: pend }];
-  return (
-    <div style={{position:"relative",width:size,height:size}}>
-      <PieChart width={size} height={size}>
-        <Pie data={data} dataKey="value" cx="50%" cy="50%" innerRadius={size*0.31} outerRadius={size*0.47}
-          startAngle={90} endAngle={-270} stroke="none" isAnimationActive={false}>
-          {vazio ? <Cell fill={T.border}/> : [<Cell key="rec" fill="#22c55e"/>, <Cell key="pend" fill="#d97706"/>]}
-        </Pie>
-      </PieChart>
-      <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:size>=100?15:12,fontWeight:700,color:T.text}}>{Math.round(pct)}%</div>
-    </div>
-  );
-}
-
-function LegendaNF({ nfRecV, nfPend, T }) {
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      <span style={{display:"flex",alignItems:"center",gap:7,fontSize:11,color:T.textMd}}><span style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/> Recebidas · <b style={{color:T.text}}>{fmtRs(nfRecV)}</b></span>
-      <span style={{display:"flex",alignItems:"center",gap:7,fontSize:11,color:T.textMd}}><span style={{width:8,height:8,borderRadius:"50%",background:"#d97706",flexShrink:0}}/> Pendentes · <b style={{color:T.text}}>{fmtRs(nfPend)}</b></span>
-    </div>
-  );
-}
-
 function TituloView({ icone: Icone, cor, corFundo, titulo, subtitulo, T }) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
@@ -112,13 +86,7 @@ function SlideVariaveis({ d, T }) {
         </Card>
         <Card T={T} style={{display:"flex",flexDirection:"column",minHeight:0}}>
           <div style={{padding:"16px 20px",flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:10,flexWrap:"wrap"}}>
-              <h4 style={{margin:0,color:T.text,fontSize:13,fontWeight:700}}>Status NFs</h4>
-              <div style={{display:"flex",gap:14,alignItems:"center"}}>
-                <DonutNF rec={d.nfRecV} pend={d.nfPend} pct={d.pctRec} T={T} size={72}/>
-                <LegendaNF nfRecV={d.nfRecV} nfPend={d.nfPend} T={T}/>
-              </div>
-            </div>
+            <h4 style={{margin:"0 0 12px",color:T.text,fontSize:13,fontWeight:700}}>Saving por Rodada</h4>
             <div style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"separate",borderSpacing:0}}>
                 <thead><tr>
@@ -176,13 +144,6 @@ function SlideFixos({ d, T, saldoUsaGasto }) {
           </div>
           <div style={{height:20,borderRadius:10,background:T.bg,border:`1px solid ${T.border}`,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${(pctReal*100).toFixed(1)}%`,background:"linear-gradient(90deg,#14532d,#22c55e)",transition:"width .3s"}}/>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:10,marginBottom:6}}>
-            <span style={{fontSize:11,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Status NFs</span>
-            <span style={{fontSize:11,color:T.textMd}}><b style={{color:"#22c55e"}}>{Math.round(d.pctRec)}%</b> recebidas ({fmtRs(d.nfRecV)}) · <b style={{color:"#d97706"}}>{Math.round(100-d.pctRec)}%</b> pendentes ({fmtRs(d.nfPend)})</span>
-          </div>
-          <div style={{height:12,borderRadius:6,background:T.bg,border:`1px solid ${T.border}`,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${Math.min(100,d.pctRec).toFixed(1)}%`,background:"#16a34a",transition:"width .3s"}}/>
           </div>
         </div>
       </Card>

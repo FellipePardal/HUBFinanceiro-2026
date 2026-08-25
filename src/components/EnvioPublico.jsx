@@ -14,8 +14,8 @@ const T = {
 const purple = "#a855f7";
 const cyan = "#06b6d4";
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
-const STATUS_NOTA = ["Pendente","Pago","Alteração"];
-const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Pago":"#22c55e","Alteração":"#ef4444"};
+const STATUS_NOTA = ["Pendente","Em sistema","Pago","Alteração"];
+const STATUS_NOTA_COLOR = {"Pendente":"#f59e0b","Em sistema":"#3b82f6","Pago":"#22c55e","Alteração":"#ef4444"};
 
 const parseEnvioRef = ref => {
   const raw = decodeURIComponent(String(ref || ""));

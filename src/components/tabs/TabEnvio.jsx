@@ -49,6 +49,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
   const [addSelJogos, setAddSelJogos] = useState(new Set());
   const [addSelMensais, setAddSelMensais] = useState(new Set());
   const [addSelLivemode, setAddSelLivemode] = useState(new Set());
+  // Mostrar quando cada NF foi adicionada ao envio (adicionadaEm) -- oculto por padrao
+  const [mostrarHorarios, setMostrarHorarios] = useState(false);
+  const fmtAdicionadaEm = n => n.adicionadaEm ? new Date(n.adicionadaEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}) : null;
 
   // Anotações internas por envio
   const [novoComentario, setNovoComentario] = useState("");
@@ -191,6 +194,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     if (!confirmarNotasJaEnviadas([...selJogosArrTodos, ...selMensaisArr, ...selLivemodeArr], "Criar o envio")) return;
     const numero = proximoNumeroEnvio;
     const totalLivemode = selLivemodeArr.reduce((s, n) => s + (n.valor||0), 0) + selReembolsosArr.reduce((s, n) => s + (n.valorNF||0), 0);
+    const adicionadaEm = new Date().toISOString();
     const novo = normalizeEnvioMetricas({
       id: Date.now(),
       numero,
@@ -202,11 +206,11 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
       notasIds: [...selJogosNFs],
       mensaisIds: [...selMensaisNFs],
       livemodeIds: [...selLivemodeNFs],
-      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
-      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+      notasResumo: selJogosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile,adicionadaEm})),
+      mensaisResumo: selMensaisArr.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile,adicionadaEm})),
       livemodeResumo: [
-        ...selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
-        ...selReembolsosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile})),
+        ...selLivemodeArr.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile,adicionadaEm})),
+        ...selReembolsosArr.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento,hasFile:n.hasFile,adicionadaEm})),
       ],
       totalJogos: 0,
       totalMensais: 0,
@@ -325,18 +329,19 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
     const novosReembolsos = agruparReembolsoComLivemode ? novosJogosTodos.filter(n => n.tipo === "reembolso_livemode") : [];
     const novosMensais = notasMensais.filter(n => addSelMensais.has(n.id));
     const novosLivemode = notasLivemode.filter(n => addSelLivemode.has(n.id));
+    const adicionadaEm = new Date().toISOString();
 
     setEnvios(ev => ev.map(e => {
       if (e.id !== envioId) return e;
       const notasIds = [...(e.notasIds||[]), ...[...addSelJogos]];
       const mensaisIds = [...(e.mensaisIds||[]), ...[...addSelMensais]];
       const livemodeIds = [...(e.livemodeIds||[]), ...[...addSelLivemode]];
-      const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
-      const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile}))];
+      const notasResumo = [...(e.notasResumo||[]), ...novosJogos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor,valorNF:n.valorNF,numeroNF:n.numeroNF,jogoLabel:n.jogoLabel,rodada:n.rodada,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile,adicionadaEm}))];
+      const mensaisResumo = [...(e.mensaisResumo||[]), ...novosMensais.map(n => ({id:n.id,fornecedor:n.fornecedor,valor:n.valor,numeroNF:n.numeroNF,categoria:n.categoria,mesLabel:n.mesLabel,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile,adicionadaEm}))];
       const livemodeResumo = [
         ...(e.livemodeResumo||[]),
-        ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile})),
-        ...novosReembolsos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile})),
+        ...novosLivemode.map(n => ({id:n.id,fornecedor:n.fornecedor||"Livemode",valor:n.valor,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile,adicionadaEm})),
+        ...novosReembolsos.map(n => ({id:n.id,codigo:n.codigo,fornecedor:n.fornecedor||"Livemode",valor:n.valorNF,numeroNF:n.numeroNF,rodada:n.rodada,rodadas:n.rodadas,rodadasLabel:n.rodadasLabel,jogoLabel:n.jogoLabel,servicosLabels:n.servicosLabels,dataEmissao:n.dataEmissao,dataPagamento:e.dataPagamento,hasFile:n.hasFile,adicionadaEm})),
       ];
       return normalizeEnvioMetricas({...e, notasIds, mensaisIds, livemodeIds, notasResumo, mensaisResumo, livemodeResumo}, { dedupeNotasPorNF });
     }));
@@ -592,6 +597,9 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
               {(envioDetalhe?.pago)?"Marcar pendente":"Marcar pago"}
             </Button>
             <Button T={T} variant="secondary" size="sm" icon={Eraser} onClick={()=>limparMarcacoes(envioDetalhe.id)}>Limpar marcações</Button>
+            <Button T={T} variant={mostrarHorarios?"primary":"secondary"} size="sm" icon={Clock} onClick={()=>setMostrarHorarios(h=>!h)}>
+              {mostrarHorarios?"Ocultar horários":"Horários"}
+            </Button>
             <Button T={T} variant="secondary" size="sm" icon={PlusCircle} onClick={()=>{setAddingNotas(!addingNotas);setAddSelJogos(new Set());setAddSelMensais(new Set());setAddSelLivemode(new Set());}}>
               {addingNotas?"Cancelar":"Adicionar notas"}
             </Button>
@@ -764,7 +772,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                 <tbody>
                   {[...envioDetalhe.notasResumo].sort((a,b) => (a.rodada||0) - (b.rodada||0) || (a.fornecedor||"").localeCompare(b.fornecedor||"")).map(n => (
                     <tr key={n.id} style={TS.tr}>
-                      <td style={TS.td}><code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{n.codigo}</code></td>
+                      <td style={TS.td}>
+                        <code className="num" style={{color:T.brand,fontSize:11,background:T.brand+"15",padding:"2px 6px",borderRadius:4,fontWeight:600}}>{n.codigo}</code>
+                        {mostrarHorarios && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap"}}>add. {fmtAdicionadaEm(n)||"—"}</div>}
+                      </td>
                       <td className="num" style={{...TS.td, fontWeight:600, fontSize:12}}>{n.numeroNF||"—"}</td>
                       <td style={{...TS.td, fontSize:12}}>{n.fornecedor}</td>
                       <td className="num" style={{...TS.tdNum, color:purple, fontWeight:700}}>{fmt(n.valorNF)}</td>
@@ -811,7 +822,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                 <tbody>
                   {envioDetalhe.mensaisResumo.map(n => (
                     <tr key={n.id} style={TS.tr}>
-                      <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
+                      <td style={{...TS.td, fontWeight:600, fontSize:12}}>
+                        {n.fornecedor}
+                        {mostrarHorarios && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap",fontWeight:400}}>add. {fmtAdicionadaEm(n)||"—"}</div>}
+                      </td>
                       <td style={TS.td}><Pill label={n.categoria} color={cyan}/></td>
                       <td style={{...TS.td, fontSize:12}}>{n.mesLabel}</td>
                       <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
@@ -860,7 +874,10 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
                 <tbody>
                   {envioDetalhe.livemodeResumo.map(n => (
                     <tr key={n.id} style={TS.tr}>
-                      <td style={{...TS.td, fontWeight:700, fontSize:12}}>{n.rodadasLabel || `Rd ${n.rodada}`}</td>
+                      <td style={{...TS.td, fontWeight:700, fontSize:12}}>
+                        {n.rodadasLabel || `Rd ${n.rodada}`}
+                        {mostrarHorarios && <div style={{fontSize:9,color:T.textSm,marginTop:3,whiteSpace:"nowrap",fontWeight:400}}>add. {fmtAdicionadaEm(n)||"—"}</div>}
+                      </td>
                       <td className="num" style={{...TS.td, fontSize:12}}>{n.numeroNF||"—"}</td>
                       <td style={{...TS.td, fontWeight:600, fontSize:12}}>{n.fornecedor}</td>
                       <td style={{...TS.td, fontSize:10, color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</td>

@@ -294,6 +294,7 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span style={{fontSize:11,color:T.textSm}}>{n.jogoLabel}</span>
                 <span style={{fontSize:10,color:T.textSm,background:T.surfaceAlt,padding:"2px 8px",borderRadius:4}}>Rd {n.rodada}</span>
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                {n.adicionadaEm && <span style={{fontSize:10,color:T.textSm}} title="Quando a NF foi adicionada ao envio">adicionada {new Date(n.adicionadaEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</span>}
                 <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"jogo",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
@@ -324,6 +325,7 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span className="num" style={{fontSize:13,fontWeight:700,color:purple,minWidth:80}}>{fmt(n.valor)}</span>
                 <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                {n.adicionadaEm && <span style={{fontSize:10,color:T.textSm}} title="Quando a NF foi adicionada ao envio">adicionada {new Date(n.adicionadaEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</span>}
                 <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"mensal",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}
@@ -353,6 +355,7 @@ export default function EnvioPublico({ numero, envioRef }) {
                 <span style={{fontSize:11,color:T.textSm}}>NF {n.numeroNF||"—"}</span>
                 {(n.servicosLabels||[]).length > 0 && <span style={{fontSize:10,color:T.textSm}}>{(n.servicosLabels||[]).join(", ")}</span>}
                 {n.dataEmissao && <span style={{fontSize:10,color:T.textSm}}>Em: {n.dataEmissao}</span>}
+                {n.adicionadaEm && <span style={{fontSize:10,color:T.textSm}} title="Quando a NF foi adicionada ao envio">adicionada {new Date(n.adicionadaEm).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</span>}
                 <select value={n.statusNota||"Pendente"} onChange={e=>requestStatusChange(n.id,"livemode",e.target.value,n.statusNota||"Pendente")} className="no-print"
                   style={{background:STATUS_NOTA_COLOR[n.statusNota||"Pendente"]+"22",color:STATUS_NOTA_COLOR[n.statusNota||"Pendente"],border:`1px solid ${STATUS_NOTA_COLOR[n.statusNota||"Pendente"]}55`,borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                   {STATUS_NOTA.map(s=><option key={s} value={s}>{s}</option>)}

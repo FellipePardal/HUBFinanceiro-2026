@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { CATS, btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile } from "../../lib/supabase";
 import { Pill } from "../shared";
+import { DateInput } from "../ui";
 
 const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 
@@ -158,14 +159,16 @@ export function ReembolsoLogisticaModal({ jogos, fornecedores, onSave, onClose, 
             ["Fornecedor","fornecedor","text"],
             ["Nº da Nota","numeroNF","text"],
             ["Valor Total NF (R$)","valorNF","number"],
-            ["Data Emissão","dataEmissao","text","dd/mm"],
-            ["Data Envio","dataEnvio","text","dd/mm"],
+            ["Data Emissão","dataEmissao","date"],
+            ["Data Envio","dataEnvio","date"],
             ["Observações","obs","text"],
           ].map(([label, key, type, ph]) => (
             <div key={key} style={{marginBottom:12}}>
               <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>{label}</label>
               {key === "fornecedor"
                 ? <FornecedorInput value={form.fornecedor} onChange={v => set("fornecedor", v)} fornecedores={fornecedores} T={T}/>
+                : type === "date"
+                ? <DateInput value={form[key]} onChange={v => set(key, v)} style={IS}/>
                 : <input type={type} value={form[key]} onChange={e => set(key, e.target.value)} placeholder={ph||""} style={IS}/>}
             </div>
           ))}

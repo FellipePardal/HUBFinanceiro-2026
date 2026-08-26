@@ -5,7 +5,7 @@ import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { getNFFile } from "../../lib/supabase";
 import { countNotasFiscais, getEnvioMetricas, normalizeEnvioMetricas, sumNotasFiscais } from "../../lib/notasFiscais";
 import { chaveDuplicataNF, chavesEmEnvios } from "../../lib/dedupeNF";
-import { Card, PanelTitle, Button, Chip, tableStyles } from "../ui";
+import { Card, PanelTitle, Button, Chip, tableStyles, DateInput } from "../ui";
 import { Plus, ArrowLeft, CheckCircle2, Clock, Eye, Trash2, Share2, ExternalLink, Download, Send, Package, Edit2, PlusCircle, X, MessageSquare, Eraser } from "lucide-react";
 
 const catTotal = (subs, cat) => cat.subs.reduce((s, sub) => s + (subs?.[sub.key]||0), 0);
@@ -451,7 +451,7 @@ export default function TabEnvio({ jogos, notas, notasMensais, notasLivemode = [
           </div>
           <div>
             <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Data de Pagamento</label>
-            <input value={dataPagamento} onChange={e=>setDataPagamento(e.target.value)} placeholder="dd/mm/aaaa" style={IS}/>
+            <DateInput value={dataPagamento} onChange={setDataPagamento} style={IS}/>
           </div>
           <div>
             <label style={{color:T.textSm,fontSize:10,display:"block",marginBottom:6,letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:700}}>Observações (opcional)</label>

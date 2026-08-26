@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
+import { DateInput } from "./ui";
 import { getState, appendState, fileToDataUrl, saveNFFile, hashDataUrl } from "../lib/supabase";
 import { nfDuplicadaServidor } from "../lib/dedupeNF";
 
@@ -105,11 +106,11 @@ function NFDataStep({ nfData, setNfData, arquivo, setArquivo, fileRef, fornecedo
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <div>
           <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Emissão</label>
-          <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+          <DateInput value={nfData.dataEmissao} onChange={v => setNfData(d => ({...d, dataEmissao:v}))} style={IS}/>
         </div>
         <div>
           <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data de Envio</label>
-          <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio:e.target.value}))} placeholder="dd/mm/aaaa" style={IS}/>
+          <DateInput value={nfData.dataEnvio} onChange={v => setNfData(d => ({...d, dataEnvio:v}))} style={IS}/>
         </div>
       </div>
       <div style={{marginBottom:14}}>

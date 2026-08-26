@@ -396,3 +396,22 @@ export const IconButton = ({ icon: Icon, onClick, title, active = false, size = 
     </button>
   );
 };
+
+// ── DateInput ─────────────────────────────────────────────────────────────────
+// <input type="date"> nativo (abre o calendario do navegador), mas o valor
+// trafega no formato brasileiro "dd/mm/aaaa" -- padrao ja gravado nas NFs,
+// envios e relatorios. Aceita valores antigos "dd/mm" (assume o ano atual).
+const brToIso = v => {
+  const m = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/.exec((v || "").trim());
+  if (!m) return "";
+  const ano = m[3] ? (m[3].length === 2 ? "20" + m[3] : m[3]) : String(new Date().getFullYear());
+  return `${ano}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+};
+const isoToBr = v => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+};
+export const DateInput = ({ value, onChange, style = {}, ...rest }) => (
+  <input type="date" value={brToIso(value)} onChange={e => onChange(isoToBr(e.target.value))}
+    style={{ ...style, colorScheme: "light dark" }} {...rest}/>
+);

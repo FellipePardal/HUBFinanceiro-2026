@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Pill } from "../shared";
+import { DateInput } from "../ui";
 import { fmt } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile } from "../../lib/supabase";
@@ -345,11 +346,11 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
               </div>
               <div style={{marginBottom:14}}>
                 <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-                <input value={nfData.dataEmissao} onChange={e => setNfData(d => ({...d, dataEmissao: e.target.value}))} placeholder="dd/mm" style={IS}/>
+                <DateInput value={nfData.dataEmissao} onChange={v => setNfData(d => ({...d, dataEmissao: v}))} style={IS}/>
               </div>
               <div style={{marginBottom:14}}>
                 <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
-                <input value={nfData.dataEnvio} onChange={e => setNfData(d => ({...d, dataEnvio: e.target.value}))} placeholder="dd/mm" style={IS}/>
+                <DateInput value={nfData.dataEnvio} onChange={v => setNfData(d => ({...d, dataEnvio: v}))} style={IS}/>
               </div>
             </div>
             <div style={{marginBottom:14}}>

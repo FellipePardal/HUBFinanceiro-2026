@@ -5,7 +5,7 @@ import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, hashDataUrl } from "../../lib/supabase";
 import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
 import { acharDuplicatasNF, confirmarDuplicatas, grafiaCanonica } from "../../lib/dedupeNF";
-import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
+import { Card, PanelTitle, Button, Chip, Progress, tableStyles, DateInput } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText, Edit2, Check } from "lucide-react";
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -216,11 +216,11 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-            <input value={form.dataEmissao} onChange={e => set("dataEmissao", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEmissao} onChange={v => set("dataEmissao", v)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
-            <input value={form.dataEnvio} onChange={e => set("dataEnvio", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEnvio} onChange={v => set("dataEnvio", v)} style={IS}/>
           </div>
         </div>
         <div style={{marginBottom:12}}>

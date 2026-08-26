@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { KPI, Pill } from "../shared";
 import { RADIUS, iSty, btnStyle } from "../../constants";
-import { Card, PanelTitle, Button, Chip, Progress, tableStyles } from "../ui";
+import { Card, PanelTitle, Button, Chip, Progress, tableStyles, DateInput } from "../ui";
 import { CheckCircle2, Clock, Edit2, Plus, Trash2, Eye, Upload } from "lucide-react";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile } from "../../lib/supabase";
 
@@ -191,7 +191,7 @@ function NFLivemodeModal({ onSave, onClose, jogos, T, servicosLm = SERVICOS_LM }
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-            <input value={form.dataEmissao} onChange={e=>set("dataEmissao",e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEmissao} onChange={v=>set("dataEmissao",v)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações</label>
@@ -368,7 +368,7 @@ function NFLiveUModal({ onSave, onClose, jogos, T }) {
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-            <input value={form.dataEmissao} onChange={e=>set("dataEmissao",e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEmissao} onChange={v=>set("dataEmissao",v)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Observações</label>

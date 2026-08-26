@@ -9,7 +9,7 @@ import { getOperacionaisPorSubKey, findFornecedorTolerante, emiteNF } from "../.
 import { countNotasFiscais, groupNotasFiscais, normalizeEnvioMetricas, notaFiscalKey, sumNotasFiscais } from "../../lib/notasFiscais";
 import { acharDuplicatasNF, confirmarDuplicatas, grafiaCanonica } from "../../lib/dedupeNF";
 import { ReembolsoLogisticaModal } from "../modals/ReembolsoLogisticaModal";
-import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles } from "../ui";
+import { Card, PanelTitle, Button, Chip, Segmented, Progress, tableStyles, DateInput } from "../ui";
 import { Plus, Eye, Trash2, Upload, Paperclip, Copy as CopyIcon, FileText } from "lucide-react";
 
 const STATUS_NF = ["Pendente","Solicitada","Recebida","Conferida"];
@@ -432,11 +432,11 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-            <input value={form.dataEmissao} onChange={e => set("dataEmissao", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEmissao} onChange={v => set("dataEmissao", v)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
-            <input value={form.dataEnvio} onChange={e => set("dataEnvio", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEnvio} onChange={v => set("dataEnvio", v)} style={IS}/>
           </div>
         </div>
         <div style={{marginBottom:12}}>
@@ -558,11 +558,11 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
-            <input value={form.dataEmissao} onChange={e => set("dataEmissao", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEmissao} onChange={v => set("dataEmissao", v)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Envio</label>
-            <input value={form.dataEnvio} onChange={e => set("dataEnvio", e.target.value)} placeholder="dd/mm" style={IS}/>
+            <DateInput value={form.dataEnvio} onChange={v => set("dataEnvio", v)} style={IS}/>
           </div>
         </div>
         <div style={{marginBottom:12}}>

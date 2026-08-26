@@ -184,6 +184,8 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
   const setValor = (key, val) => setValores(prev => ({...prev, [key]: parseFloat(val) || 0}));
 
   const handleSubmit = async () => {
+    // Janela FPF: cobre a página deixada aberta de um dia pro outro
+    if (new Date().getDate() > 20) { alert("A FPF só aceita notas até o dia 20 do mês. O formulário reabre no dia 1º do mês seguinte."); return; }
     setSubmitting(true);
     try {
       const submissionId = Date.now();
@@ -450,6 +452,8 @@ function FormMensal({ fornecedores, onDone, T }) {
   };
 
   const handleSubmit = async () => {
+    // Janela FPF: cobre a página deixada aberta de um dia pro outro
+    if (new Date().getDate() > 20) { alert("A FPF só aceita notas até o dia 20 do mês. O formulário reabre no dia 1º do mês seguinte."); return; }
     setSubmitting(true);
     try {
       // Trava de duplicata: ver comentário no FormJogo.
@@ -613,6 +617,13 @@ export default function FormularioPublicoPaulistao() {
 
   const reset = () => { setTipo(null); setDone(false); };
 
+  // Janela FPF: a federação só aceita notas até o dia 20 de cada mês.
+  // Do dia 21 em diante o formulário fecha e reabre no dia 1º do mês seguinte.
+  const hoje = new Date();
+  const formFechado = hoje.getDate() > 20;
+  const reabreEm = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1)
+    .toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
+
   if (loading) return (
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:T.textMd,fontSize:16}}>Carregando...</p>
@@ -640,7 +651,15 @@ export default function FormularioPublicoPaulistao() {
 
       <div style={{padding:"20px 16px",maxWidth:560,margin:"0 auto"}}>
 
-        {done ? (
+        {formFechado ? (
+          <div style={{background:T.card,borderRadius:18,padding:"48px 28px",textAlign:"center",border:`1px solid ${T.border}`,boxShadow:"0 20px 40px -12px rgba(0,0,0,0.6)"}}>
+            <div style={{width:64,height:64,borderRadius:18,background:"rgba(245,158,11,0.14)",border:"1px solid rgba(245,158,11,0.35)",color:"#f59e0b",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",fontSize:30}}>🔒</div>
+            <h3 style={{color:T.text,margin:"0 0 8px",fontSize:20,fontWeight:800,letterSpacing:"-0.02em"}}>Envios encerrados neste mês</h3>
+            <p style={{color:T.textMd,fontSize:13,margin:"0 0 6px",lineHeight:1.6}}>A FPF só aceita notas fiscais até o dia 20 de cada mês.</p>
+            <p style={{color:T.textMd,fontSize:13,margin:0,lineHeight:1.6}}>O formulário reabre em <b style={{color:BRAND}}>{reabreEm}</b>.</p>
+          </div>
+
+        ) : done ? (
           <div style={{background:T.card,borderRadius:18,padding:"48px 28px",textAlign:"center",border:`1px solid ${T.border}`,boxShadow:"0 20px 40px -12px rgba(0,0,0,0.6)"}}>
             <div style={{width:64,height:64,borderRadius:18,background:T.brandSoft,border:`1px solid ${T.brandBorder}`,color:BRAND,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",fontSize:32}}>✓</div>
             <h3 style={{color:T.text,margin:"0 0 8px",fontSize:20,fontWeight:800,letterSpacing:"-0.02em"}}>Nota fiscal enviada!</h3>

@@ -14,6 +14,11 @@ export const SUBKEY_TO_PORTAL = {
   vmix:        { source: 'controle', cols: ['op_vmix'] },
   audio:       { source: 'controle', cols: ['op_audio'] },
 
+  // Pessoal — funções que vivem na ESCALA GERAL do Portal (não no Controle)
+  coord_um:    { source: 'escala', cols: ['coordenador_um'] },
+  prod_um:     { source: 'escala', cols: ['produtor_um'] },
+  prod_campo:  { source: 'escala', cols: ['produtor_campo'] },
+
   // Operações — UM (Portal tem 1 coluna 'um'; padrão do jogo decide qual subKey usar)
   um_b1:       { source: 'controle', cols: ['um'], padrao: 'B1' },
   um_b2:       { source: 'controle', cols: ['um'], padrao: 'B2' },
@@ -128,15 +133,19 @@ export function findFornecedorTolerante(fornecedores, nomeOperacional) {
   return null;
 }
 
-// Tabelas operacionais do Portal por campeonato
+// Tabelas operacionais do Portal por campeonato. A escala_geral é uma tabela
+// única com todos os campeonatos — o filtro pelo rótulo mantém Brasileirão e
+// Paulistão isolados (entidades pagadoras diferentes, nunca correlacionar).
 const TABLES = {
-  brasileirao: { controle: 'brasileirao_jogos', periferico: 'perifericos_brasileirao' },
-  paulistao:   { controle: 'paulistao_feminino_jogos', periferico: 'perifericos_paulistao' },
+  brasileirao: { controle: 'brasileirao_jogos', periferico: 'perifericos_brasileirao', escalaCampeonato: 'Brasileirão 26' },
+  paulistao:   { controle: 'paulistao_feminino_jogos', periferico: 'perifericos_paulistao', escalaCampeonato: 'Paulistão F 26' },
 };
 
 // Busca rows de uma tabela e indexa por hub_jogo_id
-async function fetchByHubId(tableName) {
-  const { data, error } = await supabase.from(tableName).select('*');
+async function fetchByHubId(tableName, filtro) {
+  let query = supabase.from(tableName).select('*');
+  if (filtro) query = query.eq(filtro.col, filtro.valor);
+  const { data, error } = await query;
   if (error) return new Map();
   const map = new Map();
   (data || []).forEach(row => {
@@ -146,14 +155,15 @@ async function fetchByHubId(tableName) {
 }
 
 // Carrega dados operacionais do Portal para um campeonato.
-// Retorna { controle: Map<hub_jogo_id, row>, periferico: Map<hub_jogo_id, row> }.
+// Retorna { controle, periferico, escala }: Map<hub_jogo_id, row> cada.
 export async function loadPortalData(campeonato = 'brasileirao') {
   const t = TABLES[campeonato] || TABLES.brasileirao;
-  const [controle, periferico] = await Promise.all([
+  const [controle, periferico, escala] = await Promise.all([
     fetchByHubId(t.controle),
     fetchByHubId(t.periferico),
+    fetchByHubId('escala_geral', { col: 'campeonato', valor: t.escalaCampeonato }),
   ]);
-  return { controle, periferico };
+  return { controle, periferico, escala };
 }
 
 // Para um jogo do Hub e uma subKey financeira, retorna o(s) nome(s) operacional(is) do Portal.
@@ -171,6 +181,13 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal, jogoCategori
       const padraoEfetivo = (row.padrao && String(row.padrao).trim()) || jogoCategoria || '';
       if (String(padraoEfetivo).toUpperCase() !== cfg.padrao.toUpperCase()) return [];
     }
+    const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
+    return [...new Set(nomes)].filter(emiteNF);
+  }
+
+  if (cfg.source === 'escala') {
+    const row = portal.escala?.get(id);
+    if (!row) return [];
     const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
     return [...new Set(nomes)].filter(emiteNF);
   }

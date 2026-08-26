@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 import { loadPortalData } from '../lib/portalLink';
 
 const TABLES_BY_CAMP = {
-  brasileirao: ['brasileirao_jogos', 'perifericos_brasileirao'],
-  paulistao:   ['paulistao_feminino_jogos', 'perifericos_paulistao'],
+  brasileirao: ['brasileirao_jogos', 'perifericos_brasileirao', 'escala_geral'],
+  paulistao:   ['paulistao_feminino_jogos', 'perifericos_paulistao', 'escala_geral'],
 };
 
 // Carrega dados operacionais do Portal e mantém atualizados via realtime.
@@ -12,7 +12,7 @@ const TABLES_BY_CAMP = {
 // `enabled=false` desliga tudo (nenhuma consulta, nenhum canal realtime) — usado
 // enquanto o Portal está em reestruturação para virar a matriz (2026-08).
 export function usePortalLink(campeonato = 'brasileirao', { enabled = true } = {}) {
-  const [portal, setPortal] = useState({ controle: new Map(), periferico: new Map() });
+  const [portal, setPortal] = useState({ controle: new Map(), periferico: new Map(), escala: new Map() });
   const [loading, setLoading] = useState(enabled);
 
   useEffect(() => {

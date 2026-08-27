@@ -68,6 +68,15 @@ const NAO_EMITE_NF = [
   'op. da produtora',
   'operador da produtora',
   'estrutura globo',
+  'matheus previde',
+  'natan raddatz',
+  'ana clara',
+  'lais amorim',
+  'wilson junior',
+  'wj',
+  'juninho',
+  'gatti',
+  'guilherme soria',
 ];
 
 // Marcadores de "sem fornecedor" no Portal (qualquer valor que ESTRITAMENTE seja um marcador nulo)

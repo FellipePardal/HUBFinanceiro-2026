@@ -244,6 +244,107 @@ export const calcTotais = (orc) => {
   return { porCategoria, porFase, porPadrao, porFaixa, totalJogos, totalFixos: fixos, totalGeral: totalJogos + fixos };
 };
 
+// ─── BASELINE (ORÇAMENTO DE REFERÊNCIA) ──────────────────────────────────────
+// Comparativo edição × edição: o orçamento guarda uma base congelada (ex: o
+// aprovado de 2026) e o Comparativo mostra o delta linha a linha, com selo
+// automático — add-on (não existia na base), aumento, redução ou removido.
+//   orc.baseline = { label, importadoEm, itens:[{id, grupo, label, subKey|null, valor}],
+//                    fixos:[{id, secao, nome, valor}] }
+// Item com subKey casa com a linha do serviço; sem subKey é linha só-da-base
+// (aparece como "removido" enquanto a edição atual não tiver o equivalente).
+
+export const GRUPOS_COMPARATIVO = [
+  { key:"logistica", label:CATS[0].label, color:CATS[0].color, subs:CATS[0].subs },
+  ...GRUPOS_PREMISSA,
+];
+
+export const novaBaseline = (label) => ({
+  label: String(label || "").trim() || "Edição anterior",
+  importadoEm: new Date().toISOString(),
+  itens: [],
+  fixos: [],
+});
+
+// Total orçado por subKey somando todos os jogos (mesmo motor da aprovação).
+export const calcPorSubKey = (orc) => {
+  const porSub = {};
+  (orc?.jogos || []).forEach(j => {
+    const orcado = calcOrcadoJogo(orc, j);
+    for (const [k, v] of Object.entries(orcado)) porSub[k] = (porSub[k] || 0) + (v || 0);
+  });
+  return porSub;
+};
+
+export const statusComparativo = (base, atual) =>
+  atual > 0 && base === 0 ? "addon"
+  : base > 0 && atual === 0 ? "removido"
+  : atual > base ? "aumento"
+  : atual < base ? "reducao"
+  : "igual";
+
+const normNome = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Junta base × orçamento atual: grupos variáveis por subKey (linha da base sem
+// subKey entra como só-da-base) e fixos por seção + nome normalizado.
+export const diffBaseline = (orc) => {
+  const bl = orc?.baseline || null;
+  const porSub = calcPorSubKey(orc);
+
+  const grupos = GRUPOS_COMPARATIVO.map(g => {
+    const blItens = (bl?.itens || []).filter(i => i.grupo === g.key);
+    const usados = new Set();
+    const rows = [];
+    g.subs.forEach(sub => {
+      const atual = porSub[sub.key] || 0;
+      const bi = blItens.find(i => i.subKey === sub.key && !usados.has(i.id));
+      if (bi) usados.add(bi.id);
+      const base = bi ? (Number(bi.valor) || 0) : 0;
+      if (atual === 0 && base === 0 && !bi) return;
+      rows.push({ key: sub.key, label: sub.label, labelBase: bi?.label || null, base, atual, baseItemId: bi?.id || null });
+    });
+    blItens.filter(i => !usados.has(i.id)).forEach(i => {
+      rows.push({ key: `bl_${i.id}`, label: i.label, labelBase: i.label, base: Number(i.valor) || 0, atual: 0, baseItemId: i.id, soBase: true });
+    });
+    rows.forEach(r => { r.status = statusComparativo(r.base, r.atual); r.delta = r.atual - r.base; });
+    rows.sort((a, b) => Math.max(b.base, b.atual) - Math.max(a.base, a.atual));
+    const totalBase  = rows.reduce((s, r) => s + r.base, 0);
+    const totalAtual = rows.reduce((s, r) => s + r.atual, 0);
+    return { ...g, rows, totalBase, totalAtual, delta: totalAtual - totalBase };
+  });
+
+  // Fixos: seções = união (base ∪ atual); linhas casam por nome normalizado.
+  const secoesAtual = orc?.servicosFixos || [];
+  const secoesBase  = bl?.fixos || [];
+  const nomesSecoes = [...new Set([...secoesAtual.map(s => s.secao), ...secoesBase.map(f => f.secao)])];
+  const fixos = nomesSecoes.map(secao => {
+    const itensAtual = (secoesAtual.find(s => s.secao === secao)?.itens || []);
+    const itensBase  = secoesBase.filter(f => f.secao === secao);
+    const usados = new Set();
+    const rows = [];
+    itensAtual.forEach(it => {
+      const atual = Number(it.orcado) || 0;
+      const bi = itensBase.find(f => normNome(f.nome) === normNome(it.nome) && !usados.has(f.id));
+      if (bi) usados.add(bi.id);
+      const base = bi ? (Number(bi.valor) || 0) : 0;
+      if (atual === 0 && !bi) return;
+      rows.push({ key: `fx_${it.id}`, label: it.nome, base, atual, baseItemId: bi?.id || null });
+    });
+    itensBase.filter(f => !usados.has(f.id)).forEach(f => {
+      rows.push({ key: `blfx_${f.id}`, label: f.nome, base: Number(f.valor) || 0, atual: 0, baseItemId: f.id, soBase: true });
+    });
+    rows.forEach(r => { r.status = statusComparativo(r.base, r.atual); r.delta = r.atual - r.base; });
+    const totalBase  = rows.reduce((s, r) => s + r.base, 0);
+    const totalAtual = rows.reduce((s, r) => s + r.atual, 0);
+    return { secao, rows, totalBase, totalAtual, delta: totalAtual - totalBase };
+  }).filter(sec => sec.rows.length > 0);
+
+  const totalBase  = grupos.reduce((s, g) => s + g.totalBase, 0)  + fixos.reduce((s, f) => s + f.totalBase, 0);
+  const totalAtual = grupos.reduce((s, g) => s + g.totalAtual, 0) + fixos.reduce((s, f) => s + f.totalAtual, 0);
+  const todasRows = [...grupos.flatMap(g => g.rows), ...fixos.flatMap(f => f.rows)];
+  const numAddons = todasRows.filter(r => r.status === "addon").length;
+  return { grupos, fixos, totalBase, totalAtual, delta: totalAtual - totalBase, numAddons };
+};
+
 // Espelho leve para o orc_registry (recalculado a cada save do documento).
 export const resumoRegistry = (orc) => {
   const { totalGeral } = calcTotais(orc);

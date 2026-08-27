@@ -8,7 +8,7 @@ import {
   orcKey, orcEventosKey, ORC_REGISTRY_KEY, ORC_STATUS,
   resumoRegistry, validarAprovacao, orcamentoParaCampeonato,
 } from "../../data/orcamentos";
-import { Settings, Layers, MapPin, CalendarDays, Briefcase, LineChart } from "lucide-react";
+import { Settings, Layers, MapPin, CalendarDays, Briefcase, LineChart, GitCompareArrows } from "lucide-react";
 import { AprovarOrcamentoModal } from "../modals/AprovarOrcamentoModal";
 import SubConfiguracao from "./SubConfiguracao";
 import SubPremissas from "./SubPremissas";
@@ -16,14 +16,16 @@ import SubPracas from "./SubPracas";
 import SubJogos from "./SubJogos";
 import SubServicos from "./SubServicos";
 import SubResumo from "./SubResumo";
+import SubComparativo from "./SubComparativo";
 
 const SUBTABS = [
-  { key:"config",    label:"Configuração",        icon:Settings },
-  { key:"premissas", label:"Padrões & Premissas", icon:Layers },
-  { key:"pracas",    label:"Praças & Logística",  icon:MapPin },
-  { key:"jogos",     label:"Jogos",               icon:CalendarDays },
-  { key:"servicos",  label:"Serviços Fixos",      icon:Briefcase },
-  { key:"resumo",    label:"Resumo",              icon:LineChart },
+  { key:"config",      label:"Configuração",        icon:Settings },
+  { key:"premissas",   label:"Padrões & Premissas", icon:Layers },
+  { key:"pracas",      label:"Praças & Logística",  icon:MapPin },
+  { key:"jogos",       label:"Jogos",               icon:CalendarDays },
+  { key:"servicos",    label:"Serviços Fixos",      icon:Briefcase },
+  { key:"comparativo", label:"Comparativo",         icon:GitCompareArrows },
+  { key:"resumo",      label:"Resumo",              icon:LineChart },
 ];
 
 function SubTabNav({ active, onChange, T }) {
@@ -215,6 +217,7 @@ export default function OrcamentoEditor({
       {sub === "pracas"    && <SubPracas {...commonProps}/>}
       {sub === "jogos"     && <SubJogos {...commonProps}/>}
       {sub === "servicos"  && <SubServicos {...commonProps}/>}
+      {sub === "comparativo" && <SubComparativo {...commonProps}/>}
       {sub === "resumo"    && (
         <SubResumo
           {...commonProps}

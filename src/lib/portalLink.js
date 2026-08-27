@@ -76,7 +76,9 @@ const NAO_EMITE_NF = [
   'wj',
   'juninho',
   'gatti',
+  'bruno gatti',
   'guilherme soria',
+  'gui soria',
 ];
 
 // Marcadores de "sem fornecedor" no Portal (qualquer valor que ESTRITAMENTE seja um marcador nulo)

@@ -88,8 +88,20 @@ const VALORES_NULOS = new Set(['nao', 'n/a', 'na', 'sem', '-', '--', 'x', 'nenhu
 // (ex: "NÃO / Narração no local 5 câmeras..." vira observação, não é fornecedor)
 const PREFIXOS_NULOS = ['nao ', 'sem ', 'n a '];
 
-export function emiteNF(nomeOperacional) {
-  const n = norm(nomeOperacional);
+// Divide célula do Portal em nomes individuais ("A / B" = duas pessoas).
+// Segmentos sem letra (telefones) são descartados. Célula que começa com
+// marcador nulo ("NÃO / obs...") é descartada inteira — o resto é observação.
+function segmentosDaCelula(valorCelula) {
+  const raw = String(valorCelula || '').trim();
+  if (!raw) return [];
+  const n = norm(raw);
+  if (!n || VALORES_NULOS.has(n)) return [];
+  if (PREFIXOS_NULOS.some(p => n.startsWith(p))) return [];
+  return raw.split('/').map(s => s.trim()).filter(s => /[a-zà-öø-ÿ]/i.test(s));
+}
+
+function emiteNFUnico(nome) {
+  const n = norm(nome);
   if (!n) return false;
   if (VALORES_NULOS.has(n)) return false;
   if (PREFIXOS_NULOS.some(p => n.startsWith(p))) return false;
@@ -97,6 +109,17 @@ export function emiteNF(nomeOperacional) {
     const b = norm(blocked);
     return n === b || n.startsWith(b + ' ') || n.includes(' ' + b + ' ') || n.startsWith(b);
   });
+}
+
+// Célula emite se pelo menos um dos nomes dela emite
+// (ex: "Gui Soria / Marcelo Gabrielli" → Gabrielli emite).
+export function emiteNF(valorCelula) {
+  return segmentosDaCelula(valorCelula).some(emiteNFUnico);
+}
+
+// Nomes individuais da célula que emitem NF.
+export function nomesQueEmitem(valorCelula) {
+  return segmentosDaCelula(valorCelula).filter(emiteNFUnico);
 }
 
 // Match tolerante: aceita prefixo, contém, e nome+sobrenome em comum
@@ -192,23 +215,23 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal, jogoCategori
       const padraoEfetivo = (row.padrao && String(row.padrao).trim()) || jogoCategoria || '';
       if (String(padraoEfetivo).toUpperCase() !== cfg.padrao.toUpperCase()) return [];
     }
-    const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    return [...new Set(nomes)].filter(emiteNF);
+    const nomes = cfg.cols.flatMap(c => nomesQueEmitem(row[c]));
+    return [...new Set(nomes)];
   }
 
   if (cfg.source === 'escala') {
     const row = portal.escala?.get(id);
     if (!row) return [];
-    const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    return [...new Set(nomes)].filter(emiteNF);
+    const nomes = cfg.cols.flatMap(c => nomesQueEmitem(row[c]));
+    return [...new Set(nomes)];
   }
 
   if (cfg.source === 'periferico') {
     const row = portal.periferico.get(id);
     if (!row) return [];
     if (row[cfg.toggle] !== 'Sim') return [];
-    const nomes = cfg.cols.map(c => row[c]).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
-    return [...new Set(nomes)].filter(emiteNF);
+    const nomes = cfg.cols.flatMap(c => nomesQueEmitem(row[c]));
+    return [...new Set(nomes)];
   }
 
   if (cfg.source === 'periferico-multi') {
@@ -216,11 +239,9 @@ export function getOperacionaisPorSubKey(jogoHubId, subKey, portal, jogoCategori
     if (!row) return [];
     const nomes = [];
     cfg.subs.forEach(sub => {
-      if (row[sub.toggle] === 'Sim' && row[sub.col]) {
-        nomes.push(String(row[sub.col]).trim());
-      }
+      if (row[sub.toggle] === 'Sim') nomes.push(...nomesQueEmitem(row[sub.col]));
     });
-    return [...new Set(nomes.filter(Boolean))].filter(emiteNF);
+    return [...new Set(nomes)];
   }
 
   return [];

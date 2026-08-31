@@ -26,7 +26,17 @@ const LIGHT_T = {
 const BRAND = "#65B32E";
 const btnS = { color:"#fff", border:"none", borderRadius:10, padding:"13px 20px", cursor:"pointer", fontWeight:700, fontSize:14, width:"100%", letterSpacing:"-0.005em" };
 const getIS = T => ({ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:10, color:T.text, padding:"12px 14px", fontSize:14, width:"100%", boxSizing:"border-box", MozAppearance:"textfield", fontFamily:"'Poppins',sans-serif" });
-const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const fmt = v => (v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:2});
+// Valor digitado livre com centavos: aceita "1234,56", "1.234,56" e "1234.56"
+// (vírgula é o separador decimal padrão BR; com vírgula presente, pontos são milhar).
+const parseValorBR = v => {
+  if (typeof v === "number") return v;
+  const s = String(v ?? "").replace(/[^\d.,]/g, "");
+  if (!s) return 0;
+  const norm = s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s;
+  return parseFloat(norm) || 0;
+};
+const soDigitosValor = v => String(v ?? "").replace(/[^0-9.,]/g, "");
 const HIDE_SPINNERS = `input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield}`;
 
 // ── Serviços por jogo ──────────────────────────────────────────────────────────
@@ -159,13 +169,13 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
     ? divulgados.filter(j => j.fase === rodadaSel.fase && j.rodada === rodadaSel.rodada)
     : [];
 
-  const totalGeral = Object.values(valores).reduce((s, v) => s + (v || 0), 0);
+  const totalGeral = Object.values(valores).reduce((s, v) => s + parseValorBR(v), 0);
 
   const canNext = () => {
     if (step === 0) return rodadaSel != null;
     if (step === 1) return jogosSel.length === qtdJogos;
     if (step === 2) return Object.values(servicosSel).some(a => a.length > 0);
-    if (step === 3) return Object.values(valores).some(v => v > 0);
+    if (step === 3) return Object.values(valores).some(v => parseValorBR(v) > 0);
     if (step === 4) return nfData.fornecedor.length > 0 && nfData.numeroNF.trim().length > 0;
     return false;
   };
@@ -181,7 +191,8 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
     return {...prev, [jogoId]: arr.includes(subKey) ? arr.filter(k => k !== subKey) : [...arr, subKey]};
   });
 
-  const setValor = (key, val) => setValores(prev => ({...prev, [key]: parseFloat(val) || 0}));
+  // Guarda o texto cru enquanto digita (senão o separador decimal some a cada tecla)
+  const setValor = (key, val) => setValores(prev => ({...prev, [key]: soDigitosValor(val)}));
 
   const handleSubmit = async () => {
     // Janela FPF: cobre a página deixada aberta de um dia pro outro
@@ -215,7 +226,7 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
         jogosResumo.push(jogo);
         subs.forEach(sk => {
           const key = `${jogo.id}_${sk}`;
-          const v = valores[key] || 0;
+          const v = parseValorBR(valores[key]);
           servicosDetalhe[key] = v;
           servicosValores[sk] = (servicosValores[sk] || 0) + v;
           servicosKeys.push(key);
@@ -374,8 +385,8 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
                         <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>{s.subLabel}</label>
                         <div style={{display:"flex",alignItems:"center"}}>
                           <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
-                          <input type="number" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
-                            placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:600,color:BRAND,fontSize:16}}/>
+                          <input type="text" inputMode="decimal" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
+                            placeholder="0,00" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:600,color:BRAND,fontSize:16}}/>
                         </div>
                       </div>
                     );
@@ -399,7 +410,7 @@ function FormJogo({ divulgados, fornecedores, onDone, T }) {
                   const jogo = divulgados.find(j => j.id === jogoId);
                   if (!jogo) return null;
                   const subs = servicosSel[jogoId] || [];
-                  const total = subs.reduce((s, sk) => s + (valores[`${jogoId}_${sk}`] || 0), 0);
+                  const total = subs.reduce((s, sk) => s + parseValorBR(valores[`${jogoId}_${sk}`]), 0);
                   return (
                     <div key={jogoId} style={{marginBottom:8}}>
                       <div style={{fontWeight:600,fontSize:13,color:T.text}}>{jogo.mandante} x {jogo.visitante}</div>
@@ -446,7 +457,7 @@ function FormMensal({ fornecedores, onDone, T }) {
   const canNext = () => {
     if (step === 0) return mesSel != null;
     if (step === 1) return servicoSel != null;
-    if (step === 2) return (parseFloat(valor) || 0) > 0;
+    if (step === 2) return parseValorBR(valor) > 0;
     if (step === 3) return nfData.fornecedor.length > 0 && nfData.numeroNF.trim().length > 0;
     return false;
   };
@@ -469,7 +480,7 @@ function FormMensal({ fornecedores, onDone, T }) {
       }
       const submission = {
         id: submissionId, clientRef, tipo:"mensal", ...nfData, ...(fileHash ? { fileHash } : {}),
-        valorNF: parseFloat(valor) || 0,
+        valorNF: parseValorBR(valor),
         mes: mesSel, mesLabel: MESES[mesSel],
         servicoId: servicoSel.id,
         servicoNome: servicoSel.nome,
@@ -549,13 +560,13 @@ function FormMensal({ fornecedores, onDone, T }) {
             <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>{servicoSel?.nome} · {MESES[mesSel]}</p>
             <div style={{display:"flex",alignItems:"center"}}>
               <span style={{background:T.muted,color:T.text,padding:"12px 12px",borderRadius:"8px 0 0 8px",fontSize:14,fontWeight:600}}>R$</span>
-              <input type="number" value={valor} onChange={e => setValorState(e.target.value)}
-                placeholder="0" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:700,color:BRAND,fontSize:20}} autoFocus/>
+              <input type="text" inputMode="decimal" value={valor} onChange={e => setValorState(soDigitosValor(e.target.value))}
+                placeholder="0,00" style={{...IS,borderRadius:"0 8px 8px 0",borderLeft:"none",fontWeight:700,color:BRAND,fontSize:20}} autoFocus/>
             </div>
-            {(parseFloat(valor)||0) > 0 && (
+            {parseValorBR(valor) > 0 && (
               <div style={{background:T.bg,borderRadius:10,padding:"14px 16px",marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{color:T.textMd,fontWeight:600,fontSize:14}}>Total</span>
-                <span style={{fontSize:20,fontWeight:700,color:BRAND}}>{fmt(parseFloat(valor)||0)}</span>
+                <span style={{fontSize:20,fontWeight:700,color:BRAND}}>{fmt(parseValorBR(valor))}</span>
               </div>
             )}
           </div>
@@ -568,7 +579,7 @@ function FormMensal({ fornecedores, onDone, T }) {
                 <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Resumo</p>
                 <div style={{fontWeight:600,fontSize:13,color:T.text}}>{servicoSel?.nome}</div>
                 <div style={{fontSize:11,color:T.textSm,margin:"2px 0"}}>{MESES[mesSel]}</div>
-                <div style={{fontSize:13,color:BRAND,fontWeight:700}}>{fmt(parseFloat(valor)||0)}</div>
+                <div style={{fontSize:13,color:BRAND,fontWeight:700}}>{fmt(parseValorBR(valor))}</div>
               </div>
             }
           />

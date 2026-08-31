@@ -8,6 +8,7 @@ import { fmt, fmtK } from "../../utils";
 import {
   GitCompareArrows, Wallet, TrendingUp, TrendingDown, Sparkles,
   Pencil, Check, Plus, X, Briefcase,
+  ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react";
 
 // Selos automáticos do comparativo — a cor fala de CUSTO (aumento = vermelho).
@@ -34,6 +35,33 @@ const Selo = ({ status, T }) => {
 const deltaCor = (delta, T) => delta > 0 ? "#DC2626" : delta < 0 ? "#16A34A" : T.textSm;
 const fmtDelta = (delta) => delta === 0 ? "—" : `${delta > 0 ? "+" : "−"}${fmt(Math.abs(delta))}`;
 
+// Resumo compacto exibido no cabeçalho quando a categoria está recolhida:
+// nº de linhas + contagem por selo, para não perder o sinal do que mudou.
+const ChipsResumo = ({ rows, T }) => {
+  const contagem = { addon: 0, aumento: 0, reducao: 0, removido: 0 };
+  rows.forEach(r => { if (contagem[r.status] !== undefined) contagem[r.status]++; });
+  const chips = Object.entries(contagem).filter(([, n]) => n > 0);
+  return (
+    <span style={{display:"inline-flex",gap:6,marginLeft:10,alignItems:"center",flexWrap:"wrap"}}>
+      <span style={{fontSize:10,fontWeight:500,color:T.textSm}}>
+        {rows.length} {rows.length === 1 ? "linha" : "linhas"}
+      </span>
+      {chips.map(([status, n]) => {
+        const s = SELOS[status];
+        return (
+          <span key={status} style={{
+            fontSize:9.5, fontWeight:700, whiteSpace:"nowrap",
+            padding:"1px 7px", borderRadius:999,
+            background:`${s.color}1c`, color:s.color, border:`1px solid ${s.color}44`,
+          }}>{n} {s.label}</span>
+        );
+      })}
+    </span>
+  );
+};
+
+const lsKeyRecolhidos = (orcId) => `hub_comparativo_recolhidos_${orcId}`;
+
 const thStyle = (T, left) => ({
   padding:"11px 16px",
   textAlign:left ? "left" : "right",
@@ -52,9 +80,29 @@ const thStyle = (T, left) => ({
 export default function SubComparativo({ orc, setOrc, readOnly, T }) {
   const [editando, setEditando] = useState(false);
   const [novaLinha, setNovaLinha] = useState(null); // { grupo|secao, label, valor, subKey }
+  // Categorias recolhidas (chaves de grupo, "fixos" e "sec:{seção}") — persiste
+  // por orçamento no localStorage; no modo edição tudo fica sempre aberto.
+  const [recolhidos, setRecolhidos] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(lsKeyRecolhidos(orc.id)) || "[]")); }
+    catch { return new Set(); }
+  });
   const IS = iSty(T);
   const bl = orc.baseline || null;
   const diff = useMemo(() => diffBaseline(orc), [orc]);
+
+  const salvaRecolhidos = (next) => {
+    try { localStorage.setItem(lsKeyRecolhidos(orc.id), JSON.stringify([...next])); } catch {}
+    return next;
+  };
+  const estaAberto = (chave) => editando || !recolhidos.has(chave);
+  const toggleRecolhido = (chave) => {
+    if (editando) return;
+    setRecolhidos(prev => {
+      const next = new Set(prev);
+      next.has(chave) ? next.delete(chave) : next.add(chave);
+      return salvaRecolhidos(next);
+    });
+  };
 
   const patchBaseline = (fn) => setOrc(prev => prev.baseline ? ({ ...prev, baseline: fn(prev.baseline) }) : prev);
 
@@ -138,20 +186,33 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
     </tr>
   );
 
-  const renderHeaderGrupo = (titulo, color, tot, extra) => (
-    <tr key={`hd_${titulo}`} style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg}}>
-      <td style={{padding:"12px 16px",fontWeight:700,whiteSpace:"nowrap",color:T.text,fontSize:12.5}}>
-        <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
-          <span style={{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}/>
-          {titulo}
-        </span>
-      </td>
-      <td className="num" style={{padding:"12px 16px",textAlign:"right",color:T.textMd,fontSize:12.5,fontWeight:600,fontFamily:FONT.num}}>{fmt(tot.totalBase)}</td>
-      <td className="num" style={{padding:"12px 16px",textAlign:"right",color:T.text,fontSize:12.5,fontWeight:700,fontFamily:FONT.num}}>{fmt(tot.totalAtual)}</td>
-      <td className="num" style={{padding:"12px 16px",textAlign:"right",fontSize:12.5,fontWeight:600,color:deltaCor(tot.delta, T),fontFamily:FONT.num}}>{fmtDelta(tot.delta)}</td>
-      <td style={{padding:"12px 16px",textAlign:"right"}}>{extra || null}</td>
-    </tr>
-  );
+  const renderHeaderGrupo = (titulo, color, tot, { chave, rows, extra } = {}) => {
+    const aberto = !chave || estaAberto(chave);
+    const clicavel = !!chave && !editando;
+    const Chevron = aberto ? ChevronDown : ChevronRight;
+    return (
+      <tr key={`hd_${titulo}`}
+        onClick={clicavel ? () => toggleRecolhido(chave) : undefined}
+        title={clicavel ? (aberto ? "Recolher categoria" : "Expandir categoria") : undefined}
+        style={{
+          borderTop:`2px solid ${T.borderStrong||T.border}`, background:T.surfaceAlt||T.bg,
+          cursor: clicavel ? "pointer" : "default", userSelect:"none",
+        }}>
+        <td style={{padding:"12px 16px",fontWeight:700,whiteSpace:"nowrap",color:T.text,fontSize:12.5}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
+            {chave && <Chevron size={14} color={T.textSm} style={{flexShrink:0,opacity:editando ? 0.35 : 1}}/>}
+            <span style={{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}/>
+            {titulo}
+            {!aberto && rows && rows.length > 0 && <ChipsResumo rows={rows} T={T}/>}
+          </span>
+        </td>
+        <td className="num" style={{padding:"12px 16px",textAlign:"right",color:T.textMd,fontSize:12.5,fontWeight:600,fontFamily:FONT.num}}>{fmt(tot.totalBase)}</td>
+        <td className="num" style={{padding:"12px 16px",textAlign:"right",color:T.text,fontSize:12.5,fontWeight:700,fontFamily:FONT.num}}>{fmt(tot.totalAtual)}</td>
+        <td className="num" style={{padding:"12px 16px",textAlign:"right",fontSize:12.5,fontWeight:600,color:deltaCor(tot.delta, T),fontFamily:FONT.num}}>{fmtDelta(tot.delta)}</td>
+        <td style={{padding:"12px 16px",textAlign:"right"}}>{extra || null}</td>
+      </tr>
+    );
+  };
 
   const renderAddLinha = (tipo, grupoKey, secao) => {
     const aberta = novaLinha && ((tipo === "fixo" && novaLinha.secao === secao && novaLinha.tipo === "fixo")
@@ -194,6 +255,13 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
     );
   };
 
+  // Chaves de topo (grupos com linhas + bloco de fixos) — base do recolher tudo.
+  const chavesTopo = [
+    ...diff.grupos.filter(g => g.rows.length > 0).map(g => g.key),
+    ...(diff.fixos.length > 0 ? ["fixos"] : []),
+  ];
+  const tudoRecolhido = chavesTopo.length > 0 && chavesTopo.every(k => recolhidos.has(k));
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {/* ── KPIs ── */}
@@ -213,12 +281,22 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
           title={`Comparativo · ${bl.label} × ${orc.meta.nome} ${orc.meta.edicao}`}
           subtitle="Linha a linha por serviço — selo automático: add-on, aumento, redução ou removido"
           icon={GitCompareArrows}
-          right={!readOnly ? (
-            <Button T={T} variant={editando ? "primary" : "secondary"} size="sm" icon={editando ? Check : Pencil}
-              onClick={() => { setEditando(v => !v); setNovaLinha(null); }}>
-              {editando ? "Concluir edição" : "Editar base"}
-            </Button>
-          ) : null}
+          right={
+            <span style={{display:"inline-flex",gap:8,alignItems:"center"}}>
+              {!editando && (
+                <Button T={T} variant="secondary" size="sm" icon={tudoRecolhido ? ChevronsUpDown : ChevronsDownUp}
+                  onClick={() => setRecolhidos(() => salvaRecolhidos(tudoRecolhido ? new Set() : new Set(chavesTopo)))}>
+                  {tudoRecolhido ? "Expandir tudo" : "Recolher tudo"}
+                </Button>
+              )}
+              {!readOnly && (
+                <Button T={T} variant={editando ? "primary" : "secondary"} size="sm" icon={editando ? Check : Pencil}
+                  onClick={() => { setEditando(v => !v); setNovaLinha(null); }}>
+                  {editando ? "Concluir edição" : "Editar base"}
+                </Button>
+              )}
+            </span>
+          }
         />
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:720}}>
@@ -233,9 +311,11 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
             </thead>
             <tbody>
               {diff.grupos.map(g => (g.rows.length > 0 || editando) ? [
-                renderHeaderGrupo(g.label, g.color, g),
-                ...g.rows.map(row => renderRow(row, g, "itens")),
-                renderAddLinha("var", g.key),
+                renderHeaderGrupo(g.label, g.color, g, { chave:g.key, rows:g.rows }),
+                ...(estaAberto(g.key) ? [
+                  ...g.rows.map(row => renderRow(row, g, "itens")),
+                  renderAddLinha("var", g.key),
+                ] : []),
               ] : null)}
 
               {(diff.fixos.length > 0 || editando) && renderHeaderGrupo(
@@ -245,19 +325,35 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
                   totalAtual: diff.fixos.reduce((s, f) => s + f.totalAtual, 0),
                   delta: diff.fixos.reduce((s, f) => s + f.delta, 0),
                 },
-                <Briefcase size={13} color={T.textSm}/>
+                { chave:"fixos", rows:diff.fixos.flatMap(f => f.rows), extra:<Briefcase size={13} color={T.textSm}/> }
               )}
-              {diff.fixos.map(sec => [
-                <tr key={`sec_${sec.secao}`} style={{borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg}}>
-                  <td style={{padding:"8px 16px 6px 40px",fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>{sec.secao}</td>
-                  <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:T.textSm,fontFamily:FONT.num}}>{fmt(sec.totalBase)}</td>
-                  <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:T.textSm,fontFamily:FONT.num,fontWeight:600}}>{fmt(sec.totalAtual)}</td>
-                  <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:deltaCor(sec.delta, T),fontFamily:FONT.num}}>{fmtDelta(sec.delta)}</td>
-                  <td/>
-                </tr>,
-                ...sec.rows.map(row => renderRow(row, sec, "fixos")),
-                renderAddLinha("fixo", null, sec.secao),
-              ])}
+              {estaAberto("fixos") && diff.fixos.map(sec => {
+                const chaveSec = `sec:${sec.secao}`;
+                const secAberta = estaAberto(chaveSec);
+                const SecChevron = secAberta ? ChevronDown : ChevronRight;
+                return [
+                  <tr key={`sec_${sec.secao}`}
+                    onClick={!editando ? () => toggleRecolhido(chaveSec) : undefined}
+                    title={!editando ? (secAberta ? "Recolher seção" : "Expandir seção") : undefined}
+                    style={{borderTop:`1px solid ${T.border}`,background:T.surfaceAlt||T.bg,cursor:!editando ? "pointer" : "default",userSelect:"none"}}>
+                    <td style={{padding:"8px 16px 6px 24px",fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:6}}>
+                        <SecChevron size={12} color={T.textSm} style={{flexShrink:0,opacity:editando ? 0.35 : 1}}/>
+                        {sec.secao}
+                        {!secAberta && sec.rows.length > 0 && <ChipsResumo rows={sec.rows} T={T}/>}
+                      </span>
+                    </td>
+                    <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:T.textSm,fontFamily:FONT.num}}>{fmt(sec.totalBase)}</td>
+                    <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:T.textSm,fontFamily:FONT.num,fontWeight:600}}>{fmt(sec.totalAtual)}</td>
+                    <td className="num" style={{padding:"8px 16px",textAlign:"right",fontSize:11,color:deltaCor(sec.delta, T),fontFamily:FONT.num}}>{fmtDelta(sec.delta)}</td>
+                    <td/>
+                  </tr>,
+                  ...(secAberta ? [
+                    ...sec.rows.map(row => renderRow(row, sec, "fixos")),
+                    renderAddLinha("fixo", null, sec.secao),
+                  ] : []),
+                ];
+              })}
               {editando && diff.fixos.length === 0 && renderAddLinha("fixo", null, "Serviços")}
 
               <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>

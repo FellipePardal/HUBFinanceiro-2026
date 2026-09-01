@@ -277,8 +277,8 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
 
   const RESUMO_CATS = [...varCalc, ...fixosCalc, ...outrosMensaisCalc];
 
-  const [setor, setSetor]               = useState("orcamento");
-  const [tab, setTab]                   = useState("dashboard");
+  const [setor, setSetor]               = useState(() => role === 'visualizador' ? "notas" : "orcamento");
+  const [tab, setTab]                   = useState(() => role === 'visualizador' ? "notas fiscais" : "dashboard");
   const [showNovo, setNovo]             = useState(false);
   const [jogoEdit, setJogoEdit]         = useState(null);
   const [filtroFase, setFiltroFase]     = useState("Todas");
@@ -381,7 +381,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
 
   const TABS_ORC  = ["dashboard","serviços","jogos","micro","savings","gráficos"];
   const TABS_NF   = ["notas fiscais","mensal","serviços livemode","rastreabilidade"];
-  const TABS_REL  = ["apresentações","envio"];
+  const TABS_REL  = role === 'visualizador' ? ["envio"] : ["apresentações","envio"];
   const TABS_LOG  = ["logística"];
   const TABS = setor==="orcamento" ? TABS_ORC : setor==="notas" ? TABS_NF : setor==="logistica" ? TABS_LOG : TABS_REL;
 
@@ -390,7 +390,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     if (s === "orcamento") setTab("dashboard");
     else if (s === "notas") setTab("notas fiscais");
     else if (s === "logistica") setTab("logística");
-    else if (s === "relatorio") setTab("apresentações");
+    else if (s === "relatorio") setTab(role === 'visualizador' ? "envio" : "apresentações");
   };
 
   if (loadError) return (
@@ -405,12 +405,17 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     </div>
   );
 
-  const SETORES = [
+  const SETORES_ALL = [
     { k:"orcamento",    l:"Orçamento",            icon:LayoutDashboard },
     { k:"notas",        l:"Notas Fiscais",        icon:FileText },
     { k:"logistica",    l:"Logística",            icon:Truck },
     // Hub de Fornecedores saiu daqui (13/08/2026): módulo transversal, vive só na Home.
     { k:"relatorio",    l:"Relatório",            icon:ClipboardList },
+  ];
+  // Mesmo corte do Brasileirão/Paulistão: visualizador só vê NF + Relatório.
+  const SETORES = role === 'admin' ? SETORES_ALL : [
+    { k:"notas",     l:"Notas Fiscais", icon:FileText },
+    { k:"relatorio", l:"Relatório",     icon:ClipboardList },
   ];
   const setorAtual = SETORES.find(s => s.k === setor);
 
@@ -580,12 +585,12 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="gráficos"      && <TabGraficos divulgados={divulgados} notas={notas} savingRodada={savingPorFase} RESUMO_CATS={RESUMO_CATS} T={T}/>}
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
-        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} notasMensais={notasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T}/>}
-        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T}/>}
+        {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} notasMensais={notasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role}/>}
+        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} notas={notas} notasLivemode={notasLivemode} grupoDoJogo={grupoDoJogoRastreab} T={T} apres={apres} setApres={setApres} orcGlobal={orcadoTotalCampeonato} mesInicio={0} nomeCampeonato={`${nome} ${edicao}`}/>}
-        {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios}/>}
+        {tab==="envio"         && <TabEnvio jogos={jogosCalc} notas={notas} notasMensais={notasMensais} notasLivemode={notasLivemode} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} enviosKey={K.envios} role={role}/>}
         {tab==="rastreabilidade" && <TabRastreabilidade notas={notas} notasMensais={notasMensais} servicos={servicosCalc} jogos={jogosCalc} logistica={logistica} notasLivemode={notasLivemode} T={T} filtroInicial={filtroRastreabilidade} onClearFiltroInicial={() => setFiltroRastreabilidade(null)} grupoDoJogo={grupoDoJogoRastreab}/>}
         </Suspense>
         </div>

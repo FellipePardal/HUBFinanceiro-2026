@@ -1,6 +1,6 @@
 import { CAMPEONATOS, RADIUS, FONT } from "../constants";
 import { getChampionshipConfig } from "../config/championships";
-import { CAMPEONATO_ENTITIES, getEntity } from "../config/entities";
+import { CAMPEONATO_ENTITIES, getEntity, podeVerCampeonato } from "../config/entities";
 import ChampionshipLogo from "./ChampionshipLogo";
 import EntityLogo, { EntityLogoStack } from "./EntityLogo";
 import LivemodeLogo from "./LivemodeLogo";
@@ -221,17 +221,8 @@ function ChampCard({ camp, onEnter, onDelete, T }) {
 
 export default function Home({ onEnter, onOpenHub, T, darkMode, setDarkMode, customCampeonatos = [], onCriarCampeonato, onExcluirCampeonato, role = 'admin', entidade = null, onSignOut }) {
   // entidade pode ter múltiplos valores separados por vírgula (definidos pelo admin)
-  const entidades = String(entidade || "").split(",").map(s => s.trim()).filter(Boolean);
-  const filtroCamp = (c) => {
-    if (role !== 'visualizador') return true;
-    if (entidades.length === 0 || entidades.includes('outro')) return true;
-    return entidades.some(e =>
-      e === 'brasileirao-2026' ? c.id === 'brasileirao-2026' :
-      e === 'paulistao-feminino-2026' ? c.id !== 'brasileirao-2026' : true);
-  };
-  const campVisiveis = CAMPEONATOS.filter(filtroCamp);
-  const customVisiveis = role !== 'visualizador' ? customCampeonatos :
-    ((entidades.length === 0 || entidades.some(e => e !== 'brasileirao-2026')) ? customCampeonatos : []);
+  const campVisiveis = CAMPEONATOS.filter(c => podeVerCampeonato(role, entidade, c.id));
+  const customVisiveis = customCampeonatos.filter(c => podeVerCampeonato(role, entidade, c.id, c.organizador));
 
   const totalAtivos = campVisiveis.filter(c => !c.emBreve).length + customVisiveis.filter(c => c.status === "Em andamento").length;
 

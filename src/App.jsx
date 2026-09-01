@@ -784,11 +784,7 @@ function FornecedorPage({ T, onSignOut }) {
   );
 }
 
-const ENTIDADES = [
-  { id: "brasileirao-2026",        label: "FFU - Futebol Forte União" },
-  { id: "paulistao-feminino-2026", label: "FPF - Federação Paulista de Futebol" },
-  { id: "outro",                   label: "Outro" },
-];
+const ENTIDADES = ENTIDADES_VISUALIZADOR;
 
 function LoginGate({ T, authError, setAuthError }) {
   const [modo, setModo]         = useState("login"); // "login" | "cadastro"
@@ -996,6 +992,7 @@ import Paulistao from "./components/Paulistao";
 import CampeonatoCustom from "./components/CampeonatoCustom";
 import { NovoCampeonatoModal } from "./components/modals/NovoCampeonatoModal";
 import { REGISTRY_KEY } from "./data/customCampeonato";
+import { ENTIDADES_VISUALIZADOR, podeVerCampeonato } from "./config/entities";
 import { getState as getStateSb, setState as setStateSb } from "./lib/supabase";
 
 function PendentePage({ T, onSignOut }) {
@@ -1246,14 +1243,8 @@ export default function App() {
   const paginaEfetiva = (effectiveRole === 'visualizador' && (pagina === 'hub-fornecedores' || pagina === 'hub-orcamentos')) ? 'home' : pagina;
 
   // Bloqueio por entidade para visualizador (aceita múltiplas separadas por vírgula)
-  const podeVerCamp = (campId) => {
-    if (effectiveRole !== 'visualizador') return true;
-    const ents = String(effectiveEntidade || "").split(",").map(s => s.trim()).filter(Boolean);
-    if (ents.length === 0 || ents.includes('outro')) return true;
-    return ents.some(e =>
-      e === 'brasileirao-2026' ? campId === 'brasileirao-2026' :
-      e === 'paulistao-feminino-2026' ? campId !== 'brasileirao-2026' : true);
-  };
+  const podeVerCamp = (campId, organizador = null) =>
+    podeVerCampeonato(effectiveRole, effectiveEntidade, campId, organizador);
 
   if(paginaEfetiva==="brasileirao-2026") {
     if (!podeVerCamp('brasileirao-2026')) { setPagina("home"); return null; }
@@ -1266,6 +1257,7 @@ export default function App() {
   if(paginaEfetiva?.startsWith("custom:")) {
     const id = paginaEfetiva.slice(7);
     const config = customCampeonatos.find(c => c.id === id);
+    if (config && !podeVerCamp(config.id, config.organizador)) { setPagina("home"); return null; }
     if (config) return <>{<CampeonatoCustom config={config} onBack={()=>setPagina("home")} onOpenHub={abrirHubFornecedores} T={T} darkMode={darkMode} setDarkMode={toggleDark} role={effectiveRole}/>}{roleWidget}</>;
     setPagina("home");
     return null;

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { iSty, RADIUS } from "../../constants";
 import { Button, Chip } from "../ui";
 import { slugify, parseCSV, jogoFromCSVRow, CSV_TEMPLATE, FASES_PRESETS } from "../../data/customCampeonato";
+import { ENTIDADES_VISUALIZADOR } from "../../config/entities";
 import { Trophy, AlertCircle, ArrowRight, ArrowLeft, Copy, FastForward, Check } from "lucide-react";
 
 const overlayStyle = {
@@ -47,6 +48,7 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
   const [icon, setIcon]               = useState("🏆");
   const [cor, setCor]                 = useState("#ec4899");
   const [status, setStatus]           = useState("Em andamento");
+  const [organizador, setOrganizador] = useState("outro"); // controla quais visualizadores enxergam
   const [descricao, setDescricao]     = useState("");
   const [fasesSel, setFasesSel]       = useState(["grupos","play_in","semi","final"]);
   // Step 2
@@ -93,6 +95,7 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
       formato,
       numRodadas: formato === "pontos_corridos" ? parseInt(numRodadas) || 0 : null,
       fases,
+      organizador,
       createdAt: new Date().toISOString(),
     };
   };
@@ -220,6 +223,15 @@ export function NovoCampeonatoModal({ onSave, onClose, T }) {
                 }}/>
             ))}
           </div>
+        </Field>
+
+        <Field label="Entidade organizadora" span={2}>
+          <select value={organizador} onChange={e=>setOrganizador(e.target.value)} style={IS}>
+            {ENTIDADES_VISUALIZADOR.map(en => <option key={en.id} value={en.id}>{en.label}</option>)}
+          </select>
+          <p style={{margin:"4px 0 0", fontSize:11, color:T.textSm}}>
+            Define quais visualizadores externos enxergam este campeonato.
+          </p>
         </Field>
 
         <Field label="Descrição (opcional)" span={3}>

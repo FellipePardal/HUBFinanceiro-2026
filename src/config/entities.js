@@ -71,3 +71,27 @@ export const CAMPEONATO_ENTITIES = {
     detentores: [],
   },
 };
+
+// ─── ACESSO DO VISUALIZADOR POR ENTIDADE ─────────────────────────────────────
+// Valores possíveis de profiles.entidade (múltiplos separados por vírgula).
+// Os ids reaproveitam os ids de campeonato por legado — "brasileirao-2026"
+// significa FFU e "paulistao-feminino-2026" significa FPF.
+export const ENTIDADES_VISUALIZADOR = [
+  { id: "brasileirao-2026",        label: "FFU - Futebol Forte União" },
+  { id: "paulistao-feminino-2026", label: "FPF - Federação Paulista de Futebol" },
+  { id: "outro",                   label: "Outro" },
+];
+
+// Um usuário com esse role/entidade pode ver o campeonato?
+// `organizador` = entidade dona de um campeonato custom (config.organizador,
+// um dos ids de ENTIDADES_VISUALIZADOR). Custom sem organizador definido fica
+// visível só para "outro"/sem entidade — negar por padrão evita vazamento.
+export function podeVerCampeonato(role, entidadeStr, campId, organizador = null) {
+  if (role !== "visualizador") return true;
+  const ents = String(entidadeStr || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (ents.length === 0 || ents.includes("outro")) return true;
+  const dono = campId === "brasileirao-2026" || campId === "paulistao-feminino-2026"
+    ? campId
+    : (organizador === "outro" ? null : organizador || null);
+  return dono != null && ents.includes(dono);
+}

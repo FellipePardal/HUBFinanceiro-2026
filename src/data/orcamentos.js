@@ -410,6 +410,7 @@ export const orcamentoParaCampeonato = (orc) => {
     formato: m.formato,
     numRodadas: m.formato === "pontos_corridos" ? (m.numRodadas || 0) : null,
     fases,
+    organizador: m.organizador || "outro",
     times: orc.times || [],
     createdAt: new Date().toISOString(),
     origemOrcamento: orc.id,

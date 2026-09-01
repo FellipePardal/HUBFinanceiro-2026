@@ -3,6 +3,7 @@ import { iSty, FONT } from "../../constants";
 import { Card, SectionHeader, Badge, Button, Chip } from "../ui";
 import { FASES_PRESETS } from "../../data/customCampeonato";
 import { ORC_STATUS } from "../../data/orcamentos";
+import { ENTIDADES_VISUALIZADOR } from "../../config/entities";
 import { Settings, History, Send, Undo2, Trophy, Lock, Users, Plus, X, CalendarDays } from "lucide-react";
 
 const COR_PRESETS = ["#ec4899","#10b981","#3b82f6","#f59e0b","#8b5cf6","#ef4444","#06b6d4","#22c55e"];
@@ -90,6 +91,11 @@ export default function SubConfiguracao({ orc, setOrc, readOnly, T, eventos = []
             <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
               <Field T={T} label="Descrição" flex={3}>
                 <input value={m.descricao} disabled={readOnly} onChange={e=>setMeta({descricao:e.target.value})} style={IS} placeholder={`${m.nome} · ${m.edicao}`}/>
+              </Field>
+              <Field T={T} label="Entidade organizadora" flex={2}>
+                <select value={m.organizador || "outro"} disabled={readOnly} onChange={e=>setMeta({organizador:e.target.value})} style={IS}>
+                  {ENTIDADES_VISUALIZADOR.map(en => <option key={en.id} value={en.id}>{en.label}</option>)}
+                </select>
               </Field>
               <Field T={T} label="Cor do tema" flex={2}>
                 <div style={{display:"flex",gap:6,alignItems:"center",height:32}}>

@@ -1019,25 +1019,35 @@ function PendentePage({ T, onSignOut }) {
   );
 }
 
-function RoleTestWidget({ roleOverride, onOverride, T }) {
+function RoleTestWidget({ roleOverride, entOverride, onOverride, T }) {
   const [open, setOpen] = useState(false);
-  const LABELS = { visualizador: 'Visualizador', fornecedor: 'Fornecedor' };
-  if (roleOverride) return (
-    <div style={{ position:'fixed', bottom:16, right:16, zIndex:9999, background:'#F59E0B', color:'#000', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, fontFamily:"'Poppins',sans-serif", display:'flex', alignItems:'center', gap:10, boxShadow:'0 2px 12px rgba(0,0,0,0.3)' }}>
-      Testando: {LABELS[roleOverride]}
-      <button onClick={() => onOverride(null)} style={{ background:'none', border:'none', cursor:'pointer', fontWeight:700, fontSize:16, lineHeight:1, color:'#000', padding:0 }}>×</button>
-    </div>
-  );
+  // Opções de teste: visualizador simula também a entidade (independe da
+  // entidade do admin logado); fornecedor não tem entidade.
+  const OPTIONS = [
+    { role: 'visualizador', ent: 'brasileirao-2026',        label: 'Visualizador — FFU' },
+    { role: 'visualizador', ent: 'paulistao-feminino-2026', label: 'Visualizador — FPF' },
+    { role: 'visualizador', ent: 'outro',                   label: 'Visualizador — Outro' },
+    { role: 'fornecedor',   ent: null,                      label: 'Fornecedor' },
+  ];
+  if (roleOverride) {
+    const atual = OPTIONS.find(o => o.role === roleOverride && o.ent === entOverride);
+    return (
+      <div style={{ position:'fixed', bottom:16, right:16, zIndex:9999, background:'#F59E0B', color:'#000', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, fontFamily:"'Poppins',sans-serif", display:'flex', alignItems:'center', gap:10, boxShadow:'0 2px 12px rgba(0,0,0,0.3)' }}>
+        Testando: {atual?.label || roleOverride}
+        <button onClick={() => onOverride(null, null)} style={{ background:'none', border:'none', cursor:'pointer', fontWeight:700, fontSize:16, lineHeight:1, color:'#000', padding:0 }}>×</button>
+      </div>
+    );
+  }
   return (
     <div style={{ position:'fixed', bottom:16, right:16, zIndex:9999 }}>
       <button onClick={() => setOpen(o => !o)} style={{ background:T.surface||T.card, border:`1px solid ${T.border}`, color:T.textMd, borderRadius:8, padding:'6px 12px', fontSize:11, cursor:'pointer', fontFamily:"'Poppins',sans-serif", boxShadow:'0 2px 8px rgba(0,0,0,0.2)' }}>
         Testar como ▾
       </button>
       {open && (
-        <div style={{ position:'absolute', bottom:'calc(100% + 6px)', right:0, background:T.card||T.surface, border:`1px solid ${T.border}`, borderRadius:8, overflow:'hidden', minWidth:150, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>
-          {Object.entries(LABELS).map(([r, l]) => (
-            <button key={r} onClick={() => { onOverride(r); setOpen(false); }} style={{ display:'block', width:'100%', padding:'9px 14px', background:'none', border:'none', color:T.text, fontSize:12, cursor:'pointer', textAlign:'left', fontFamily:"'Poppins',sans-serif" }}>
-              {l}
+        <div style={{ position:'absolute', bottom:'calc(100% + 6px)', right:0, background:T.card||T.surface, border:`1px solid ${T.border}`, borderRadius:8, overflow:'hidden', minWidth:190, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>
+          {OPTIONS.map(o => (
+            <button key={o.label} onClick={() => { onOverride(o.role, o.ent); setOpen(false); }} style={{ display:'block', width:'100%', padding:'9px 14px', background:'none', border:'none', color:T.text, fontSize:12, cursor:'pointer', textAlign:'left', fontFamily:"'Poppins',sans-serif" }}>
+              {o.label}
             </button>
           ))}
         </div>
@@ -1060,6 +1070,7 @@ export default function App() {
   const [roleError, setRoleError] = useState(false);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [roleOverride, setRoleOverride] = useState(null);
+  const [entOverride,  setEntOverride]  = useState(null); // entidade simulada no "Testar como"
   const T = darkMode ? DARK : LIGHT;
 
   useEffect(() => {
@@ -1122,14 +1133,23 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // Deslogado automaticamente se o admin apagar o perfil.
+  // Deslogado automaticamente se o admin apagar o perfil; role/entidade
+  // atualizam ao vivo quando alterados no painel (antes só valiam no relogin —
+  // era por isso que trocar a entidade pra FPF não refletia nos cards).
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`profile-deleted-${user.id}`)
+      .channel(`profile-changes-${user.id}`)
       .on('postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         () => supabase.auth.signOut()
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload) => {
+          setRole(payload.new?.role ?? 'visualizador');
+          setEntidade(payload.new?.entidade ?? null);
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -1212,14 +1232,15 @@ export default function App() {
   // Pendente — aguarda aprovação do admin
   if (role === 'pendente') return <PendentePage T={T} onSignOut={signOut}/>;
 
-  const effectiveRole = roleOverride ?? role;
+  const effectiveRole     = roleOverride ?? role;
+  const effectiveEntidade = roleOverride ? (entOverride ?? entidade) : entidade;
 
   const roleWidget = role === 'admin' && (
-    <RoleTestWidget roleOverride={roleOverride} onOverride={r => { setRoleOverride(r); setPagina("home"); }} T={T}/>
+    <RoleTestWidget roleOverride={roleOverride} entOverride={entOverride} onOverride={(r, ent) => { setRoleOverride(r); setEntOverride(ent ?? null); setPagina("home"); }} T={T}/>
   );
 
   // Fornecedor — só acessa formulário externo
-  if (effectiveRole === 'fornecedor') return <>{<FornecedorPage T={T} onSignOut={roleOverride ? () => setRoleOverride(null) : signOut}/>}{roleWidget}</>;
+  if (effectiveRole === 'fornecedor') return <>{<FornecedorPage T={T} onSignOut={roleOverride ? () => { setRoleOverride(null); setEntOverride(null); } : signOut}/>}{roleWidget}</>;
 
   // Visualizador não acessa os módulos transversais
   const paginaEfetiva = (effectiveRole === 'visualizador' && (pagina === 'hub-fornecedores' || pagina === 'hub-orcamentos')) ? 'home' : pagina;
@@ -1227,7 +1248,7 @@ export default function App() {
   // Bloqueio por entidade para visualizador (aceita múltiplas separadas por vírgula)
   const podeVerCamp = (campId) => {
     if (effectiveRole !== 'visualizador') return true;
-    const ents = String(entidade || "").split(",").map(s => s.trim()).filter(Boolean);
+    const ents = String(effectiveEntidade || "").split(",").map(s => s.trim()).filter(Boolean);
     if (ents.length === 0 || ents.includes('outro')) return true;
     return ents.some(e =>
       e === 'brasileirao-2026' ? campId === 'brasileirao-2026' :
@@ -1260,7 +1281,7 @@ export default function App() {
         T={T} darkMode={darkMode} setDarkMode={toggleDark}
         customCampeonatos={customCampeonatos}
         role={effectiveRole}
-        entidade={entidade}
+        entidade={effectiveEntidade}
         onSignOut={signOut}
         onCriarCampeonato={effectiveRole === 'admin' ? ()=>setShowNovoCampModal(true) : undefined}
         onExcluirCampeonato={effectiveRole === 'admin' ? excluirCampeonato : undefined}

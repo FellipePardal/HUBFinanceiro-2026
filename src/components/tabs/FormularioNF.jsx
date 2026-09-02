@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Pill } from "../shared";
 import { DateInput } from "../ui";
-import { fmt } from "../../utils";
+import { fmt, parseValorBR } from "../../utils";
 import { CATS, btnStyle, iSty } from "../../constants";
 import { fileToDataUrl, saveNFFile } from "../../lib/supabase";
 
@@ -83,7 +83,7 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
     if (step === 0) return rodadaSel != null;
     if (step === 1) return jogosSel.length === qtdJogos;
     if (step === 2) return Object.values(servicosSel).some(arr => arr.length > 0);
-    if (step === 3) return Object.values(valores).some(v => v > 0);
+    if (step === 3) return Object.values(valores).some(v => parseValorBR(v) > 0);
     if (step === 4) return nfData.fornecedor.length > 0;
     return false;
   };
@@ -104,9 +104,9 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
     });
   };
 
-  const setValor = (key, val) => setValores(prev => ({...prev, [key]: parseFloat(val) || 0}));
+  const setValor = (key, val) => setValores(prev => ({...prev, [key]: val}));
 
-  const totalGeral = Object.values(valores).reduce((s, v) => s + (v || 0), 0);
+  const totalGeral = Object.values(valores).reduce((s, v) => s + parseValorBR(v), 0);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -120,7 +120,7 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
       const servicosValores = {};
       let valorNF = 0;
       subs.forEach(sk => {
-        const v = valores[`${jogoId}_${sk}`] || 0;
+        const v = parseValorBR(valores[`${jogoId}_${sk}`]);
         servicosValores[sk] = v;
         valorNF += v;
       });
@@ -313,7 +313,7 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
                           <span style={{fontSize:11,color:T.textSm}}>Ref: {fmt(s.valorRef)}</span>
                           <div style={{display:"flex",alignItems:"center",gap:4}}>
                             <span style={{fontSize:12,color:T.textMd}}>R$</span>
-                            <input type="number" value={valores[key] || ""} onChange={e => setValor(key, e.target.value)}
+                            <input type="text" inputMode="decimal" placeholder="0,00" value={valores[key] ?? ""} onChange={e => setValor(key, e.target.value)}
                               placeholder={String(s.valorRef)}
                               style={{...IS,width:110,textAlign:"right",padding:"6px 10px",fontWeight:600,color:"#8b5cf6"}}/>
                           </div>
@@ -379,7 +379,7 @@ export default function FormularioNF({ jogos, fornecedores = [], onSubmit, T }) 
                 if (!jogo) return null;
                 const subs = servicosSel[jogoId] || [];
                 const allServicos = extrairServicos(jogo);
-                const total = subs.reduce((s, sk) => s + (valores[`${jogoId}_${sk}`] || 0), 0);
+                const total = subs.reduce((s, sk) => s + parseValorBR(valores[`${jogoId}_${sk}`]), 0);
                 return (
                   <div key={jogoId} style={{marginBottom:6}}>
                     <span style={{fontSize:12,color:T.text,fontWeight:600}}>{jogo.mandante} x {jogo.visitante}</span>

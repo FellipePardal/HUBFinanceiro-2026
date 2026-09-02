@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
-import { fmt, subTotal } from "../../utils";
+import { fmt, subTotal, parseValorBR } from "../../utils";
 import { CATS, btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, nfFileExiste, deleteNFFile, getState, setState as setSupabaseState, appendState, removeFromStateList } from "../../lib/supabase";
 import { pushHistorico } from "../../lib/historico";
@@ -267,19 +267,19 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
   };
 
   const setValorUnit = (key, val) => {
-    setSelecionados(prev => ({...prev, [key]: parseFloat(val) || 0}));
+    setSelecionados(prev => ({...prev, [key]: val}));
   };
 
   const setValorNFForm = (val) => {
     setForm(f => ({...f, valorNF: val}));
     // Com um único serviço selecionado, sincroniza o valor direto no selecionados
     if (selKeys.length === 1) {
-      setSelecionados(prev => ({...prev, [selKeys[0]]: parseFloat(val) || 0}));
+      setSelecionados(prev => ({...prev, [selKeys[0]]: val}));
     }
   };
 
   const selKeys = Object.keys(selecionados);
-  const totalNF = Object.values(selecionados).reduce((s, v) => s + (v || 0), 0);
+  const totalNF = Object.values(selecionados).reduce((s, v) => s + parseValorBR(v), 0);
   const rodada = jogosRodada[0]?.rodada;
 
   // Seleção é manual: o usuário clica em cada chip do fornecedor (ou no checkbox)
@@ -303,7 +303,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
     const servicosValores = {};
     selKeys.forEach(k => {
       const subKey = k.split("_").slice(1).join("_");
-      servicosValores[subKey] = (servicosValores[subKey] || 0) + selecionados[k];
+      servicosValores[subKey] = (servicosValores[subKey] || 0) + parseValorBR(selecionados[k]);
     });
     // jogoIds envolvidos — salvar array para sync multi-jogo
     const jogosEnvolvidos = [...new Set(selKeys.map(k => parseInt(k.split("_")[0])))];
@@ -325,7 +325,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
       servicosKeys: selKeys,
       servicosLabels: [...new Set(allLabels)],
       servicosValores,
-      servicosDetalhe: {...selecionados}, // "jogoId_subKey": valor (granular)
+      servicosDetalhe: Object.fromEntries(selKeys.map(k => [k, parseValorBR(selecionados[k])])), // "jogoId_subKey": valor (granular)
       tipo: "prevista",
       status: "Conferida",
       hasFile,
@@ -395,7 +395,7 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
                         {s.multi ? <>Rest. <b style={{color:T.textMd}}>{fmt(s.restante)}</b></> : fmt(s.valorRef)}
                       </span>
                       {checked
-                        ? <input type="number" value={selecionados[key]} onChange={e => setValorUnit(key, e.target.value)}
+                        ? <input type="text" inputMode="decimal" placeholder="0,00" value={selecionados[key]} onChange={e => setValorUnit(key, e.target.value)}
                             style={{...IS,width:100,textAlign:"right",padding:"3px 6px",fontSize:12,color:"#8b5cf6",fontWeight:600}}/>
                         : <span style={{width:100}}/>}
                     </div>
@@ -427,8 +427,8 @@ function RegistrarNFModal({ jogosRodada, notasExistentes, fornecedores, onSave, 
               Valor NF (R$){selKeys.length > 1 && <span style={{color:T.textSm,fontSize:10,marginLeft:6}}>— edite por serviço acima</span>}
             </label>
             {selKeys.length <= 1
-              ? <input type="number" value={form.valorNF} onChange={e => setValorNFForm(e.target.value)} style={IS}/>
-              : <input readOnly value={totalNF} style={{...IS, opacity:0.55, cursor:"not-allowed"}}/>}
+              ? <input type="text" inputMode="decimal" placeholder="0,00" value={form.valorNF} onChange={e => setValorNFForm(e.target.value)} style={IS}/>
+              : <input readOnly value={fmt(totalNF)} style={{...IS, opacity:0.55, cursor:"not-allowed"}}/>}
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
@@ -509,7 +509,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
         hasFile = true;
       } catch(_){}
     }
-    const valorNF = parseFloat(form.valorNF) || 0;
+    const valorNF = parseValorBR(form.valorNF);
     onSave({
       id: notaId,
       codigo,
@@ -554,7 +554,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Valor NF (R$)</label>
-            <input type="number" value={form.valorNF} onChange={e => set("valorNF", e.target.value)} style={IS}/>
+            <input type="text" inputMode="decimal" placeholder="0,00" value={form.valorNF} onChange={e => set("valorNF", e.target.value)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>
@@ -589,7 +589,7 @@ function NFAvulsaModal({ jogos, fornecedores, onSave, onClose, T }) {
           </div>
         </div>
 
-        {(form.numeroNF || form.valorNF > 0) && (
+        {(form.numeroNF || parseValorBR(form.valorNF) > 0) && (
           <div style={{background:T.bg,borderRadius:8,padding:"12px 16px",marginBottom:16}}>
             <p style={{color:T.textSm,fontSize:11,margin:"0 0 4px"}}>Código do arquivo:</p>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -695,14 +695,19 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
   };
 
   const setEditValor = (subKey, val) => {
-    setEditServicos(prev => ({...prev, [subKey]: parseFloat(val) || 0}));
+    setEditServicos(prev => ({...prev, [subKey]: val}));
   };
 
   // Monta a nota final a partir da submissão (com os valores editados, se houver).
   // A nota sai com decisao:"aprovada" — o addNota do TabNotas usa isso pra NÃO
   // gravar a entrada "registrada" no histórico (o aprovar já grava a "aprovada";
   // antes entravam as duas, com o mesmo id, e o histórico ficava duplicado).
-  const montarNotaAprovada = (subOriginal, editVals) => {
+  const montarNotaAprovada = (subOriginal, editValsCrus) => {
+    // O estado de edição guarda o texto digitado (pra aceitar "4.999,12");
+    // aqui vira número de vez.
+    const editVals = editValsCrus
+      ? Object.fromEntries(Object.entries(editValsCrus).map(([k, v]) => [k, parseValorBR(v)]))
+      : null;
     // Grafia do fornecedor vira a canônica do cadastro na aprovação — o
     // formulário público aceita texto livre, e grafias divergentes fragmentam
     // os agrupamentos por fornecedor (Rastreabilidade) além de dificultarem
@@ -927,8 +932,8 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
         const allServicos = jogo ? extrairServicos(jogo) : [];
         const svAtual = isEditing ? editServicos : (sub.servicosValores || {});
         const valorAtual = sub.tipo === "mensal"
-          ? (isEditing ? (editServicos._mensal || 0) : (sub.valorNF || 0))
-          : Object.values(svAtual).reduce((s, v) => s + (v || 0), 0);
+          ? (isEditing ? parseValorBR(editServicos._mensal) : (sub.valorNF || 0))
+          : Object.values(svAtual).reduce((s, v) => s + parseValorBR(v), 0);
         // Mesmo fornecedor + nº de NF (grafia normalizada) ou mesmo arquivo em
         // outra pendente ou nota já aprovada (jogo OU mensal) = provável reenvio.
         // A versão antiga só olhava `notas` e exigia grafia idêntica — foi assim
@@ -966,7 +971,7 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
                   <p style={{color:T.textMd,fontSize:11,fontWeight:600,margin:"0 0 8px"}}>Editar valor:</p>
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
                     <span style={{flex:1,fontSize:12,color:T.text,fontWeight:600}}>{sub.servicoNome}</span>
-                    <input type="number" value={editServicos._mensal ?? ""} onChange={e => setEditValor("_mensal", e.target.value)}
+                    <input type="text" inputMode="decimal" placeholder="0,00" value={editServicos._mensal ?? ""} onChange={e => setEditValor("_mensal", e.target.value)}
                       style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:110,textAlign:"right",fontSize:13,fontWeight:700}} autoFocus/>
                   </div>
                 </>) : sub.servicosDetalhe ? (<>
@@ -992,7 +997,7 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
                               <input type="checkbox" checked={ativo} onChange={() => toggleEditServico(sub, key)}/>
                               <span style={{flex:1,fontSize:12,color:ativo?T.text:T.textSm}}>{label}</span>
                               {ativo && (
-                                <input type="number" value={editServicos[key]} onChange={e => setEditValor(key, e.target.value)}
+                                <input type="text" inputMode="decimal" placeholder="0,00" value={editServicos[key]} onChange={e => setEditValor(key, e.target.value)}
                                   style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:90,textAlign:"right",fontSize:12,fontWeight:600}}/>
                               )}
                             </div>
@@ -1010,7 +1015,7 @@ function RecebidasTab({ notas, notasMensais = [], addNota, addNotaMensal, jogos,
                         <input type="checkbox" checked={ativo} onChange={() => toggleEditServico(sub, s.subKey)}/>
                         <span style={{flex:1,fontSize:12,color:ativo?T.text:T.textSm}}>{s.subLabel}</span>
                         {ativo && (
-                          <input type="number" value={editServicos[s.subKey]} onChange={e => setEditValor(s.subKey, e.target.value)}
+                          <input type="text" inputMode="decimal" placeholder="0,00" value={editServicos[s.subKey]} onChange={e => setEditValor(s.subKey, e.target.value)}
                             style={{background:T.card,border:`1px solid ${T.muted}`,borderRadius:6,color:"#8b5cf6",padding:"4px 8px",width:90,textAlign:"right",fontSize:12,fontWeight:600}}/>
                         )}
                       </div>

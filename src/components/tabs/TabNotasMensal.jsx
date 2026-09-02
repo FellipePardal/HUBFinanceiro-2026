@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { KPI, Pill } from "../shared";
-import { fmt } from "../../utils";
+import { fmt, parseValorBR } from "../../utils";
 import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, hashDataUrl } from "../../lib/supabase";
 import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
@@ -113,7 +113,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
     ? (notasExistentes||[]).filter(n => n.servicoId === servicoSel.id).reduce((s, n) => s + (n.valor||0), 0)
     : 0;
   const saldoServico = servicoSel ? (servicoSel.provisionado||0) - gastoServico : 0;
-  const valorAtual = parseFloat(form.valor) || 0;
+  const valorAtual = parseValorBR(form.valor);
   const saldoAposNota = saldoServico - valorAtual;
 
   const handleSave = async () => {
@@ -155,7 +155,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
       fornecedor: fornecedorCanonico,
       categoria,
       servicoId,
-      valor: parseFloat(form.valor) || 0,
+      valor: parseValorBR(form.valor),
       mes: parseInt(form.mes),
       mesLabel: MESES[parseInt(form.mes)],
       status: "Conferida",
@@ -212,7 +212,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Valor (R$)</label>
-            <input type="number" value={form.valor} onChange={e => set("valor", e.target.value)} style={IS}/>
+            <input type="text" inputMode="decimal" placeholder="0,00" value={form.valor} onChange={e => set("valor", e.target.value)} style={IS}/>
           </div>
           <div style={{marginBottom:12}}>
             <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Data Emissão</label>

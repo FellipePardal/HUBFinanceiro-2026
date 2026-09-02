@@ -100,7 +100,26 @@ function FornecedorInput({ value, onChange, fornecedores, T }) {
 }
 
 // Passo "Dados da Nota Fiscal" — compartilhado entre o fluxo de jogo e o mensal.
+// Só PDF: um fornecedor mandou a NF em .xlsx (Contra Ataque, 09/2026) e o
+// arquivo não abria no visualizador do Hub. O accept do input é só dica —
+// o navegador deixa escolher "todos os arquivos" — então valida de verdade.
+const MAX_NF_MB = 10;
+const validarArquivoNF = (f) => {
+  if (!f) return null;
+  const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
+  if (!isPdf) return "Só aceitamos a nota em PDF. Planilhas, fotos e outros formatos não são aceitos.";
+  if (f.size > MAX_NF_MB * 1024 * 1024) return `Arquivo muito grande (máx. ${MAX_NF_MB}MB).`;
+  return null;
+};
+
 function NFDataStep({ nfData, setNfData, arquivo, setArquivo, fileRef, fornecedores, resumo, T }) {
+  const [erroArquivo, setErroArquivo] = useState(null);
+  const escolherArquivo = (f) => {
+    const erro = validarArquivoNF(f);
+    setErroArquivo(erro);
+    setArquivo(erro ? null : (f || null));
+    if (erro && fileRef.current) fileRef.current.value = "";
+  };
   const IS = getIS(T);
   return (
     <div>
@@ -131,15 +150,16 @@ function NFDataStep({ nfData, setNfData, arquivo, setArquivo, fileRef, fornecedo
       </div>
       <div style={{marginBottom:16}}>
         <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Arquivo da NF</label>
-        <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
+        <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={e => escolherArquivo(e.target.files[0]||null)} style={{display:"none"}}/>
         <div onClick={() => fileRef.current?.click()}
           onDragOver={e => e.preventDefault()}
-          onDrop={e => {e.preventDefault(); setArquivo(e.dataTransfer.files[0]||null);}}
-          style={{border:`2px dashed ${arquivo?BRAND:T.muted}`,borderRadius:10,padding:"20px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":T.bg}}>
+          onDrop={e => {e.preventDefault(); escolherArquivo(e.dataTransfer.files[0]||null);}}
+          style={{border:`2px dashed ${arquivo?BRAND:(erroArquivo?"#ef4444":T.muted)}`,borderRadius:10,padding:"20px 16px",cursor:"pointer",textAlign:"center",background:arquivo?"#22c55e11":(erroArquivo?"#ef444411":T.bg)}}>
           {arquivo
             ? <p style={{margin:0,color:BRAND,fontSize:14,fontWeight:600}}>{arquivo.name}<br/><span style={{fontSize:12,fontWeight:400}}>({(arquivo.size/1024).toFixed(0)} KB)</span></p>
-            : <p style={{margin:0,color:T.textSm,fontSize:13}}>Toque para selecionar ou arraste o arquivo<br/><span style={{fontSize:11}}>PDF, PNG, JPG (máx. 10MB)</span></p>}
+            : <p style={{margin:0,color:T.textSm,fontSize:13}}>Toque para selecionar ou arraste o arquivo<br/><span style={{fontSize:11}}>Somente PDF (máx. {MAX_NF_MB}MB)</span></p>}
         </div>
+        {erroArquivo && <p style={{margin:"6px 0 0",color:"#ef4444",fontSize:12,fontWeight:600}}>{erroArquivo}</p>}
       </div>
       {resumo}
     </div>

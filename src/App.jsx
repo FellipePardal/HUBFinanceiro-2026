@@ -49,6 +49,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const [eventosLog, setEventosLogRaw]   = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [apres, setApresRaw]             = useState({});
+  const [fixos, setFixosRaw]             = useState(null); // contratos fixos p/ cobrança de NF (lib/cobrancaFixos.js)
   const [loading, setLoading]            = useState(true);
   const [loadError, setLoadError]        = useState(null);
   // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
@@ -61,7 +62,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   useEffect(() => {
     async function load() {
       try {
-        const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg, ap] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log'), getState('apresentacoes')]);
+        const [j, s, n, f, nm, ev, lm, nlm, nlu, co, fj, lg, elg, ap, fx] = await Promise.all([getState('jogos'), getState('servicos'), getState('notas'), getState('fornecedores'), getState('notas_mensais'), getState('envios'), getState('livemode'), getState('notas_livemode'), getState('notas_liveu'), getState('cotacoes'), getState('fornecedores_jogo'), getState('logistica'), getState('eventos_log'), getState('apresentacoes'), getState('fixos_contratos')]);
         // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
         // Nunca sobrescreve um array vazio legítimo, e nunca escreve por cima de
         // dados existentes — assim um getState com falha transitória/null não zera
@@ -127,6 +128,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         // Migração one-time da aba Apresentações: importa os overrides que
         // viviam no localStorage (prefixo "bra") quando a linha ainda não existe.
         seedIfMissing(ap,  'apresentacoes',     lerApresentacoesDoLocalStorage('bra'), setApresRaw);
+        seedIfMissing(fx,  'fixos_contratos',   { mesesSemServico: [], contratos: [] }, setFixosRaw);
         setLoading(false);
         setLoadError(null);
       } catch (err) {
@@ -155,6 +157,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         if (key === 'logistica')     setLogisticaRaw(payload.new.value);
         if (key === 'eventos_log')   setEventosLogRaw(payload.new.value);
         if (key === 'apresentacoes') setApresRaw(payload.new.value);
+        if (key === 'fixos_contratos') setFixosRaw(payload.new.value);
       })
       .subscribe();
 
@@ -175,6 +178,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
   const setLogistica         = createPersistedSetter('logistica',         setLogisticaRaw,         persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo  = createPersistedSetter('fornecedores_jogo', setFornecedoresJogoRaw,  persistRefs, { empty: {}, debounceMs: 500 });
   const setApres             = createPersistedSetter('apresentacoes',     setApresRaw,             persistRefs, { empty: {}, debounceMs: 600 });
+  const setFixos             = createPersistedSetter('fixos_contratos',   setFixosRaw,             persistRefs, { empty: { mesesSemServico: [], contratos: [] } });
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
@@ -727,7 +731,7 @@ function Brasileirao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admi
         {tab==="micro"         && <VisaoMicro       jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos      servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} notasMensais={notasMensais} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role} dedupeNotasPorNF={true}/>}
-        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
+        {tab==="mensal" && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role} fixos={fixos} setFixos={setFixos} mesInicioCamp={0} mesFimCamp={11} nomeCampeonato="Brasileirão 2026" linkFormulario={`${window.location.origin}${window.location.pathname}#formulario`}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} notasLiveU={notasLiveU} setNotasLiveU={setNotasLiveU} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} notas={notas} notasLivemode={notasLivemode} notasLiveU={notasLiveU} dedupeNotasPorNF={true} T={T} apres={apres} setApres={setApres} orcGlobal={10130480} mesInicio={0} nomeCampeonato="Brasileirão 2026"/>}

@@ -5,46 +5,15 @@ import { btnStyle, iSty, RADIUS } from "../../constants";
 import { fileToDataUrl, saveNFFile, getNFFile, deleteNFFile, getState, setState as setSupabaseState, hashDataUrl } from "../../lib/supabase";
 import { normalizeEnvioMetricas } from "../../lib/notasFiscais";
 import { acharDuplicatasNF, confirmarDuplicatas, grafiaCanonica } from "../../lib/dedupeNF";
-import { Card, PanelTitle, Button, Chip, Progress, tableStyles, DateInput } from "../ui";
+import { Card, PanelTitle, Button, Chip, Progress, tableStyles, DateInput, Segmented } from "../ui";
 import { Plus, Eye, Trash2, Upload, X, Download, FileText, Edit2, Check } from "lucide-react";
+import FornecedorInput from "../FornecedorInput";
+import CobrancasFixos from "./CobrancasFixos";
 
 const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const VAR_CATEGORIAS = ["Transporte","Uber","Hospedagem","Seg. Espacial"];
 const CATEGORIAS_MENSAL = [...VAR_CATEGORIAS, "Outro"];
 const STATUS_COLOR = {"Pendente":"#f59e0b","Recebida":"#8b5cf6","Conferida":"#22c55e"};
-
-function FornecedorInput({ value, onChange, fornecedores, T }) {
-  const IS = iSty(T);
-  const [open, setOpen] = useState(false);
-  const query = value.toLowerCase();
-  const filtered = query.length > 0
-    ? fornecedores.filter(f => f.apelido.toLowerCase().includes(query) || f.razaoSocial.toLowerCase().includes(query) || f.funcao.toLowerCase().includes(query)).slice(0, 8)
-    : [];
-
-  return (
-    <div style={{position:"relative"}}>
-      <input value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)}
-        placeholder="Digite para buscar..." style={IS}/>
-      {open && filtered.length > 0 && (
-        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:8,marginTop:4,maxHeight:200,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
-          {filtered.map(f => (
-            <div key={f.id} onMouseDown={() => { onChange(f.apelido); setOpen(false); }}
-              style={{padding:"8px 12px",cursor:"pointer",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:2}}
-              onMouseEnter={e => e.currentTarget.style.background = T.bg}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:13,fontWeight:600,color:T.text}}>{f.apelido}</span>
-                <span style={{fontSize:10,color:T.textSm,background:T.bg,padding:"1px 6px",borderRadius:4}}>{f.tipo}</span>
-              </div>
-              <span style={{fontSize:11,color:T.textSm}}>{f.funcao}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function PreviewModal({ nota, onClose, T }) {
   const [src, setSrc] = useState(null);
@@ -201,7 +170,7 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
             )}
           </div>
           <div style={{marginBottom:12}}>
-            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Mês de referência</label>
+            <label style={{color:T.textMd,fontSize:12,display:"block",marginBottom:4}}>Mês trabalhado (competência)</label>
             <select value={form.mes} onChange={e => set("mes", e.target.value)} style={IS}>
               {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
             </select>
@@ -255,7 +224,11 @@ function NovaNotaMensalModal({ fornecedores, servicos, notasExistentes, onSave, 
   );
 }
 
-export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], envios = [], setEnvios, T, role = 'admin' }) {
+export default function TabNotasMensal({ notas, setNotas, fornecedores = [], servicos = [], envios = [], setEnvios, T, role = 'admin',
+  fixos, setFixos, mesInicioCamp = 0, mesFimCamp = 11, nomeCampeonato = "", linkFormulario = "" }) {
+  // "notas" = lista de NFs mensais; "cobrancas" = contratos fixos × competências
+  // (quem deve NF todo mês e o que ainda não chegou). Ver lib/cobrancaFixos.js.
+  const [visao, setVisao] = useState("notas");
   const canEdit = role === 'admin';
   const [mesSel, setMesSel] = useState(new Date().getMonth());
   const [filtroCat, setFiltroCat] = useState("Todas");
@@ -357,8 +330,25 @@ export default function TabNotasMensal({ notas, setNotas, fornecedores = [], ser
   const TS = tableStyles(T);
   const cyan = "#06b6d4";
 
+  const seletorVisao = setFixos ? (
+    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+      <Segmented T={T} value={visao} onChange={setVisao} options={[{value:"notas",label:"Notas mensais"},{value:"cobrancas",label:"Cobranças de fixos"}]}/>
+    </div>
+  ) : null;
+
+  if (visao === "cobrancas" && setFixos) {
+    return (
+      <>
+        {seletorVisao}
+        <CobrancasFixos fixos={fixos} setFixos={setFixos} notasMensais={notas} fornecedores={fornecedores} servicos={servicos} T={T} role={role}
+          mesInicioCamp={mesInicioCamp} mesFimCamp={mesFimCamp} nomeCampeonato={nomeCampeonato} linkFormulario={linkFormulario}/>
+      </>
+    );
+  }
+
   return (
     <>
+      {seletorVisao}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16,marginBottom:24}}>
         <KPI label={`Total ${MESES[mesSel]}`} value={fmt(totalValor)} sub={`${filtered.length} notas`} color={cyan} T={T}/>
         <KPI label="Total Geral" value={fmt(totalGeral)} sub={`${notas.length} notas (todos os meses)`} color="#a855f7" T={T}/>

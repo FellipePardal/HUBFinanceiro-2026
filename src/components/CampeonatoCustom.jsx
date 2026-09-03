@@ -65,6 +65,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
     logistica:        `${campId}_logistica`,
     eventos_log:      `${campId}_eventos_log`,
     apresentacoes:    `${campId}_apresentacoes`,
+    fixos_contratos:  `${campId}_fixos_contratos`,
   };
 
   const [jogos, setJogosRaw]                       = useState(initialJogos);
@@ -80,6 +81,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const [eventosLog, setEventosLogRaw]             = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [apres, setApresRaw]                       = useState({});
+  const [fixos, setFixosRaw]                       = useState(null);
   const [loading, setLoading]                      = useState(true);
   const [loadError, setLoadError]                  = useState(null);
   // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
@@ -92,11 +94,11 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   useEffect(() => {
     async function load() {
       try {
-        const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg, ap] = await Promise.all([
+        const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg, ap, fx] = await Promise.all([
           getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
           getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
           getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
-          getState(K.apresentacoes),
+          getState(K.apresentacoes), getState(K.fixos_contratos),
         ]);
         // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
         // Nunca sobrescreve dados — getState com falha transitória não pode zerar
@@ -122,6 +124,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         // Sem migração de localStorage aqui: os customs compartilhavam as chaves
         // "bra_apres_*" com o Brasileirão — importar traria overrides errados.
         seedIfMissing(ap,  K.apresentacoes,     {},                  setApresRaw);
+        seedIfMissing(fx,  K.fixos_contratos,   { mesesSemServico: [], contratos: [] }, setFixosRaw);
         setLoading(false);
         setLoadError(null);
       } catch (err) {
@@ -140,7 +143,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
           [K.envios]: setEnviosRaw, [K.livemode]: setLivemodeRaw, [K.notas_livemode]: setNotasLivemodeRaw,
           [K.cotacoes]: setCotacoesRaw, [K.fornecedores_jogo]: setFornecedoresJogoRaw,
           [K.logistica]: setLogisticaRaw, [K.eventos_log]: setEventosLogRaw,
-          [K.apresentacoes]: setApresRaw,
+          [K.apresentacoes]: setApresRaw, [K.fixos_contratos]: setFixosRaw,
         };
         const fn = m[payload.new.key];
         if (fn && !isPersistPending(persistRefs, payload.new.key)) fn(payload.new.value);
@@ -162,6 +165,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
   const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
   const setApres            = createPersistedSetter(K.apresentacoes,     setApresRaw,            persistRefs, { empty: {}, debounceMs: 600 });
+  const setFixos            = createPersistedSetter(K.fixos_contratos,   setFixosRaw,            persistRefs, { empty: { mesesSemServico: [], contratos: [] } });
 
   // Rateia Seg. Espacial entre os jogos do mês. Quando o mês não tem nenhum jogo,
   // não tem jogo pra receber o rateio -- o valor ia sendo descartado do realizado
@@ -586,7 +590,7 @@ export default function CampeonatoCustom({ config, initialJogos = [], initialSer
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} notasMensais={notasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} role={role}/>}
-        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
+        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role} fixos={fixos} setFixos={setFixos} mesInicioCamp={0} mesFimCamp={11} nomeCampeonato={`${nome} ${edicao}`}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} fornecedores={fornecedores} T={T} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} notas={notas} notasLivemode={notasLivemode} grupoDoJogo={grupoDoJogoRastreab} T={T} apres={apres} setApres={setApres} orcGlobal={orcadoTotalCampeonato} mesInicio={0} nomeCampeonato={`${nome} ${edicao}`}/>}

@@ -536,8 +536,8 @@ function FormMensal({ fornecedores, onDone, T }) {
 
         {step === 0 && (
           <div>
-            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual o mês de referência?</h3>
-            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Selecione o mês da competência</p>
+            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:16}}>Qual o mês trabalhado?</h3>
+            <p style={{color:T.textSm,fontSize:12,margin:"0 0 16px"}}>Mês em que o serviço foi prestado (competência), não o da emissão. Ex.: NF pedida em 1º de setembro = Setembro.</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {MESES.map((m, i) => (
                 <button key={m} onClick={() => setMesSel(i)}

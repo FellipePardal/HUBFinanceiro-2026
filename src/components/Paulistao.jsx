@@ -99,6 +99,7 @@ const K = {
   logistica:        "paulistao_logistica",
   eventos_log:      "paulistao_eventos_log",
   apresentacoes:    "paulistao_apresentacoes",
+  fixos_contratos:  "paulistao_fixos_contratos",
 };
 
 export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode, role = 'admin', onSignOut }) {
@@ -115,6 +116,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const [eventosLog, setEventosLogRaw]             = useState([]);
   const [fornecedoresJogo, setFornecedoresJogoRaw] = useState({});
   const [apres, setApresRaw]                       = useState({});
+  const [fixos, setFixosRaw]                       = useState(null);
   const [loading, setLoading]                      = useState(true);
   const [loadError, setLoadError]                  = useState(null);
   // Cada setter relê o valor atual do Supabase antes de gravar de volta (ver
@@ -127,11 +129,11 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   useEffect(() => {
     async function load() {
       try {
-      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg, ap] = await Promise.all([
+      const [j, s, n, f, nm, ev, lm, nlm, co, fj, lg, elg, ap, fx] = await Promise.all([
         getState(K.jogos), getState(K.servicos), getState(K.notas), getState(K.fornecedores),
         getState(K.notas_mensais), getState(K.envios), getState(K.livemode), getState(K.notas_livemode),
         getState(K.cotacoes), getState(K.fornecedores_jogo), getState(K.logistica), getState(K.eventos_log),
-        getState(K.apresentacoes),
+        getState(K.apresentacoes), getState(K.fixos_contratos),
       ]);
       // Seed APENAS quando o valor é null/undefined (linha não existe no banco).
       // Nunca sobrescreve dados — getState com falha transitória não pode zerar
@@ -223,6 +225,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
       // Migração one-time da aba Apresentações: importa overrides do localStorage
       // (prefixo "pau") quando a linha ainda não existe no banco.
       seedIfMissing(ap,  K.apresentacoes,     lerApresentacoesDoLocalStorage('pau'), setApresRaw);
+      seedIfMissing(fx,  K.fixos_contratos,   { mesesSemServico: [], contratos: [] }, setFixosRaw);
       setLoading(false);
       setLoadError(null);
       } catch (err) {
@@ -241,7 +244,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
           [K.envios]: setEnviosRaw, [K.livemode]: setLivemodeRaw, [K.notas_livemode]: setNotasLivemodeRaw,
           [K.cotacoes]: setCotacoesRaw, [K.fornecedores_jogo]: setFornecedoresJogoRaw,
           [K.logistica]: setLogisticaRaw, [K.eventos_log]: setEventosLogRaw,
-          [K.apresentacoes]: setApresRaw,
+          [K.apresentacoes]: setApresRaw, [K.fixos_contratos]: setFixosRaw,
         };
         const fn = m[payload.new.key];
         if (fn && !isPersistPending(persistRefs, payload.new.key)) fn(payload.new.value);
@@ -264,6 +267,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
   const setLogistica        = createPersistedSetter(K.logistica,         setLogisticaRaw,        persistRefs, { debounceMs: 500 });
   const setFornecedoresJogo = createPersistedSetter(K.fornecedores_jogo, setFornecedoresJogoRaw, persistRefs, { empty: {}, debounceMs: 500 });
   const setApres            = createPersistedSetter(K.apresentacoes,     setApresRaw,            persistRefs, { empty: {}, debounceMs: 600 });
+  const setFixos            = createPersistedSetter(K.fixos_contratos,   setFixosRaw,            persistRefs, { empty: { mesesSemServico: [], contratos: [] } });
 
   // Agenda herdada do Portal de Controle (a matriz desde 2026-08): descritivo
   // dos jogos vem de lá; orçamento/realizado continuam 100% do Hub.
@@ -724,7 +728,7 @@ export default function Paulistao({ onBack, onOpenHub, T, darkMode, setDarkMode,
         {tab==="micro"         && <VisaoMicro jogos={jogosCalc} jogoId={microJogoId} onChangeJogo={setMicroJogoId} onSave={saveJogo} T={T}/>}
         {tab==="serviços"      && <TabServicos servicos={servicosCalc} setServicos={setServicos} T={T}/>}
         {tab==="notas fiscais" && <TabNotas notas={notas} setNotas={setNotas} jogos={jogos} setJogos={setJogos} fornecedores={fornecedores} envios={envios} setEnvios={setEnvios} fornecedoresJogo={fornecedoresJogo} setFornecedoresJogo={setFornecedoresJogo} notasMensais={notasMensais} setNotasMensais={setNotasMensais} onReembolsoCriado={nota => setLogistica(ls => marcarLogisticaReembolsada(ls, nota))} T={T} submissionsKey="paulistao_nf_submissions" historicoKey="paulistao_nf_historico" formHash="#formulario-paulistao" usarPortal={false} subsExcluirExtra={["downlink","distribuicao","maquinas"]} dedupeNotasPorNF={true} role={role}/>}
-        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role}/>}
+        {tab==="mensal"        && <TabNotasMensal notas={notasMensais} setNotas={setNotasMensais} fornecedores={fornecedores} servicos={servicosCalc} envios={envios} setEnvios={setEnvios} T={T} role={role} fixos={fixos} setFixos={setFixos} mesInicioCamp={4} mesFimCamp={11} nomeCampeonato="Paulistão Feminino 2026" linkFormulario={`${window.location.origin}${window.location.pathname}#formulario-paulistao`}/>}
         {tab==="serviços livemode" && <TabLivemode livemode={livemode} setLivemode={setLivemode} notasLivemode={notasLivemode} setNotasLivemode={setNotasLivemode} jogos={jogos} fornecedores={fornecedores} T={T} useOrcadoLivemode={true} servicosLm={SERVICOS_LM_PAULISTAO} role={role}/>}
         {tab==="logística"     && <TabLogistica logistica={logistica} setLogistica={setLogistica} jogos={jogos} fornecedores={fornecedores} eventosLog={eventosLog} setEventosLog={setEventosLog} notas={notas} setNotas={setNotas} historicoKey="paulistao_nf_historico" T={T}/>}
         {tab==="apresentações" && <TabApresentacoes jogos={divulgados} servicos={servicosCalc} notasMensais={notasMensais} notas={notas} notasLivemode={notasLivemode} dedupeNotasPorNF={true} grupoDoJogo={grupoDoJogoPaulistao} T={T} apres={apres} setApres={setApres} orcGlobal={orcGlobalVariaveis} mesInicio={4} nomeCampeonato="Paulistão Feminino 2026"/>}

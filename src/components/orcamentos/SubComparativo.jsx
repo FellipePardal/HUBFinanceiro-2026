@@ -336,24 +336,6 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
     </tr>
   );
 
-  // Barra empilhada variáveis × fixos, base e atual lado a lado.
-  const BarraComposicao = ({ rotulo, variaveis, fixos, total, forte }) => (
-    <div style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:12,alignItems:"center"}}>
-      <div style={{fontSize:11.5,fontWeight:forte ? 700 : 500,color:forte ? T.text : T.textMd,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={rotulo}>{rotulo}</div>
-      <div style={{display:"flex",height:26,borderRadius:6,overflow:"hidden",background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`}}>
-        {[["variaveis", variaveis], ["fixos", fixos]].map(([k, v]) => {
-          const w = total > 0 ? (v / total) * 100 : 0;
-          return (
-            <div key={k} title={`${blocos[k].label}: ${fmt(v)} (${pct(v, total)})`}
-              style={{width:`${w}%`,background:blocos[k].color,opacity:forte ? 1 : 0.55,display:"flex",alignItems:"center",justifyContent:"center",
-                      color:"#fff",fontSize:10.5,fontWeight:700,fontFamily:FONT.num,whiteSpace:"nowrap",overflow:"hidden",transition:"width .3s"}}>
-              {w > 14 ? `${fmtK(v)} · ${pct(v, total)}` : (w > 6 ? pct(v, total) : "")}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
@@ -366,57 +348,6 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
           color={deltaCor(diff.delta, T)} icon={diff.delta >= 0 ? TrendingUp : TrendingDown}/>
         <Stat T={T} label="Add-ons" value={String(diff.numAddons)} sub="Serviços novos nesta edição" color="#8b5cf6" icon={Sparkles}/>
       </div>
-
-      {/* ── Variáveis × Fixos ── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12}}>
-        {[blocos.variaveis, blocos.fixos].map(b => (
-          <Card T={T} key={b.key} accent={b.color}>
-            <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
-                  {b.key === "fixos" ? <Briefcase size={14} color={b.color}/> : <Layers size={14} color={b.color}/>}
-                  <span style={{fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:b.color}}>{b.label}</span>
-                </span>
-                <Selo status={statusBloco(b)} T={T}/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {[
-                  ["Base", b.totalBase, pct(b.totalBase, diff.totalBase), T.textMd],
-                  ["Atual", b.totalAtual, pct(b.totalAtual, diff.totalAtual), T.text],
-                ].map(([r, v, p, cor]) => (
-                  <div key={r}>
-                    <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>{r}</div>
-                    <div className="num" style={{fontSize:15,fontWeight:700,color:cor,fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmtK(v)}</div>
-                    <div style={{fontSize:10.5,color:T.textSm}}>{p} do total</div>
-                  </div>
-                ))}
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>Variação</div>
-                  <div className="num" style={{fontSize:15,fontWeight:700,color:deltaCor(b.delta, T),fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmtDelta(b.delta)}</div>
-                  <div style={{fontSize:10.5,color:T.textSm}}>{b.totalBase ? `${b.delta >= 0 ? "+" : ""}${((b.delta / b.totalBase) * 100).toFixed(1)}% vs base` : "—"}</div>
-                </div>
-              </div>
-              <div style={{fontSize:10.5,color:T.textSm}}>{b.sub}</div>
-            </div>
-          </Card>
-        ))}
-      </div>
-      <Card T={T}>
-        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-            <span style={{fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:T.textSm}}>Composição do orçamento</span>
-            <span style={{display:"inline-flex",gap:14}}>
-              {[blocos.variaveis, blocos.fixos].map(b => (
-                <span key={b.key} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:T.textMd}}>
-                  <span style={{width:10,height:10,borderRadius:2,background:b.color}}/>{b.label}
-                </span>
-              ))}
-            </span>
-          </div>
-          <BarraComposicao rotulo={bl.label} variaveis={blocos.variaveis.totalBase} fixos={blocos.fixos.totalBase} total={diff.totalBase}/>
-          <BarraComposicao rotulo={`${orc.meta.nome} ${orc.meta.edicao}`} variaveis={blocos.variaveis.totalAtual} fixos={blocos.fixos.totalAtual} total={diff.totalAtual} forte/>
-        </div>
-      </Card>
 
       {/* ── Tabela comparativa ── */}
       <Card T={T}>

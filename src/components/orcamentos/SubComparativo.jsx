@@ -7,7 +7,7 @@ import {
 import { fmt, fmtK } from "../../utils";
 import {
   GitCompareArrows, Wallet, TrendingUp, TrendingDown, Sparkles,
-  Pencil, Check, Plus, X, Briefcase,
+  Pencil, Check, Plus, X, Briefcase, Layers,
   ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react";
 
@@ -33,6 +33,8 @@ const Selo = ({ status, T }) => {
 };
 
 const deltaCor = (delta, T) => delta > 0 ? "#DC2626" : delta < 0 ? "#16A34A" : T.textSm;
+// Selo do bloco inteiro (variáveis/fixos): só sinal do total, sem "add-on".
+const statusBloco = (b) => b.delta > 0 ? "aumento" : b.delta < 0 ? "reducao" : "igual";
 const fmtDelta = (delta) => delta === 0 ? "—" : `${delta > 0 ? "+" : "−"}${fmt(Math.abs(delta))}`;
 
 // Resumo compacto exibido no cabeçalho quando a categoria está recolhida:
@@ -263,6 +265,96 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
   ];
   const tudoRecolhido = chavesTopo.length > 0 && chavesTopo.every(k => recolhidos.has(k));
 
+  // ── Blocos: custos VARIÁVEIS (por jogo) × custos FIXOS (por edição) ──
+  const soma = (arr, k) => arr.reduce((s, x) => s + x[k], 0);
+  const blocos = {
+    variaveis: {
+      key:"variaveis", label:"Custos Variáveis", sub:`por jogo · ${(orc.jogos || []).length} jogos na edição atual`,
+      color: T.info || "#2563EB",
+      totalBase: soma(diff.grupos, "totalBase"), totalAtual: soma(diff.grupos, "totalAtual"),
+      rows: diff.grupos.flatMap(g => g.rows),
+    },
+    fixos: {
+      key:"fixos", label:"Custos Fixos", sub:"por edição · pessoal fixo, serviços e reembolsos",
+      color: "#a855f7",
+      totalBase: soma(diff.fixos, "totalBase"), totalAtual: soma(diff.fixos, "totalAtual"),
+      rows: diff.fixos.flatMap(f => f.rows),
+    },
+  };
+  Object.values(blocos).forEach(b => { b.delta = b.totalAtual - b.totalBase; });
+  const pct = (parte, total) => total > 0 ? `${Math.round((parte / total) * 100)}%` : "—";
+
+  // Faixa divisória de bloco: título, totais e (opcional) recolher o bloco inteiro.
+  const renderBloco = (b, { chave, icon: Icon } = {}) => {
+    const aberto = !chave || estaAberto(chave);
+    const clicavel = !!chave && !editando;
+    const Chevron = aberto ? ChevronDown : ChevronRight;
+    return (
+      <tr key={`bloco_${b.key}`}
+        onClick={clicavel ? () => toggleRecolhido(chave) : undefined}
+        title={clicavel ? (aberto ? "Recolher bloco" : "Expandir bloco") : undefined}
+        style={{
+          borderTop:`3px solid ${b.color}`, background:`${b.color}12`,
+          cursor: clicavel ? "pointer" : "default", userSelect:"none",
+        }}>
+        <td style={{padding:"13px 16px",whiteSpace:"nowrap"}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:10}}>
+            {chave && <Chevron size={15} color={b.color} style={{flexShrink:0,opacity:editando ? 0.35 : 1}}/>}
+            {Icon && <Icon size={15} color={b.color} style={{flexShrink:0}}/>}
+            <span style={{display:"flex",flexDirection:"column",gap:1}}>
+              <span style={{fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:b.color}}>{b.label}</span>
+              <span style={{fontSize:10.5,color:T.textSm}}>{b.sub}</span>
+            </span>
+            {!aberto && b.rows.length > 0 && <ChipsResumo rows={b.rows} T={T}/>}
+          </span>
+        </td>
+        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.textMd,fontSize:13,fontWeight:600,fontFamily:FONT.num,whiteSpace:"nowrap"}}>
+          {fmt(b.totalBase)}<div style={{fontSize:10,fontWeight:500,color:T.textSm}}>{pct(b.totalBase, diff.totalBase)} do total</div>
+        </td>
+        <td className="num" style={{padding:"13px 16px",textAlign:"right",color:T.text,fontSize:13,fontWeight:700,fontFamily:FONT.num,whiteSpace:"nowrap"}}>
+          {fmt(b.totalAtual)}<div style={{fontSize:10,fontWeight:500,color:T.textSm}}>{pct(b.totalAtual, diff.totalAtual)} do total</div>
+        </td>
+        <td className="num" style={{padding:"13px 16px",textAlign:"right",fontSize:13,fontWeight:700,color:deltaCor(b.delta, T),fontFamily:FONT.num,whiteSpace:"nowrap"}}>
+          {fmtDelta(b.delta)}
+          <div style={{fontSize:10,fontWeight:500,color:T.textSm}}>{b.totalBase ? `${b.delta >= 0 ? "+" : ""}${((b.delta / b.totalBase) * 100).toFixed(1)}%` : "—"}</div>
+        </td>
+        <td/>
+      </tr>
+    );
+  };
+
+  // Linha de fechamento do bloco (subtotal) — fecha visualmente antes do próximo bloco.
+  const renderSubtotal = (b) => (
+    <tr key={`sub_${b.key}`} style={{background:`${b.color}0c`,borderTop:`1px solid ${b.color}55`}}>
+      <td style={{padding:"10px 16px",fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:b.color,whiteSpace:"nowrap"}}>
+        Subtotal {b.label.replace("Custos ", "")}
+      </td>
+      <td className="num" style={{padding:"10px 16px",textAlign:"right",color:T.textMd,fontSize:12.5,fontWeight:600,fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmt(b.totalBase)}</td>
+      <td className="num" style={{padding:"10px 16px",textAlign:"right",color:T.text,fontSize:12.5,fontWeight:700,fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmt(b.totalAtual)}</td>
+      <td className="num" style={{padding:"10px 16px",textAlign:"right",fontSize:12.5,fontWeight:700,color:deltaCor(b.delta, T),fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmtDelta(b.delta)}</td>
+      <td style={{padding:"10px 16px",textAlign:"right"}}><Selo status={statusBloco(b)} T={T}/></td>
+    </tr>
+  );
+
+  // Barra empilhada variáveis × fixos, base e atual lado a lado.
+  const BarraComposicao = ({ rotulo, variaveis, fixos, total, forte }) => (
+    <div style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:12,alignItems:"center"}}>
+      <div style={{fontSize:11.5,fontWeight:forte ? 700 : 500,color:forte ? T.text : T.textMd,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={rotulo}>{rotulo}</div>
+      <div style={{display:"flex",height:26,borderRadius:6,overflow:"hidden",background:T.surfaceAlt||T.bg,border:`1px solid ${T.border}`}}>
+        {[["variaveis", variaveis], ["fixos", fixos]].map(([k, v]) => {
+          const w = total > 0 ? (v / total) * 100 : 0;
+          return (
+            <div key={k} title={`${blocos[k].label}: ${fmt(v)} (${pct(v, total)})`}
+              style={{width:`${w}%`,background:blocos[k].color,opacity:forte ? 1 : 0.55,display:"flex",alignItems:"center",justifyContent:"center",
+                      color:"#fff",fontSize:10.5,fontWeight:700,fontFamily:FONT.num,whiteSpace:"nowrap",overflow:"hidden",transition:"width .3s"}}>
+              {w > 14 ? `${fmtK(v)} · ${pct(v, total)}` : (w > 6 ? pct(v, total) : "")}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {/* ── KPIs ── */}
@@ -274,6 +366,57 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
           color={deltaCor(diff.delta, T)} icon={diff.delta >= 0 ? TrendingUp : TrendingDown}/>
         <Stat T={T} label="Add-ons" value={String(diff.numAddons)} sub="Serviços novos nesta edição" color="#8b5cf6" icon={Sparkles}/>
       </div>
+
+      {/* ── Variáveis × Fixos ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12}}>
+        {[blocos.variaveis, blocos.fixos].map(b => (
+          <Card T={T} key={b.key} accent={b.color}>
+            <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
+                  {b.key === "fixos" ? <Briefcase size={14} color={b.color}/> : <Layers size={14} color={b.color}/>}
+                  <span style={{fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:b.color}}>{b.label}</span>
+                </span>
+                <Selo status={statusBloco(b)} T={T}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                {[
+                  ["Base", b.totalBase, pct(b.totalBase, diff.totalBase), T.textMd],
+                  ["Atual", b.totalAtual, pct(b.totalAtual, diff.totalAtual), T.text],
+                ].map(([r, v, p, cor]) => (
+                  <div key={r}>
+                    <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>{r}</div>
+                    <div className="num" style={{fontSize:15,fontWeight:700,color:cor,fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmtK(v)}</div>
+                    <div style={{fontSize:10.5,color:T.textSm}}>{p} do total</div>
+                  </div>
+                ))}
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:T.textSm}}>Variação</div>
+                  <div className="num" style={{fontSize:15,fontWeight:700,color:deltaCor(b.delta, T),fontFamily:FONT.num,whiteSpace:"nowrap"}}>{fmtDelta(b.delta)}</div>
+                  <div style={{fontSize:10.5,color:T.textSm}}>{b.totalBase ? `${b.delta >= 0 ? "+" : ""}${((b.delta / b.totalBase) * 100).toFixed(1)}% vs base` : "—"}</div>
+                </div>
+              </div>
+              <div style={{fontSize:10.5,color:T.textSm}}>{b.sub}</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+      <Card T={T}>
+        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:11,fontWeight:800,letterSpacing:"0.08em",textTransform:"uppercase",color:T.textSm}}>Composição do orçamento</span>
+            <span style={{display:"inline-flex",gap:14}}>
+              {[blocos.variaveis, blocos.fixos].map(b => (
+                <span key={b.key} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:T.textMd}}>
+                  <span style={{width:10,height:10,borderRadius:2,background:b.color}}/>{b.label}
+                </span>
+              ))}
+            </span>
+          </div>
+          <BarraComposicao rotulo={bl.label} variaveis={blocos.variaveis.totalBase} fixos={blocos.fixos.totalBase} total={diff.totalBase}/>
+          <BarraComposicao rotulo={`${orc.meta.nome} ${orc.meta.edicao}`} variaveis={blocos.variaveis.totalAtual} fixos={blocos.fixos.totalAtual} total={diff.totalAtual} forte/>
+        </div>
+      </Card>
 
       {/* ── Tabela comparativa ── */}
       <Card T={T}>
@@ -311,23 +454,19 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
               </tr>
             </thead>
             <tbody>
-              {diff.grupos.map(g => (g.rows.length > 0 || editando) ? [
+              {/* ══ BLOCO 1 · CUSTOS VARIÁVEIS (por jogo) ══ */}
+              {renderBloco(blocos.variaveis, { chave:"variaveis", icon:Layers })}
+              {estaAberto("variaveis") && diff.grupos.map(g => (g.rows.length > 0 || editando) ? [
                 renderHeaderGrupo(g.label, g.color, g, { chave:g.key, rows:g.rows }),
                 ...(estaAberto(g.key) ? [
                   ...g.rows.map(row => renderRow(row, g, "itens")),
                   renderAddLinha("var", g.key),
                 ] : []),
               ] : null)}
+              {renderSubtotal(blocos.variaveis)}
 
-              {(diff.fixos.length > 0 || editando) && renderHeaderGrupo(
-                "Serviços Fixos", "#a855f7",
-                {
-                  totalBase: diff.fixos.reduce((s, f) => s + f.totalBase, 0),
-                  totalAtual: diff.fixos.reduce((s, f) => s + f.totalAtual, 0),
-                  delta: diff.fixos.reduce((s, f) => s + f.delta, 0),
-                },
-                { chave:"fixos", rows:diff.fixos.flatMap(f => f.rows), extra:<Briefcase size={13} color={T.textSm}/> }
-              )}
+              {/* ══ BLOCO 2 · CUSTOS FIXOS (por edição) ══ */}
+              {(diff.fixos.length > 0 || editando) && renderBloco(blocos.fixos, { chave:"fixos", icon:Briefcase })}
               {estaAberto("fixos") && diff.fixos.map(sec => {
                 const chaveSec = `sec:${sec.secao}`;
                 const secAberta = estaAberto(chaveSec);
@@ -356,8 +495,9 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
                 ];
               })}
               {editando && diff.fixos.length === 0 && renderAddLinha("fixo", null, "Serviços")}
+              {(diff.fixos.length > 0 || editando) && renderSubtotal(blocos.fixos)}
 
-              <tr style={{borderTop:`2px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
+              <tr style={{borderTop:`3px solid ${T.borderStrong||T.border}`,background:T.surfaceAlt||T.bg,fontWeight:700}}>
                 <td style={{padding:"14px 16px",color:T.text,fontSize:12,letterSpacing:"0.04em",textTransform:"uppercase"}}>Total Geral</td>
                 <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.textMd,whiteSpace:"nowrap",fontSize:14,fontWeight:600,fontFamily:FONT.num}}>{fmt(diff.totalBase)}</td>
                 <td className="num" style={{padding:"14px 16px",textAlign:"right",color:T.info||"#2563EB",whiteSpace:"nowrap",fontSize:14,fontWeight:700,fontFamily:FONT.num}}>{fmt(diff.totalAtual)}</td>

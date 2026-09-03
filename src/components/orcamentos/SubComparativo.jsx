@@ -152,11 +152,12 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
     );
   }
 
-  const renderRow = (row, g, campoBase) => (
+  // Fixo pareado com linha de JOGO da base (baseSubKey) edita a base em `itens`, não em `fixos`.
+  const renderRow = (row, g, campoBaseGrupo) => { const campoBase = row.campoBase || campoBaseGrupo; return (
     <tr key={row.key} style={{borderTop:`1px solid ${T.border}`,opacity:row.status === "removido" ? 0.65 : 1}}>
       <td style={{padding:"10px 16px 10px 40px",whiteSpace:"nowrap",color:T.text,fontSize:12.5,fontWeight:500}}>
         {row.label}
-        {row.labelBase && row.labelBase !== row.label && (
+        {row.labelBase && row.labelBase.trim().toLowerCase() !== String(row.label).trim().toLowerCase() && (
           <span style={{marginLeft:8,fontSize:10,color:T.textSm}}>(base: {row.labelBase})</span>
         )}
       </td>
@@ -184,7 +185,7 @@ export default function SubComparativo({ orc, setOrc, readOnly, T }) {
       </td>
       <td style={{padding:"10px 16px",textAlign:"right"}}><Selo status={row.status} T={T}/></td>
     </tr>
-  );
+  ); };
 
   const renderHeaderGrupo = (titulo, color, tot, { chave, rows, extra } = {}) => {
     const aberto = !chave || estaAberto(chave);

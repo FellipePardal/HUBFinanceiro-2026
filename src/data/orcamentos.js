@@ -286,12 +286,29 @@ const normNome = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 
 // Junta base × orçamento atual: grupos variáveis por subKey (linha da base sem
 // subKey entra como só-da-base) e fixos por seção + nome normalizado.
+// Vínculo explícito (a base NUNCA é renomeada para casar):
+//   • item fixo com `baseNome`   → casa com a linha da base de mesma seção com
+//     esse nome (ex: "Produtor externa 1" ↔ "Produtor Campo/Detentores");
+//   • item fixo com `baseSubKey` → casa com a linha de JOGO da base com esse
+//     subKey (serviço que era por jogo e virou fixo, ex: Downlink → downlink).
+//     A linha sai do grupo variável e aparece pareada em fixos.
 export const diffBaseline = (orc) => {
   const bl = orc?.baseline || null;
   const porSub = calcPorSubKey(orc);
+  const fixosAtuais = (orc?.servicosFixos || []).flatMap(s => s.itens || []);
+  const itensBasePuxados = new Map(); // fixoItemId → item da base (bl.itens) reivindicado
+  {
+    const tomados = new Set();
+    fixosAtuais.forEach(it => {
+      if (!it.baseSubKey) return;
+      const bi = (bl?.itens || []).find(i => i.subKey === it.baseSubKey && !tomados.has(i.id));
+      if (bi) { tomados.add(bi.id); itensBasePuxados.set(it.id, bi); }
+    });
+  }
+  const puxadosIds = new Set([...itensBasePuxados.values()].map(i => i.id));
 
   const grupos = GRUPOS_COMPARATIVO.map(g => {
-    const blItens = (bl?.itens || []).filter(i => i.grupo === g.key);
+    const blItens = (bl?.itens || []).filter(i => i.grupo === g.key && !puxadosIds.has(i.id));
     const usados = new Set();
     const rows = [];
     g.subs.forEach(sub => {
@@ -323,11 +340,19 @@ export const diffBaseline = (orc) => {
     const rows = [];
     itensAtual.forEach(it => {
       const atual = Number(it.orcado) || 0;
-      const bi = itensBase.find(f => normNome(f.nome) === normNome(it.nome) && !usados.has(f.id));
+      const puxado = itensBasePuxados.get(it.id) || null;
+      const alvo = normNome(it.baseNome || it.nome);
+      const bi = puxado ? null : itensBase.find(f => normNome(f.nome) === alvo && !usados.has(f.id));
       if (bi) usados.add(bi.id);
-      const base = bi ? (Number(bi.valor) || 0) : 0;
-      if (atual === 0 && !bi) return;
-      rows.push({ key: `fx_${it.id}`, label: it.nome, base, atual, baseItemId: bi?.id || null });
+      const refBase = puxado || bi;
+      const base = refBase ? (Number(refBase.valor) || 0) : 0;
+      if (atual === 0 && !refBase) return;
+      rows.push({
+        key: `fx_${it.id}`, label: it.nome, base, atual,
+        labelBase: refBase ? (puxado ? puxado.label : refBase.nome) : null,
+        baseItemId: refBase?.id || null,
+        campoBase: puxado ? "itens" : "fixos",
+      });
     });
     itensBase.filter(f => !usados.has(f.id)).forEach(f => {
       rows.push({ key: `blfx_${f.id}`, label: f.nome, base: Number(f.valor) || 0, atual: 0, baseItemId: f.id, soBase: true });

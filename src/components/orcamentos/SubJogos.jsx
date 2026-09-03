@@ -5,6 +5,15 @@ import { calcOrcadoJogo, blocosJogo, GRUPOS_PREMISSA, SUBS_NAO_EDITAVEIS, DSLR_Q
 import { fmt } from "../../utils";
 import { CalendarDays, Plus, Trash2, Copy, ChevronDown, ChevronUp, Eraser, Zap } from "lucide-react";
 
+// Modos de agrupamento da lista de jogos. Cada grupo mostra nº de jogos e total.
+export const MODOS_AGRUPAR = [
+  { key:"mandante",     label:"Time (mandante)" },
+  { key:"padrao_faixa", label:"Padrão × Faixa" },
+  { key:"fase",         label:"Fase" },
+  { key:"praca",        label:"Praça" },
+  { key:"nenhum",       label:"Sem agrupamento" },
+];
+
 // Jogos estimados do orçamento. O orçado de cada linha é DERIVADO ao vivo
 // (premissa do padrão + logística da faixa da praça); a linha expandida
 // permite override pontual de qualquer subKey (vence premissa e faixa).
@@ -12,7 +21,13 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   const IS = iSty(T);
   const ts = tableStyles(T);
   const [expandido, setExpandido] = useState(null);
-  const [agrupar, setAgrupar] = useState(true);   // agrupa por padrão × faixa de distância
+  // Modo de agrupamento da lista (persiste por orçamento no navegador)
+  const lsKeyAgrupar = `hub_orc_jogos_agrupar_${orc.id}`;
+  const [agrupar, setAgruparState] = useState(() => {
+    try { const v = localStorage.getItem(lsKeyAgrupar); return MODOS_AGRUPAR.some(m => m.key === v) ? v : "mandante"; }
+    catch { return "mandante"; }
+  });
+  const setAgrupar = (v) => { setAgruparState(v); try { localStorage.setItem(lsKeyAgrupar, v); } catch {} };
   const [loteQtd, setLoteQtd]     = useState("2");
   const [loteFase, setLoteFase]   = useState("");
   const [lotePraca, setLotePraca] = useState("");
@@ -28,37 +43,54 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
   // Linhas da tabela: sem agrupamento = ordem original; agrupado = seções
   // padrão × faixa de distância (ordem dos padrões e das faixas do orçamento)
   // com cabeçalho somando os jogos do grupo.
-  const linhasRender = useMemo(() => {
-    const comIdx = jogos.map((jogo, idx) => ({ tipo: "jogo", jogo, idx }));
-    if (!agrupar) return comIdx;
-    const faixaDoJogo = (j) => {
-      const praca = pracas.find(p => p.id === j.pracaId);
-      return faixasDoc.find(f => f.key === praca?.faixaKey) || null;
-    };
-    const rankPadrao = (p) => { const i = padroes.indexOf(p); return i === -1 ? 99 : i; };
-    const rankFaixa = (f) => { const i = faixasDoc.findIndex(x => x.key === f?.key); return i === -1 ? 99 : i; };
-    const grupos = new Map();
-    comIdx.forEach(item => {
-      const j = item.jogo;
-      const faixa = faixaDoJogo(j);
-      const key = `${j.padrao || "—"}|${faixa?.key || "—"}`;
-      if (!grupos.has(key)) grupos.set(key, {
-        key,
-        padrao: j.padrao || "—",
-        faixaLabel: faixa?.label || "sem faixa",
-        rank: rankPadrao(j.padrao) * 100 + rankFaixa(faixa),
-        itens: [], total: 0,
-      });
-      const g = grupos.get(key);
-      g.itens.push(item);
-      g.total += blocosJogo(orc, j).total;
-    });
-    return [...grupos.values()]
-      .sort((a, b) => a.rank - b.rank)
-      .flatMap(g => [{ tipo: "grupo", grupo: g }, ...g.itens]);
-  }, [jogos, agrupar, pracas, faixasDoc, padroes, orc]);
   const pontosCorridos = orc.meta.formato === "pontos_corridos";
   const fases = pontosCorridos ? [] : (orc.meta.fases || []);
+
+  // Linhas da tabela conforme o modo: sem agrupamento = ordem original; nos
+  // outros modos, seções com cabeçalho (rótulo · nº de jogos · total). Cada
+  // modo define a chave do grupo, o rótulo, a ordem dos grupos e a ordem
+  // interna (fase → rodada), para a lista ler como calendário do mandante.
+  const linhasRender = useMemo(() => {
+    const comIdx = jogos.map((jogo, idx) => ({ tipo: "jogo", jogo, idx }));
+    if (agrupar === "nenhum") return comIdx;
+    const pracaDe  = (j) => pracas.find(p => p.id === j.pracaId) || null;
+    const faixaDe  = (j) => faixasDoc.find(f => f.key === pracaDe(j)?.faixaKey) || null;
+    const rankIdx  = (arr, v) => { const i = arr.indexOf(v); return i === -1 ? 999 : i; };
+    const rankFase = (j) => pontosCorridos ? 0 : rankIdx(fases.map(f => f.key), j.fase);
+    const faseLabel = (j) => fases.find(f => f.key === j.fase)?.label || j.fase || "—";
+    const timesOrdem = [...times, ...[...new Set(jogos.map(j => j.mandante).filter(Boolean))].filter(t => !times.includes(t)).sort((a, b) => a.localeCompare(b, "pt-BR"))];
+
+    const MODOS = {
+      padrao_faixa: (j) => {
+        const faixa = faixaDe(j);
+        return { key:`${j.padrao || "—"}|${faixa?.key || "—"}`, destaque:j.padrao || "—", label:faixa?.label || "sem faixa",
+                 rank: rankIdx(padroes, j.padrao) * 100 + rankIdx(faixasDoc.map(f => f.key), faixa?.key) };
+      },
+      // Time: jogos da 1ª fase agrupam pelo mandante; mata-mata (sem time
+      // definido) agrupa pela fase, depois dos times.
+      mandante: (j) => {
+        const primeiraFase = pontosCorridos || rankFase(j) === 0;
+        if (primeiraFase && j.mandante) return { key:`t|${j.mandante}`, destaque:j.mandante, label:pracaDe(j)?.cidade || "", rank: rankIdx(timesOrdem, j.mandante) };
+        return { key:`f|${j.fase}`, destaque:faseLabel(j), label:"mata-mata", rank: 10000 + rankFase(j) };
+      },
+      fase:  (j) => ({ key:`f|${j.fase}`, destaque:faseLabel(j), label:"", rank: rankFase(j) }),
+      praca: (j) => { const p = pracaDe(j); const faixa = faixaDe(j);
+        return { key:`p|${p?.id || "—"}`, destaque:p?.cidade || "sem praça", label:faixa?.label || "", rank: rankIdx(pracas.map(x => x.id), p?.id) }; },
+    };
+    const modo = MODOS[agrupar] || MODOS.padrao_faixa;
+    const grupos = new Map();
+    comIdx.forEach(item => {
+      const info = modo(item.jogo);
+      if (!grupos.has(info.key)) grupos.set(info.key, { ...info, itens: [], total: 0 });
+      const g = grupos.get(info.key);
+      g.itens.push(item);
+      g.total += blocosJogo(orc, item.jogo).total;
+    });
+    const ordemInterna = (a, b) => (rankFase(a.jogo) - rankFase(b.jogo)) || ((Number(a.jogo.rodada) || 0) - (Number(b.jogo.rodada) || 0)) || (a.idx - b.idx);
+    return [...grupos.values()]
+      .sort((a, b) => a.rank - b.rank || a.destaque.localeCompare(b.destaque, "pt-BR"))
+      .flatMap(g => [{ tipo: "grupo", grupo: g }, ...g.itens.sort(ordemInterna)]);
+  }, [jogos, agrupar, pracas, faixasDoc, padroes, times, fases, pontosCorridos, orc]);
 
   const proximoId = () => jogos.reduce((m, j) => Math.max(m, Number(j.id) || 0), 0) + 1;
 
@@ -155,18 +187,17 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
         {jogos.length > 0 && (
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 20px 0"}}>
             <span style={{fontSize:10,color:T.textSm,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Agrupar</span>
-            <button onClick={()=>setAgrupar(true)} style={{
-              padding:"4px 12px",borderRadius:14,fontSize:11,fontWeight:600,cursor:"pointer",
-              border:`1px solid ${agrupar ? (T.brand||"#65B32E") : T.border}`,
-              background: agrupar ? (T.brand||"#65B32E") : "transparent",
-              color: agrupar ? "#fff" : T.textMd,
-            }}>Padrão × Faixa</button>
-            <button onClick={()=>setAgrupar(false)} style={{
-              padding:"4px 12px",borderRadius:14,fontSize:11,fontWeight:600,cursor:"pointer",
-              border:`1px solid ${!agrupar ? (T.brand||"#65B32E") : T.border}`,
-              background: !agrupar ? (T.brand||"#65B32E") : "transparent",
-              color: !agrupar ? "#fff" : T.textMd,
-            }}>Sem agrupamento</button>
+            {MODOS_AGRUPAR.map(m => {
+              const ativo = agrupar === m.key;
+              return (
+                <button key={m.key} onClick={()=>setAgrupar(m.key)} style={{
+                  padding:"4px 12px",borderRadius:14,fontSize:11,fontWeight:600,cursor:"pointer",
+                  border:`1px solid ${ativo ? (T.brand||"#65B32E") : T.border}`,
+                  background: ativo ? (T.brand||"#65B32E") : "transparent",
+                  color: ativo ? "#fff" : T.textMd,
+                }}>{m.label}</button>
+              );
+            })}
           </div>
         )}
 
@@ -201,9 +232,8 @@ export default function SubJogos({ orc, setOrc, readOnly, T }) {
                         borderTop:`2px solid ${T.borderStrong||T.border}`,
                         fontSize:11, fontWeight:700, color:T.text, fontFamily:FONT.ui,
                       }}>
-                        <span style={{color:T.brand||"#65B32E"}}>{g.padrao}</span>
-                        <span style={{color:T.textSm, fontWeight:500}}> · </span>
-                        {g.faixaLabel}
+                        <span style={{color:T.brand||"#65B32E"}}>{g.destaque}</span>
+                        {g.label && <><span style={{color:T.textSm, fontWeight:500}}> · </span>{g.label}</>}
                         <span style={{color:T.textSm, fontWeight:500}}> — {g.itens.length} jogo{g.itens.length===1?"":"s"} · </span>
                         <span className="num" style={{fontFamily:FONT.num}}>{fmt(g.total)}</span>
                       </td>

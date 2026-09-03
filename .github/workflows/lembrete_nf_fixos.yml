@@ -1,0 +1,48 @@
+name: Lembrete NF fixos (Slack)
+
+# Cobrança das NFs dos freelas fixos/mensais no PRIMEIRO DIA ÚTIL de cada mês.
+# O cron acorda todo dia 1 a 5 às 09:00 de Brasília (12:00 UTC); o script
+# decide se hoje é o 1º dia útil (fim de semana + feriados nacionais) e só
+# então posta no Slack a lista de competências sem NF — a mesma lista da tela
+# "Cobranças de fixos" (aba Mensal do Hub).
+#
+# Secrets necessários (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL        (opcional; default é o projeto do Hub)
+#   SUPABASE_KEY        service_role — o RLS esconde notas_mensais do anon
+#   SLACK_WEBHOOK_URL   Incoming Webhook do app "Hub Financeiro" no Slack
+
+on:
+  schedule:
+    - cron: '0 12 1-5 * *'
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: 'Postar mesmo que hoje não seja o 1º dia útil (teste)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Só montar a mensagem no log, sem enviar ao Slack'
+        type: boolean
+        default: false
+
+jobs:
+  lembrete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Calcular pendências e avisar no Slack
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          HUB_URL: https://hub-financeiro-2026.vercel.app
+        run: |
+          ARGS=""
+          if [ "${{ inputs.forcar }}" = "true" ]; then ARGS="$ARGS --forcar"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          node scripts/lembrete_nf_fixos.mjs $ARGS
